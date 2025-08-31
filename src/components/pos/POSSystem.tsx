@@ -10,6 +10,7 @@ import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Packag
 import { AddProductModal } from './AddProductModal';
 import { CheckoutModal } from './CheckoutModal';
 import { DiscountModal } from './DiscountModal';
+import { ProductEditor } from './ProductEditor';
 
 interface POSSystemProps {
   storeId: string;
@@ -27,6 +28,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showProductEditor, setShowProductEditor] = useState(false);
   const [isReturnMode, setIsReturnMode] = useState(false);
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
@@ -224,10 +226,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
     )
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 
-  // Top 10 nejprodávanějších produktů na základě soldCount
+  // Top 12 nejprodávanějších produktů na základě soldCount
   const topSellingProducts = products
     .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0))
-    .slice(0, 10);
+    .slice(0, 12);
 
   const popularProducts = products.filter(product => product.isPopular);
 
@@ -397,6 +399,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
             >
               <Plus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-blue-500 flex-shrink-0" />
               <span className="truncate">Nový produkt</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowProductEditor(true);
+                setShowMenu(false);
+              }}
+              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
+            >
+              <Package className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-purple-500 flex-shrink-0" />
+              <span className="truncate">Editor</span>
             </button>
             <button
               onClick={() => {
@@ -731,7 +743,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
             </div>
           )}
 
-          {/* Top 10 Nejprodávanějších */}
+          {/* Top 12 Nejprodávanějších */}
           {topSellingProducts.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -781,6 +793,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
               setCart([]);
               setShowCheckout(false);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showProductEditor && (
+          <ProductEditor
+            storeId={storeId}
+            onClose={() => setShowProductEditor(false)}
           />
         )}
       </AnimatePresence>
