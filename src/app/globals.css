@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #ffffff;
@@ -19,8 +21,81 @@
   }
 }
 
+/* Mobile optimization */
+html {
+  height: 100%;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#__next {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Povolení scrollování na mobilních zařízeních */
+@media (max-width: 768px) {
+  #__next {
+    overflow-y: auto; /* Vertikální scrollování */
+    overflow-x: hidden; /* Horizontální scrollování zakázáno */
+    -webkit-overflow-scrolling: touch; /* Smooth scrollování na iOS */
+  }
+  
+  /* Povolení scrollování pro prodejní systém */
+  .pos-system {
+    overflow-y: visible; /* Povolení scrollování */
+    height: auto;
+    min-height: 100vh;
+  }
+  
+  /* Povolení scrollování pro obsah prodejny */
+  .store-content {
+    overflow-y: visible;
+    height: auto;
+    min-height: 100vh;
+  }
+}
+
+/* Prevent input zoom on focus */
+input, textarea, select {
+  font-size: 16px;
+}
+
+/* Support for safe areas */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+    padding-top: max(0px, env(safe-area-inset-top));
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Custom scrollbar styles */
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
 }

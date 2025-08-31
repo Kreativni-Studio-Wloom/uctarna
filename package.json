@@ -1,27 +1,72 @@
 {
   "name": "uctarna",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Moderní online prodejní systém ve stylu ProfiÚčtenka s Firebase, offline podporou a PWA funkcionalitou",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "next dev",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "deploy:vercel": "chmod +x scripts/deploy-vercel.sh && ./scripts/deploy-vercel.sh",
+    "deploy:wedos": "chmod +x scripts/deploy-wedos.sh && ./scripts/deploy-wedos.sh",
+    "build:vercel": "next build",
+    "build:wedos": "next build",
+    "firebase:deploy": "chmod +x deploy-functions.sh && ./deploy-functions.sh",
+    "firebase:serve": "cd functions && npm run serve"
   },
   "dependencies": {
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.2"
+    "@firebase/auth": "^1.6.0",
+    "@firebase/firestore": "^4.4.0",
+    "@headlessui/react": "^1.7.17",
+    "@hookform/resolvers": "^3.3.2",
+    "date-fns": "^2.30.0",
+    "firebase": "^10.7.0",
+    "framer-motion": "^10.16.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "lucide-react": "^0.294.0",
+    "next": "15.0.0",
+    "nodemailer": "^6.9.7",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-hook-form": "^7.48.2",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3.0.0",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
-    "eslint": "^9",
-    "eslint-config-next": "15.5.2",
-    "@eslint/eslintrc": "^3"
-  }
+    "@types/nodemailer": "^7.0.1",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8",
+    "eslint-config-next": "15.0.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "uctarna",
+    "prodejni-system",
+    "pos",
+    "firebase",
+    "nextjs",
+    "typescript",
+    "tailwind",
+    "pwa"
+  ],
+  "author": "Účtárna Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/uctarna.git"
+  },
+  "bugs": {
+    "url": "https://github.com/username/uctarna/issues"
+  },
+  "homepage": "https://uctarna.cz"
 }

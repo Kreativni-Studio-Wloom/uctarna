@@ -1,0 +1,94 @@
+export interface User {
+  uid: string;
+  email: string;
+  displayName?: string | null; // Změněno pro kompatibilitu s Firestore
+  createdAt: Date;
+  settings: UserSettings;
+}
+
+export interface UserSettings {
+  eurRate: number; // Kurz EUR
+  theme: 'light' | 'dark' | 'auto';
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isActive: boolean;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  price: number; // v Kč
+  category?: string;
+  isPopular: boolean;
+  soldCount: number; // Počet historicky prodaných kusů
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CartItem {
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+}
+
+export interface PendingPurchase {
+  id: string;
+  items: CartItem[];
+  totalAmount: number; // v Kč (může být záporné pro vratky)
+  discount?: { type: 'percentage' | 'amount'; value: number } | null;
+  finalAmount: number; // v Kč po slevě
+  createdAt: Date;
+  storeId: string;
+  userId: string;
+  note?: string; // Volitelná poznámka k odloženému nákupu
+}
+
+export interface Sale {
+  id: string;
+  items: CartItem[];
+  totalAmount: number; // v Kč (může být záporné pro vratky)
+  paymentMethod: 'cash' | 'card'; // SumUp funguje automaticky při platbě kartou
+  createdAt: Date;
+  storeId: string;
+  userId: string;
+  isRefund?: boolean; // Identifikace vratky
+  refundAmount?: number; // Částka vratky (absolutní hodnota)
+  sumUpData?: SumUpTransactionData; // SumUp specifická data (pouze při platbě kartou)
+}
+
+export interface SumUpTransactionData {
+  foreignTxId: string; // Vlastní transaction ID
+  sumUpTxCode?: string; // SumUp transaction kód (po callback)
+  status: 'pending' | 'success' | 'failed';
+  callbackReceived?: boolean;
+  callbackTimestamp?: Date;
+}
+
+export interface Receipt extends Sale {
+  receiptNumber: string;
+  type: 'sale' | 'refund';
+}
+
+export interface DailyReport {
+  date: string;
+  totalSales: number;
+  cashSales: number;
+  cardSales: number; // Zahrnuje i SumUp platby (automaticky při kartě)
+  customerCount: number;
+  sales: Sale[];
+}
+
+export interface MonthlyReport {
+  month: string;
+  totalSales: number;
+  cashSales: number;
+  cardSales: number; // Zahrnuje i SumUp platby (automaticky při kartě)
+  customerCount: number;
+  dailyReports: DailyReport[];
+}

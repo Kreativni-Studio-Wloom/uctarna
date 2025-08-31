@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Uživatelé mohou nahrávat a stahovat pouze své vlastní soubory
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Reporty - uživatelé mohou stahovat pouze své vlastní
+    match /reports/{userId}/{storeId}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Pouze Firebase Functions mohou zapisovat
+    }
+    
+    // Veřejné soubory (pokud budou potřeba)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
