@@ -52,14 +52,22 @@ export interface PendingPurchase {
 export interface Sale {
   id: string;
   items: CartItem[];
-  totalAmount: number; // v Kč (může být záporné pro vratky)
+  totalAmount: number; // v Kč nebo EUR (může být záporné pro vratky)
   paymentMethod: 'cash' | 'card'; // SumUp funguje automaticky při platbě kartou
+  currency: 'CZK' | 'EUR'; // Měna platby
+  eurRate?: number; // Kurz EUR při platbě v eurech
+  originalAmountCZK?: number; // Původní částka v korunách pro reference
   createdAt: Date;
   storeId: string;
   userId: string;
   isRefund?: boolean; // Identifikace vratky
   refundAmount?: number; // Částka vratky (absolutní hodnota)
   sumUpData?: SumUpTransactionData; // SumUp specifická data (pouze při platbě kartou)
+  // Informace o vrácení při platbě v eurech
+  paidAmount?: number; // Zaplacená částka (pouze při hotovostní platbě)
+  paidCurrency?: 'CZK' | 'EUR'; // Měna zaplacené částky
+  changeAmount?: number; // Částka k vrácení v korunách
+  changeAmountEUR?: number; // Částka k vrácení v eurech (pouze při platbě v eurech)
 }
 
 export interface SumUpTransactionData {

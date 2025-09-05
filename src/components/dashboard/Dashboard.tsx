@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Store as StoreIcon, LogOut, Settings, User } from 'lucide-react';
+import { Plus, Store as StoreIcon, LogOut, Settings, User, Trash2 } from 'lucide-react';
 import { StoreCard } from './StoreCard';
 import { AddStoreModal } from './AddStoreModal';
 import { UserMenu } from './UserMenu';
@@ -17,6 +17,9 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddStore, setShowAddStore] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedStores, setSelectedStores] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -29,7 +32,13 @@ export const Dashboard: React.FC = () => {
     const unsubscribe = onSnapshot(storesQuery, (snapshot) => {
       const storesData: Store[] = [];
       snapshot.forEach((doc) => {
-        storesData.push({ id: doc.id, ...doc.data() } as Store);
+        const data = doc.data();
+        storesData.push({ 
+          id: doc.id, 
+          ...data,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Store);
       });
       setStores(storesData);
       setLoading(false);
@@ -58,6 +67,45 @@ export const Dashboard: React.FC = () => {
       setShowAddStore(false);
     } catch (error) {
       console.error('Error adding store:', error);
+    }
+  };
+
+  const handleDeleteSelectedStores = async () => {
+    if (!user || selectedStores.length === 0) return;
+
+    setDeleting(true);
+    try {
+      // Označit vybrané prodejny jako neaktivní místo fyzického smazání
+      const deletePromises = selectedStores.map(storeId => 
+        updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
+          isActive: false,
+          updatedAt: serverTimestamp()
+        })
+      );
+
+      await Promise.all(deletePromises);
+      setShowDeleteModal(false);
+      setSelectedStores([]);
+    } catch (error) {
+      console.error('Error deleting stores:', error);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleStoreSelect = (storeId: string) => {
+    setSelectedStores(prev => 
+      prev.includes(storeId) 
+        ? prev.filter(id => id !== storeId)
+        : [...prev, storeId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedStores.length === stores.length) {
+      setSelectedStores([]);
+    } else {
+      setSelectedStores(stores.map(store => store.id));
     }
   };
 
@@ -109,15 +157,29 @@ export const Dashboard: React.FC = () => {
                 Spravujte své prodejny a prodeje
               </p>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowAddStore(true)}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center"
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              Nová prodejna
-            </motion.button>
+            <div className="flex space-x-3">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowAddStore(true)}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Nová prodejna
+              </motion.button>
+              
+              {stores.length > 0 && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center"
+                >
+                  <Trash2 className="h-5 w-5 mr-2" />
+                  Odstranit prodejny
+                </motion.button>
+              )}
+            </div>
           </div>
 
           {stores.length === 0 ? (
@@ -169,6 +231,113 @@ export const Dashboard: React.FC = () => {
             onClose={() => setShowAddStore(false)}
             onAdd={handleAddStore}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Delete Stores Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mr-4">
+                  <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Vyberte prodejny k odstranění
+                </h3>
+              </div>
+              
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-gray-600 dark:text-gray-400">
+                  Označte prodejny, které chcete odstranit
+                </p>
+                <button
+                  onClick={handleSelectAll}
+                  className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                >
+                  {selectedStores.length === stores.length ? 'Odznačit vše' : 'Označit vše'}
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto mb-6">
+                <div className="space-y-3">
+                  {stores.map((store) => (
+                    <div
+                      key={store.id}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedStores.includes(store.id)
+                          ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                      }`}
+                      onClick={() => handleStoreSelect(store.id)}
+                    >
+                      <div className="flex items-center">
+                        <div className={`w-5 h-5 rounded border-2 mr-3 flex items-center justify-center ${
+                          selectedStores.includes(store.id)
+                            ? 'border-red-500 bg-red-500'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {selectedStores.includes(store.id) && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900 dark:text-white">
+                            {store.name}
+                          </h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Vytvořeno {new Intl.DateTimeFormat('cs-CZ', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            }).format(store.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setSelectedStores([]);
+                  }}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={handleDeleteSelectedStores}
+                  disabled={deleting || selectedStores.length === 0}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Odstraňuji...
+                    </>
+                  ) : (
+                    `Odstranit (${selectedStores.length})`
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

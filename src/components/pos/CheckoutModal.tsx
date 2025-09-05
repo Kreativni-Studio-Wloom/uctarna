@@ -25,19 +25,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onSuccess
 }) => {
   const { user } = useAuth();
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
   const [loading, setLoading] = useState(false);
   const [showEurConversion, setShowEurConversion] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paidCurrency, setPaidCurrency] = useState<'CZK' | 'EUR'>('CZK');
   const [sumUpAvailable, setSumUpAvailable] = useState(false);
+  const [payInEUR, setPayInEUR] = useState(false);
 
   const eurRate = user?.settings?.eurRate || 25.0;
   const eurAmount = totalAmount / eurRate;
 
-  // Výpočet částky k vrácení (vždy v korunách)
-  const paidAmountInCZK = paidCurrency === 'EUR' ? paidAmount * eurRate : paidAmount;
-  const changeAmount = paidAmountInCZK - totalAmount;
+  // Výpočet částky k vrácení
+  let changeAmount: number;
+  let paidAmountInCZK: number;
+  
+  if (payInEUR) {
+    // Při platbě v eurech: zaplacená částka v eurech - hodnota nákupu v eurech, pak přepočítat na koruny
+    const paidAmountInEUR = paidCurrency === 'EUR' ? paidAmount : paidAmount / eurRate;
+    const changeAmountInEUR = paidAmountInEUR - eurAmount; // Zaplacená částka minus hodnota nákupu
+    changeAmount = changeAmountInEUR * eurRate; // Přepočítat na koruny (může být záporné)
+    paidAmountInCZK = paidAmountInEUR * eurRate; // Pro zobrazení - přepočítat zaplacenou částku na koruny
+  } else {
+    // Při platbě v korunách: standardní výpočet
+    paidAmountInCZK = paidCurrency === 'EUR' ? paidAmount * eurRate : paidAmount;
+    changeAmount = paidAmountInCZK - totalAmount;
+  }
+
+  // Aktuální částka pro zobrazení (v eurech pokud je vybrána platba v eurech)
+  const displayAmount = payInEUR ? eurAmount : totalAmount;
+  const displayCurrency = payInEUR ? 'EUR' : 'CZK';
 
   // Kontrola, zda je to vratka (záporná částka)
   const isRefund = totalAmount < 0;
@@ -52,6 +69,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       SumUpService.detectSumUpApp().then(setSumUpAvailable);
     }
   }, []);
+
+  // Automaticky nastavit měnu podle platby v eurech
+  useEffect(() => {
+    if (payInEUR) {
+      setPaidCurrency('EUR');
+    } else {
+      setPaidCurrency('CZK');
+    }
+  }, [payInEUR]);
+
+  // Resetovat platbu v eurech při změně způsobu platby na kartu
+  useEffect(() => {
+    if (paymentMethod === 'card') {
+      setPayInEUR(false);
+    }
+  }, [paymentMethod]);
 
   const handlePayment = async () => {
     if (!user) return;
@@ -91,13 +124,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Hotovost nebo neúspěšná SumUp platba - vytvoř prodej/vratku v Firestore
       const sale = {
         items: cart,
-        totalAmount,
+        totalAmount: payInEUR ? eurAmount : totalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
         paymentMethod,
+        currency: payInEUR ? 'EUR' : 'CZK', // Přidat měnu
+        eurRate: payInEUR ? eurRate : null, // Přidat kurz pokud je platba v eurech
+        originalAmountCZK: totalAmount, // Původní částka v korunách pro reference
         createdAt: serverTimestamp(),
         storeId,
         userId: user.uid,
         isRefund, // Přidáno pole pro identifikaci vratky
         refundAmount: isRefund ? refundAmount : null, // Přidáno pole pro částku vratky
+        // Informace o vrácení při platbě v eurech
+        paidAmount: paymentMethod === 'cash' ? paidAmount : null,
+        paidCurrency: paymentMethod === 'cash' ? (payInEUR ? 'EUR' : paidCurrency) : null,
+        changeAmount: paymentMethod === 'cash' ? changeAmount : null,
+        changeAmountEUR: paymentMethod === 'cash' && payInEUR ? (changeAmount / eurRate) : null,
       };
 
       await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
@@ -176,36 +217,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
                 <div className="flex justify-between items-center text-lg font-bold text-gray-900 dark:text-white">
                   <span>Celkem:</span>
-                  <span>{totalAmount} Kč</span>
+                  <span>
+                    {displayCurrency === 'EUR' ? 
+                      `${displayAmount.toFixed(2)} €` : 
+                      `${displayAmount.toFixed(2)} Kč`
+                    }
+                    {payInEUR && (
+                      <span className="text-sm text-gray-500 ml-2">
+                        ({totalAmount} Kč)
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* EUR Conversion - pouze při platbě hotovostí */}
-            {paymentMethod === 'cash' && (
-              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Převod na EUR
-                  </span>
-                  <button
-                    onClick={() => setShowEurConversion(!showEurConversion)}
-                    className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                  >
-                    <Calculator className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Euro className="h-4 w-4 text-gray-500" />
-                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {eurAmount.toFixed(2)} EUR
-                  </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    (kurz: {eurRate} Kč/EUR)
-                  </span>
-                </div>
-              </div>
-            )}
 
             {/* Zaplaceno - pouze při platbě hotovostí */}
             {paymentMethod === 'cash' && (
@@ -231,21 +257,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     />
                   </div>
                   
-                  {/* Výběr měny */}
+                  {/* Výběr měny - vždy deaktivovaný */}
                   <div className="relative">
                     <select
-                      value={paidCurrency}
-                      onChange={(e) => setPaidCurrency(e.target.value as 'CZK' | 'EUR')}
-                      className="px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-medium cursor-pointer appearance-none pr-10"
+                      value={payInEUR ? 'EUR' : paidCurrency}
+                      disabled={true}
+                      className="px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 font-medium cursor-not-allowed appearance-none pr-4 opacity-50"
                     >
                       <option value="CZK">🇨🇿 Kč</option>
                       <option value="EUR">🇪🇺 €</option>
                     </select>
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                      <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
                   </div>
                 </div>
 
@@ -255,8 +276,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div className="flex justify-between items-center text-sm mb-3">
                       <span className="text-blue-700 dark:text-blue-300 font-medium">Zaplaceno:</span>
                       <span className="font-semibold text-gray-900 dark:text-white">
-                        {paidAmount} {paidCurrency === 'CZK' ? 'Kč' : '€'}
-                        {paidCurrency === 'EUR' && (
+                        {payInEUR ? 
+                          `${paidAmount.toFixed(2)} €` : 
+                          `${paidAmount} ${paidCurrency === 'CZK' ? 'Kč' : '€'}`
+                        }
+                        {payInEUR && (
+                          <span className="text-xs text-gray-500 ml-2 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg">
+                            ({(paidAmount * eurRate).toFixed(2)} Kč)
+                          </span>
+                        )}
+                        {!payInEUR && paidCurrency === 'EUR' && (
                           <span className="text-xs text-gray-500 ml-2 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-lg">
                             ({paidAmountInCZK.toFixed(2)} Kč)
                           </span>
@@ -267,7 +296,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div className="flex justify-between items-center text-lg font-bold">
                       <span className="text-green-600 dark:text-green-400">Vrátit:</span>
                       <span className="text-green-600 dark:text-green-400">
-                        {changeAmount > 0 ? `${changeAmount.toFixed(2)} Kč` : '0 Kč'}
+                        {changeAmount > 0 ? (
+                          `${changeAmount.toFixed(2)} Kč`
+                        ) : changeAmount < 0 ? (
+                          `0 Kč`
+                        ) : (
+                          '0 Kč'
+                        )}
                       </span>
                     </div>
                     
@@ -317,7 +352,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <CreditCard className="h-5 w-5 mr-2 text-purple-600" />
-                  <span className="font-medium">Karta</span>
+                  <span className="font-medium text-white">Karta</span>
                   {!canUseCard && (
                     <span className="text-xs text-gray-500 ml-1">(nedostupná)</span>
                   )}
@@ -332,9 +367,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <DollarSign className="h-5 w-5 mr-2 text-green-600" />
-                  <span className="font-medium">Hotovost</span>
+                  <span className="font-medium text-white">Hotovost</span>
                 </button>
               </div>
+              
+              {/* Tlačítko platba v eurech - pouze při platbě hotovostí */}
+              {paymentMethod === 'cash' && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => setPayInEUR(!payInEUR)}
+                    className={`w-full p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                      payInEUR
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                    }`}
+                  >
+                    <Euro className="h-5 w-5 mr-2 text-blue-600" />
+                    <span className="font-medium text-white">
+                      {payInEUR ? 'Platba v eurech (zapnuto)' : 'Platba v eurech'}
+                    </span>
+                  </button>
+                  {payInEUR && (
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
+                      <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
+                        <Euro className="h-4 w-4 mr-2" />
+                        <span>
+                          Celková částka: {displayAmount.toFixed(2)} € (kurz: {eurRate} Kč/EUR)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* SumUp info - pouze při platbě kartou */}
               {paymentMethod === 'card' && sumUpAvailable && (
@@ -385,7 +449,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Zpracování...
                   </div>
                 ) : (
-                  isRefund ? `Vrátit zákazníkovi ${refundAmount} Kč` : `Zaplatit ${totalAmount} Kč`
+                  isRefund ? 
+                    `Vrátit zákazníkovi ${refundAmount} Kč` : 
+                    displayCurrency === 'EUR' ? 
+                      `Zaplatit ${displayAmount.toFixed(2)} €` : 
+                      `Zaplatit ${displayAmount.toFixed(2)} Kč`
                 )}
               </motion.button>
             </div>

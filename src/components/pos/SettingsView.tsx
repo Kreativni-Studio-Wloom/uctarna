@@ -11,6 +11,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user, updateUserSettings } = useAuth();
+  const extendedUser = user as any; // Cast na ExtendedUser
   const [eurRate, setEurRate] = useState(user?.settings?.eurRate || 25.0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -103,7 +104,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 min="0"
                 value={eurRate}
                 onChange={(e) => setEurRate(parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="25.00"
               />
             </div>
@@ -176,7 +177,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 Vytvořeno:
               </div>
               <div className="text-sm text-gray-900 dark:text-white">
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('cs-CZ') : 'N/A'}
+                {(() => {
+                  const currentStore = extendedUser?.stores?.find((store: any) => store.id === storeId);
+                  if (!currentStore?.createdAt) return 'N/A';
+                  
+                  const createdAt = currentStore.createdAt;
+                  if (createdAt instanceof Date) {
+                    return createdAt.toLocaleDateString('cs-CZ');
+                  } else if ((createdAt as any)?.toDate) {
+                    return (createdAt as any).toDate().toLocaleDateString('cs-CZ');
+                  }
+                  return 'N/A';
+                })()}
               </div>
             </div>
           </div>

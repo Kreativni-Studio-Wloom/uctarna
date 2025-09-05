@@ -3,7 +3,7 @@
 import React from 'react';
 import { Store } from '@/types';
 import { motion } from 'framer-motion';
-import { Store as StoreIcon, Calendar, ArrowRight } from 'lucide-react';
+import { Store as StoreIcon, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface StoreCardProps {
@@ -47,18 +47,6 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store }) => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-            <Calendar className="h-4 w-4 mr-2" />
-            Aktualizováno {formatDate(store.updatedAt)}
-          </div>
-          <motion.div
-            whileHover={{ x: 2 }}
-            className="text-purple-600 dark:text-purple-400"
-          >
-            <ArrowRight className="h-5 w-5" />
-          </motion.div>
-        </div>
       </div>
 
       <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 px-6 py-3">

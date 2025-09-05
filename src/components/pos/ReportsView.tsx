@@ -8,7 +8,7 @@ import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterva
 import { cs } from 'date-fns/locale';
 import { Sale } from '@/types';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3 } from 'lucide-react';
+import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro } from 'lucide-react';
 import { generateEmailContent } from '@/lib/email';
 
 // Rozšířený User interface s prodejnami
@@ -41,6 +41,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'month' | 'total'>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showActionNameModal, setShowActionNameModal] = useState(false);
+  const [actionName, setActionName] = useState('');
 
   // Cast user na ExtendedUser
   const extendedUser = user as ExtendedUser | null;
@@ -86,17 +88,60 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
   const getReportData = () => {
     const filteredSales = getFilteredSales();
-    const totalSales = filteredSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
+    const eurRate = extendedUser?.settings?.eurRate || 25.0;
+    
+    // Výpočet tržeb podle měn
+    let totalSalesCZK = 0; // Celková tržba přepočtená na koruny
+    let salesInCZK = 0; // Tržby v korunách (odečtené vrácené koruny)
+    let salesInEUR = 0; // Skutečně vybrané eura (včetně vrácených)
+    
+    filteredSales.forEach(sale => {
+      if (sale.currency === 'EUR' && sale.eurRate) {
+        // Prodej v eurech
+        const amountInCZK = sale.totalAmount * sale.eurRate;
+        totalSalesCZK += amountInCZK;
+        
+        // Přidej skutečně vybrané eura (zaplacená částka v eurech)
+        if (sale.paidAmount && sale.paidCurrency === 'EUR') {
+          salesInEUR += sale.paidAmount;
+        } else {
+          // Fallback - pokud nejsou uloženy informace o platbě
+          salesInEUR += sale.totalAmount;
+        }
+        
+        // Odečti vrácené koruny (pokud byly vráceny)
+        if (sale.changeAmount && sale.changeAmount > 0) {
+          salesInCZK -= sale.changeAmount; // Odečti vrácené koruny
+        }
+      } else {
+        // Prodej v korunách
+        totalSalesCZK += sale.totalAmount;
+        salesInCZK += sale.totalAmount;
+      }
+    });
+    
     const cashSales = filteredSales
       .filter(sale => sale.paymentMethod === 'cash')
-      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+      .reduce((sum, sale) => {
+        if (sale.currency === 'EUR' && sale.eurRate) {
+          return sum + (sale.totalAmount * sale.eurRate);
+        }
+        return sum + sale.totalAmount;
+      }, 0);
     const cardSales = filteredSales
       .filter(sale => sale.paymentMethod === 'card')
-      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+      .reduce((sum, sale) => {
+        if (sale.currency === 'EUR' && sale.eurRate) {
+          return sum + (sale.totalAmount * sale.eurRate);
+        }
+        return sum + sale.totalAmount;
+      }, 0);
     const customerCount = filteredSales.length;
 
     return {
-      totalSales,
+      totalSales: totalSalesCZK, // Celková tržba v korunách
+      salesInCZK, // Tržby v korunách (odečtené vrácené koruny)
+      salesInEUR, // Skutečně vybrané eura
       cashSales,
       cardSales,
       customerCount,
@@ -104,7 +149,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     };
   };
 
-  const generatePDFReport = async () => {
+  const generatePDFReport = async (customActionName?: string) => {
     if (!user || !firebaseUser) {
       alert('Pro generování uzávěrky musíte být přihlášeni');
       return;
@@ -124,28 +169,38 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       }
       
       // Vytvoř report data
-      const reportData = {
+      const reportData = getReportData();
+      const reportDataForPDF = {
         storeName: extendedUser?.stores?.find(s => s.id === storeId)?.name || 'Neznámá prodejna',
         period: selectedPeriod === 'day' ? 'Denní' : selectedPeriod === 'month' ? 'Měsíční' : 'Celková',
-        startDate: selectedPeriod === 'total' ? 'Od založení' : format(selectedPeriod === 'day' ? startOfDay(selectedDate) : startOfMonth(selectedDate), 'dd.MM.yyyy', { locale: cs }),
-        endDate: selectedPeriod === 'total' ? 'Dosud' : format(selectedPeriod === 'day' ? endOfDay(selectedDate) : endOfMonth(selectedDate), 'dd.MM.yyyy', { locale: cs }),
-        totalSales: filteredSales.reduce((sum: number, sale: Sale) => sum + sale.totalAmount, 0),
-        cashSales: filteredSales.filter((sale: Sale) => sale.paymentMethod === 'cash').reduce((sum: number, sale: Sale) => sum + sale.totalAmount, 0),
-        cardSales: filteredSales.filter((sale: Sale) => sale.paymentMethod === 'card').reduce((sum: number, sale: Sale) => sum + sale.totalAmount, 0),
-        customerCount: filteredSales.length,
-        sales: filteredSales
+        startDate: selectedPeriod === 'day' 
+          ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+          : selectedPeriod === 'month' 
+            ? format(selectedDate, 'MMMM yyyy', { locale: cs })
+            : extendedUser?.stores?.find(s => s.id === storeId)?.createdAt 
+              ? format(extendedUser.stores.find(s => s.id === storeId)!.createdAt, 'd.M.yyyy', { locale: cs })
+              : 'Od založení',
+        endDate: selectedPeriod === 'day' 
+          ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+          : selectedPeriod === 'month' 
+            ? format(selectedDate, 'MMMM yyyy', { locale: cs })
+            : format(new Date(), 'd.M.yyyy', { locale: cs }),
+        totalSales: reportData.totalSales,
+        salesInCZK: reportData.salesInCZK,
+        salesInEUR: reportData.salesInEUR,
+        cashSales: reportData.cashSales,
+        cardSales: reportData.cardSales,
+        customerCount: reportData.customerCount,
+        sales: reportData.sales
       };
 
-      console.log('✅ Report data prepared:', reportData);
+      console.log('✅ Report data prepared:', reportDataForPDF);
 
       // Generování HTML uzávěrky
-      const htmlContent = generateReportHTML(reportData);
+      const htmlContent = generateReportHTML(reportDataForPDF);
       
       // Odešli email uzávěrky přes SMTP
-      await sendReportEmail(reportData, user.email || '');
-      
-      // Vytvoření nového okna a tisk
-      generatePrintWindow(htmlContent, reportData);
+      await sendReportEmail(reportDataForPDF, user.email || '', customActionName);
 
       alert('Uzávěrka byla úspěšně vygenerována a odeslána na váš email!');
       
@@ -170,17 +225,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     startDate: string;
     endDate: string;
     totalSales: number;
+    salesInCZK: number;
+    salesInEUR: number;
     cashSales: number;
     cardSales: number;
     customerCount: number;
     sales: Sale[];
-  }, userEmail: string) => {
+  }, userEmail: string, customActionName?: string) => {
     try {
       console.log('📧 Sending email to:', userEmail);
       
       // Vytvoření email obsahu pomocí nové funkce
-      const emailContent = generateEmailContent(reportData);
-      const emailSubject = `${reportData.period} uzávěrka - ${reportData.storeName}`;
+      const emailContent = generateEmailContent(reportData, customActionName);
+      const actionNameText = customActionName ? ` - ${customActionName}` : '';
+      const emailSubject = `${reportData.period} uzávěrka${actionNameText} - ${reportData.storeName}`;
       
       // Odeslání emailu přes API endpoint (který používá SMTP)
       const response = await fetch('/api/send-email', {
@@ -207,8 +265,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       console.error('❌ Error sending email via SMTP:', error);
       
       // Fallback: otevři email klienta s předvyplněnými daty
-      const emailSubject = `${reportData.period} uzávěrka - ${reportData.storeName}`;
-      const emailContent = generateEmailContent(reportData);
+      const actionNameText = customActionName ? ` - ${customActionName}` : '';
+      const emailSubject = `${reportData.period} uzávěrka${actionNameText} - ${reportData.storeName}`;
+      const emailContent = generateEmailContent(reportData, customActionName);
       const mailtoLink = `mailto:${userEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailContent.text)}`;
       
       console.log('📧 Fallback: opening email client');
@@ -218,6 +277,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     }
   };
 
+  const handleActionNameSubmit = () => {
+    generatePDFReport(actionName.trim() || undefined);
+    setShowActionNameModal(false);
+    setActionName('');
+  };
+
+  const handleActionNameCancel = () => {
+    setShowActionNameModal(false);
+    setActionName('');
+  };
+
   // Generování HTML obsahu uzávěrky
   const generateReportHTML = (reportData: {
     storeName: string;
@@ -225,6 +295,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     startDate: string;
     endDate: string;
     totalSales: number;
+    salesInCZK: number;
+    salesInEUR: number;
     cashSales: number;
     cardSales: number;
     customerCount: number;
@@ -295,7 +367,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         <div class="container">
           <div class="header">
             <h1>${reportData.storeName}</h1>
-            <p>${reportData.period} uzávěrka - ${reportData.startDate} až ${reportData.endDate}</p>
+            <p>${selectedPeriod === 'day' 
+              ? `Denní uzávěrka z ${reportData.startDate}`
+              : selectedPeriod === 'month' 
+                ? `Uzávěrka za měsíc ${reportData.startDate}`
+                : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
           </div>
           
           <div class="content">
@@ -308,18 +384,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </div>
               
               <div class="stat-card">
+                <div class="stat-value cash-value">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Koruny (po vrácení)</div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-value card-value">${reportData.salesInEUR.toFixed(2)} €</div>
+                <div class="stat-label">Eura (vybrané)</div>
+              </div>
+              
+              <div class="stat-card">
                 <div class="stat-value customer-value">${reportData.customerCount}</div>
                 <div class="stat-label">Počet zákazníků</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value cash-value">${reportData.cashSales.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Hotovost</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value card-value">${reportData.cardSales.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Karty</div>
               </div>
             </div>
             
@@ -339,10 +415,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             
             <div class="summary">
               <h4>📊 Souhrn tržeb</h4>
-              <p><strong>Období:</strong> ${reportData.startDate} až ${reportData.endDate}</p>
+              <p><strong>Období:</strong> ${selectedPeriod === 'day' 
+                ? `Denní uzávěrka z ${reportData.startDate}`
+                : selectedPeriod === 'month' 
+                  ? `Uzávěrka za měsíc ${reportData.startDate}`
+                  : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -357,35 +437,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     `;
   };
 
-  // Generování tiskového okna
-  const generatePrintWindow = (htmlContent: string, reportData: {
-    storeName: string;
-    period: string;
-    startDate: string;
-    endDate: string;
-    totalSales: number;
-    cashSales: number;
-    cardSales: number;
-    customerCount: number;
-    sales: Sale[];
-  }) => {
-    try {
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        
-        // Počkej na načtení obsahu
-        printWindow.onload = () => {
-          printWindow.print();
-          printWindow.close();
-        };
-      }
-    } catch (error) {
-      console.error('Error generating print window:', error);
-      alert('Chyba při generování tiskového okna. Zkuste to znovu.');
-    }
-  };
 
   const formatDate = (date: Date) => {
     if (selectedPeriod === 'day') {
@@ -411,33 +462,19 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Uzávěrky a reporty
+          Přehled a reporty
         </h2>
         <div className="flex space-x-3">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={generatePDFReport}
-            disabled={generatingPDF || reportData.sales.length === 0}
-            className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
-          >
-            {generatingPDF ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Generování uzávěrky...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4 mr-2" />
-                Generovat uzávěrku
-              </>
-            )}
-          </motion.button>
-          
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={generatePDFReport}
+            onClick={() => {
+              if (selectedPeriod === 'day') {
+                setShowActionNameModal(true);
+              } else {
+                generatePDFReport();
+              }
+            }}
             disabled={generatingPDF || reportData.sales.length === 0}
             className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
           >
@@ -522,7 +559,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                 Celková tržba
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {reportData.totalSales} Kč
+                {reportData.totalSales.toLocaleString('cs-CZ')} Kč
               </p>
             </div>
           </div>
@@ -536,14 +573,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         >
           <div className="flex items-center">
             <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mr-4">
-              <DollarSign className="h-6 w-6 text-green-600" />
+              <Banknote className="h-6 w-6 text-green-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Hotovost
+                Koruny (po vrácení)
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {reportData.cashSales} Kč
+                {reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
               </p>
             </div>
           </div>
@@ -557,14 +594,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         >
           <div className="flex items-center">
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-              <CreditCard className="h-6 w-6 text-purple-600" />
+              <Euro className="h-6 w-6 text-purple-600" />
             </div>
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Karty
+                Eura (vybrané)
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {reportData.cardSales} Kč
+                {reportData.salesInEUR.toFixed(2)} €
               </p>
             </div>
           </div>
@@ -615,8 +652,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                   <span className="text-sm text-gray-500 dark:text-gray-400">
                     {sale.paymentMethod === 'cash' ? 'Hotovost' : 'Karta'}
                   </span>
+                  <span className="text-xs text-gray-400">
+                    {sale.currency === 'EUR' ? 'EUR' : 'CZK'}
+                  </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {sale.totalAmount} Kč
+                    {sale.currency === 'EUR' ? 
+                      `${sale.totalAmount.toFixed(2)} €` : 
+                      `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
+                    }
                   </span>
                 </div>
               </div>
@@ -632,6 +675,55 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           <p className="text-gray-600 dark:text-gray-400">
             Pro generování uzávěrky potřebujete mít alespoň jeden prodej
           </p>
+        </div>
+      )}
+
+      {/* Action Name Modal */}
+      {showActionNameModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4"
+          >
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mr-4">
+                <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Název akce
+              </h3>
+            </div>
+            
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Zadejte název akce, který se zobrazí v předmětu a nadpisu emailu. Můžete nechat prázdné.
+            </p>
+            
+            <input
+              type="text"
+              value={actionName}
+              onChange={(e) => setActionName(e.target.value)}
+              placeholder="Např. Ranní směna, Večerní uzávěrka..."
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-6"
+              autoFocus
+            />
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleActionNameCancel}
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={handleActionNameSubmit}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Generovat uzávěrku
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

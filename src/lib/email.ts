@@ -29,6 +29,8 @@ export interface ReportData {
   startDate: string;
   endDate: string;
   totalSales: number;
+  salesInCZK: number;
+  salesInEUR: number;
   cashSales: number;
   cardSales: number;
   customerCount: number;
@@ -79,7 +81,7 @@ export async function sendEmailViaService(emailData: EmailData) {
 }
 
 // Funkce pro generování email obsahu
-export function generateEmailContent(reportData: ReportData) {
+export function generateEmailContent(reportData: ReportData, actionName?: string) {
   // Agregace všech prodaných položek
   const productSummary = new Map<string, { quantity: number; totalPrice: number; price: number }>();
   
@@ -144,8 +146,12 @@ export function generateEmailContent(reportData: ReportData) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>${reportData.storeName}</h1>
-            <p>${reportData.period} uzávěrka - ${reportData.startDate} až ${reportData.endDate}</p>
+            <h1>${reportData.storeName}${actionName ? ` - ${actionName}` : ''}</h1>
+            <p>${reportData.period === 'Denní' 
+              ? `Denní uzávěrka z ${reportData.startDate}`
+              : reportData.period === 'Měsíční' 
+                ? `Uzávěrka za měsíc ${reportData.startDate}`
+                : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
           </div>
           
           <div class="content">
@@ -163,13 +169,13 @@ export function generateEmailContent(reportData: ReportData) {
               </div>
               
               <div class="stat-card">
-                <div class="stat-value cash-value">${reportData.cashSales.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Hotovost</div>
+                <div class="stat-value cash-value">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Koruny (po vrácení)</div>
               </div>
               
               <div class="stat-card">
-                <div class="stat-value card-value">${reportData.cardSales.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Karty</div>
+                <div class="stat-value card-value">${reportData.salesInEUR.toFixed(2)} €</div>
+                <div class="stat-label">Eura (vybrané)</div>
               </div>
             </div>
             
@@ -189,10 +195,14 @@ export function generateEmailContent(reportData: ReportData) {
             
             <div class="summary">
               <h4>📊 Souhrn tržeb</h4>
-              <p><strong>Období:</strong> ${reportData.startDate} až ${reportData.endDate}</p>
+              <p><strong>Období:</strong> ${reportData.period === 'Denní' 
+                ? `Denní uzávěrka z ${reportData.startDate}`
+                : reportData.period === 'Měsíční' 
+                  ? `Uzávěrka za měsíc ${reportData.startDate}`
+                  : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -206,15 +216,19 @@ export function generateEmailContent(reportData: ReportData) {
       </html>
     `,
     text: `
-${reportData.period} uzávěrka - ${reportData.storeName}
+${reportData.period} uzávěrka - ${reportData.storeName}${actionName ? ` - ${actionName}` : ''}
 
-Období: ${reportData.startDate} až ${reportData.endDate}
+Období: ${reportData.period === 'Denní' 
+  ? `Denní uzávěrka z ${reportData.startDate}`
+  : reportData.period === 'Měsíční' 
+    ? `Uzávěrka za měsíc ${reportData.startDate}`
+    : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}
 
 📊 STATISTIKY:
 - Celková tržba: ${reportData.totalSales.toLocaleString('cs-CZ')} Kč
 - Počet zákazníků: ${reportData.customerCount}
-- Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč
-- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč
+- Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
+- Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
 - Počet různých produktů: ${productSummary.size}
 
 📋 SOUHRN PRODANÝCH POLOŽEK:

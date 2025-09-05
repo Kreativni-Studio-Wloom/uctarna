@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, Settings, User as UserIcon } from 'lucide-react';
+import { LogOut, User as UserIcon } from 'lucide-react';
 
 interface UserMenuProps {
   onClose: () => void;
@@ -48,17 +48,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
 
         {/* Menu Items */}
         <div className="py-1">
-          <button
-            onClick={() => {
-              // TODO: Implementovat nastavení
-              onClose();
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center transition-colors"
-          >
-            <Settings className="h-4 w-4 mr-3" />
-            Nastavení
-          </button>
-          
           <button
             onClick={handleSignOut}
             className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors"

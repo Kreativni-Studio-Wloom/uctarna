@@ -47,7 +47,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const stores: Store[] = [];
       
       storesSnapshot.forEach((doc) => {
-        stores.push({ id: doc.id, ...doc.data() } as Store);
+        const data = doc.data();
+        stores.push({ 
+          id: doc.id, 
+          ...data,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
+        } as Store);
       });
       
       return stores;

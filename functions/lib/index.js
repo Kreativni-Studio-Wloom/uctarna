@@ -219,7 +219,11 @@ async function sendReportEmail(reportData, userEmail) {
         <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
             <h1 style="margin: 0; font-size: 24px;">${reportData.storeName}</h1>
-            <p style="margin: 10px 0 0 0; opacity: 0.9;">${reportData.period} uzávěrka - ${reportData.startDate} až ${reportData.endDate}</p>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">${reportData.period === 'Denní' 
+              ? `Denní uzávěrka z ${reportData.startDate}`
+              : reportData.period === 'Měsíční' 
+                ? `Uzávěrka za měsíc ${reportData.startDate}`
+                : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
           </div>
           
           <div style="padding: 20px; background: #f8f9fa;">
@@ -286,7 +290,11 @@ async function sendReportEmail(reportData, userEmail) {
             
             <div style="background: #e9ecef; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <h4 style="color: #333; margin-top: 0;">📊 Souhrn tržeb</h4>
-              <p style="margin: 5px 0;"><strong>Období:</strong> ${reportData.startDate} až ${reportData.endDate}</p>
+              <p style="margin: 5px 0;"><strong>Období:</strong> ${reportData.period === 'Denní' 
+                ? `Denní uzávěrka z ${reportData.startDate}`
+                : reportData.period === 'Měsíční' 
+                  ? `Uzávěrka za měsíc ${reportData.startDate}`
+                  : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
               <p style="margin: 5px 0;"><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
               <p style="margin: 5px 0;"><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč</p>
               <p style="margin: 5px 0;"><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč</p>
