@@ -1,27 +1,45 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Settings, Euro, Save, Check } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 interface SettingsViewProps {
   storeId: string;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
-  const { user, updateUserSettings } = useAuth();
+  const { user } = useAuth();
   const extendedUser = user as any; // Cast na ExtendedUser
-  const [eurRate, setEurRate] = useState(user?.settings?.eurRate || 25.0);
+  const [eurRate, setEurRate] = useState(25.0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Načtení kurzu pro konkrétní prodejnu
+  useEffect(() => {
+    if (!user || !storeId) return;
+    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
+    const unsubscribe = onSnapshot(storeRef, (snap) => {
+      const data: any = snap.data() || {};
+      if (typeof data.eurRate === 'number') {
+        setEurRate(data.eurRate);
+      }
+    });
+    return unsubscribe;
+  }, [user, storeId]);
 
   const handleSave = async () => {
     if (!user) return;
 
     setSaving(true);
     try {
-      await updateUserSettings({ eurRate });
+      await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
+        eurRate,
+        updatedAt: serverTimestamp(),
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (error) {

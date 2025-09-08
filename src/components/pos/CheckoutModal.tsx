@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, DollarSign, Euro, Calculator } from 'lucide-react';
 import { CartItem } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 
@@ -33,7 +33,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [sumUpAvailable, setSumUpAvailable] = useState(false);
   const [payInEUR, setPayInEUR] = useState(false);
 
-  const eurRate = user?.settings?.eurRate || 25.0;
+  const [eurRate, setEurRate] = useState<number>(25.0);
   const eurAmount = totalAmount / eurRate;
 
   // Výpočet částky k vrácení
@@ -63,12 +63,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
 
-  // Detekce SumUp app dostupnosti
+  // Načtení kurzu pro store z Firestore a detekce SumUp
   useEffect(() => {
+    if (!user || !storeId) return;
     if (typeof window !== 'undefined') {
       SumUpService.detectSumUpApp().then(setSumUpAvailable);
     }
-  }, []);
+    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
+    const unsubscribe = onSnapshot(storeRef, (snap) => {
+      const data: any = snap.data() || {};
+      if (typeof data.eurRate === 'number') {
+        setEurRate(data.eurRate);
+      }
+    });
+    return unsubscribe;
+  }, [user, storeId]);
 
   // Automaticky nastavit měnu podle platby v eurech
   useEffect(() => {
@@ -93,6 +102,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       // SumUp platba kartou - otevře se až při kliknutí "Zaplatit kartou"
       if (paymentMethod === 'card' && !isRefund && sumUpAvailable) {
+        // Vygenerujeme TX id dopředu, uložíme a použijeme v payment params
+        const generatedForeignTxId = SumUpService.generateTransactionId();
+
         // Uložíme kompletní informace o platbě do localStorage pro callback navigaci a opakování
         localStorage.setItem('uctarna_payment_data', JSON.stringify({
           storeId,
@@ -100,6 +112,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           cartItems: cart,
           totalAmount,
           currency: 'CZK',
+          foreignTxId: generatedForeignTxId,
           timestamp: Date.now()
         }));
         
@@ -107,7 +120,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           amount: totalAmount,
           currency: 'CZK',
           title: `Nákup v obchodě`,
-          foreignTxId: SumUpService.generateTransactionId(),
+          foreignTxId: generatedForeignTxId,
           skipSuccessScreen: true,
           // Přidáno pro callback handling
           storeId,
@@ -139,6 +152,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         paidCurrency: paymentMethod === 'cash' ? (payInEUR ? 'EUR' : paidCurrency) : null,
         changeAmount: paymentMethod === 'cash' ? changeAmount : null,
         changeAmountEUR: paymentMethod === 'cash' && payInEUR ? (changeAmount / eurRate) : null,
+        served: false,
       };
 
       await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
@@ -174,7 +188,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+          className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -196,7 +210,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-6 flex-1 overflow-y-auto overscroll-contain">
             {/* Cart Summary */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -352,7 +366,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <CreditCard className="h-5 w-5 mr-2 text-purple-600" />
-                  <span className="font-medium text-white">Karta</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Karta</span>
                   {!canUseCard && (
                     <span className="text-xs text-gray-500 ml-1">(nedostupná)</span>
                   )}
@@ -367,7 +381,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   }`}
                 >
                   <DollarSign className="h-5 w-5 mr-2 text-green-600" />
-                  <span className="font-medium text-white">Hotovost</span>
+                  <span className="font-medium text-gray-900 dark:text-white">Hotovost</span>
                 </button>
               </div>
               
@@ -383,7 +397,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     }`}
                   >
                     <Euro className="h-5 w-5 mr-2 text-blue-600" />
-                    <span className="font-medium text-white">
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {payInEUR ? 'Platba v eurech (zapnuto)' : 'Platba v eurech'}
                     </span>
                   </button>

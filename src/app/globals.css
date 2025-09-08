@@ -39,6 +39,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: var(--foreground);
+  background-color: var(--background);
 }
 
 #__next {
@@ -98,4 +100,13 @@ input, textarea, select {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Safari and Chrome */
+}
+
+/* Global dark-mode overrides for Tailwind text grays to ensure readability */
+@media (prefers-color-scheme: dark) {
+  .dark .text-gray-900 { color: #e5e7eb !important; }
+  .dark .text-gray-800 { color: #e5e7eb !important; }
+  .dark .text-gray-700 { color: #d1d5db !important; }
+  .dark .text-gray-600 { color: #9ca3af !important; }
+  .dark .text-gray-500 { color: #6b7280 !important; }
 }

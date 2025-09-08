@@ -7,14 +7,15 @@ import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings } from 'lucide-react';
+import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { POSSystem } from '@/components/pos/POSSystem';
 import { ReceiptsView } from '@/components/pos/ReceiptsView';
 import { ReportsView } from '@/components/pos/ReportsView';
 import { SettingsView } from '@/components/pos/SettingsView';
+import { DispatchView } from '@/components/pos/DispatchView';
 
-type ViewType = 'pos' | 'receipts' | 'reports' | 'settings';
+type ViewType = 'pos' | 'receipts' | 'dispatch' | 'reports' | 'settings';
 
 export default function StorePage() {
   const params = useParams();
@@ -44,6 +45,14 @@ export default function StorePage() {
     return unsubscribe;
   }, [user, storeId, router]);
 
+  // Podpora query parametru ?view=pos|receipts|dispatch|reports|settings
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view') as ViewType | null;
+    if (v) setCurrentView(v);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,6 +71,8 @@ export default function StorePage() {
         return <POSSystem storeId={storeId} />;
       case 'receipts':
         return <ReceiptsView storeId={storeId} />;
+      case 'dispatch':
+        return store.type === 'bistro' ? <DispatchView storeId={storeId} /> : <POSSystem storeId={storeId} />;
       case 'reports':
         return <ReportsView storeId={storeId} />;
       case 'settings':
@@ -77,6 +88,8 @@ export default function StorePage() {
         return <ShoppingCart className="h-5 w-5" />;
       case 'receipts':
         return <Receipt className="h-5 w-5" />;
+      case 'dispatch':
+        return <UtensilsCrossed className="h-5 w-5" />;
       case 'reports':
         return <BarChart3 className="h-5 w-5" />;
       case 'settings':
@@ -90,6 +103,8 @@ export default function StorePage() {
         return 'Prodej';
       case 'receipts':
         return 'Doklady';
+      case 'dispatch':
+        return 'Výdej';
       case 'reports':
         return 'Uzávěrky';
       case 'settings':
@@ -110,7 +125,11 @@ export default function StorePage() {
               >
                 <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </button>
-              <StoreIcon className="h-8 w-8 text-purple-600 mr-3" />
+              {store.type === 'bistro' ? (
+                <UtensilsCrossed className="h-8 w-8 text-purple-600 mr-3" />
+              ) : (
+                <StoreIcon className="h-8 w-8 text-purple-600 mr-3" />
+              )}
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                   {store.name}
@@ -128,7 +147,13 @@ export default function StorePage() {
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-6 md:space-x-8 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
-            {(['pos', 'receipts', 'reports', 'settings'] as ViewType[]).map((view) => (
+            {([
+              'pos',
+              'receipts',
+              ...(store.type === 'bistro' ? (['dispatch'] as ViewType[]) : ([] as ViewType[])),
+              'reports',
+              'settings'
+            ] as ViewType[]).map((view) => (
               <button
                 key={view}
                 onClick={() => setCurrentView(view)}

@@ -3,7 +3,7 @@
 import React from 'react';
 import { Store } from '@/types';
 import { motion } from 'framer-motion';
-import { Store as StoreIcon, ArrowRight } from 'lucide-react';
+import { Store as StoreIcon, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface StoreCardProps {
@@ -35,12 +35,17 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store }) => {
       <div className="p-6">
         <div className="flex items-center mb-4">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mr-4">
-            <StoreIcon className="h-6 w-6 text-white" />
+            {store.type === 'bistro' ? (
+              <UtensilsCrossed className="h-6 w-6 text-white" />
+            ) : (
+              <StoreIcon className="h-6 w-6 text-white" />
+            )}
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {store.name}
             </h3>
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{store.type === 'bistro' ? 'Bistro' : 'Prodejna'}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Vytvořeno {formatDate(store.createdAt)}
             </p>

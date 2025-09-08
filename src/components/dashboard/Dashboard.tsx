@@ -29,30 +29,41 @@ export const Dashboard: React.FC = () => {
       where('isActive', '==', true)
     );
 
-    const unsubscribe = onSnapshot(storesQuery, (snapshot) => {
+    const unsubscribe = onSnapshot(storesQuery, async (snapshot) => {
       const storesData: Store[] = [];
+      const updates: Promise<any>[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
-        storesData.push({ 
+        const storeWithDefaults = {
           id: doc.id, 
           ...data,
+          type: data.type || 'prodejna',
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
-        } as Store);
+        } as Store;
+        storesData.push(storeWithDefaults);
+        // Backfill typu prodejny pro existující záznamy
+        if (!data.type) {
+          updates.push(updateDoc(doc.ref, { type: 'prodejna' }));
+        }
       });
       setStores(storesData);
       setLoading(false);
+      if (updates.length > 0) {
+        try { await Promise.allSettled(updates); } catch {}
+      }
     });
 
     return unsubscribe;
   }, [user]);
 
-  const handleAddStore = async (storeName: string) => {
+  const handleAddStore = async (storeName: string, type: 'prodejna' | 'bistro') => {
     if (!user) return;
 
     try {
       const newStore: Omit<Store, 'id'> = {
         name: storeName,
+        type,
         createdAt: new Date(),
         updatedAt: new Date(),
         isActive: true,

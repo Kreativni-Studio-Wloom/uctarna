@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
         userId,
         isRefund: false,
         refundAmount: null,
+        served: false,
         sumUpData: {
           foreignTxId,
           sumUpTxCode: txCode,

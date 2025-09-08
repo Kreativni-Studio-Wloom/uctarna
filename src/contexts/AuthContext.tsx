@@ -91,6 +91,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Načti prodejny uživatele
             const stores = await loadUserStores(firebaseUser.uid);
             setUser({ ...userData, stores });
+            // Ulož do seznamu nedávných účtů (localStorage)
+            try {
+              const recentRaw = localStorage.getItem('uctarna_recent_accounts');
+              const recent = recentRaw ? JSON.parse(recentRaw) as Array<{ email: string; displayName: string | null }> : [];
+              const entry = { email: firebaseUser.email || '', displayName: userData.displayName || null };
+              const filtered = recent.filter(a => a.email !== entry.email);
+              const next = [entry, ...filtered].slice(0, 5);
+              localStorage.setItem('uctarna_recent_accounts', JSON.stringify(next));
+            } catch {}
           } else {
             // Vytvoř nového uživatele - opraveno pro undefined displayName
             const newUser: ExtendedUser = {
@@ -107,6 +116,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
             setUser(newUser);
+            // Ulož do seznamu nedávných účtů (localStorage)
+            try {
+              const recentRaw = localStorage.getItem('uctarna_recent_accounts');
+              const recent = recentRaw ? JSON.parse(recentRaw) as Array<{ email: string; displayName: string | null }> : [];
+              const entry = { email: firebaseUser.email || '', displayName: newUser.displayName || null };
+              const filtered = recent.filter(a => a.email !== entry.email);
+              const next = [entry, ...filtered].slice(0, 5);
+              localStorage.setItem('uctarna_recent_accounts', JSON.stringify(next));
+            } catch {}
           }
         } catch (error) {
           console.error('Error loading user:', error);

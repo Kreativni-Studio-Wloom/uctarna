@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,27 +41,30 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
       .toLowerCase();
   };
 
-  // Funkce pro ukládání košíku do localStorage
-  const saveCartToLocalStorage = (cartItems: CartItem[]) => {
-    try {
-      localStorage.setItem('uctarna_cart', JSON.stringify(cartItems));
-    } catch (error) {
-      console.error('Chyba při ukládání košíku do localStorage:', error);
-    }
-  };
+  // Firestore perzistence košíku (per uživatel a prodejna)
+  const suppressNextSaveRef = useRef(false);
+  const hasLoadedCartRef = useRef(false);
 
-  // Funkce pro načítání košíku z localStorage
-  const loadCartFromLocalStorage = (): CartItem[] => {
-    try {
-      const savedCart = localStorage.getItem('uctarna_cart');
-      if (savedCart) {
-        return JSON.parse(savedCart);
+  // Odběr košíku z Firestore
+  useEffect(() => {
+    if (!user || !storeId) return;
+
+    const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
+    const unsubscribe = onSnapshot(cartDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data: any = snapshot.data();
+        const items: CartItem[] = Array.isArray(data.items) ? data.items : [];
+        suppressNextSaveRef.current = true;
+        setCart(items);
+      } else {
+        suppressNextSaveRef.current = true;
+        setCart([]);
       }
-    } catch (error) {
-      console.error('Chyba při načítání košíku z localStorage:', error);
-    }
-    return [];
-  };
+      hasLoadedCartRef.current = true;
+    });
+
+    return unsubscribe;
+  }, [user, storeId]);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
@@ -121,23 +124,29 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
     }
   };
 
-  // Načtení košíku z localStorage při inicializaci
+  // Ukládání košíku do Firestore při změně obsahu
   useEffect(() => {
-    const savedCart = loadCartFromLocalStorage();
-    if (savedCart.length > 0) {
-      setCart(savedCart);
+    if (!user || !storeId) return;
+    if (!hasLoadedCartRef.current) return; // počkej na první načtení ze snapshotu
+    if (suppressNextSaveRef.current) {
+      suppressNextSaveRef.current = false;
+      return;
     }
-  }, []);
+    const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
+    const save = async () => {
+      try {
+        await setDoc(cartDocRef, {
+          items: cart,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      } catch (error) {
+        console.error('❌ Chyba při ukládání košíku do Firestore:', error);
+      }
+    };
+    save();
+  }, [cart, user, storeId]);
 
-  // Automatické ukládání košíku do localStorage při každé změně
-  useEffect(() => {
-    if (cart.length > 0) {
-      saveCartToLocalStorage(cart);
-    } else {
-      // Pokud je košík prázdný, vyčistíme localStorage
-      localStorage.removeItem('uctarna_cart');
-    }
-  }, [cart]);
+  // --- konec perzistence košíku ---
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -465,7 +474,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
           </div>
 
           {/* Cart Items */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 md:p-3 lg:p-4 max-h-64 md:max-h-80 lg:max-h-96 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-2 md:p-3 lg:p-4 max-h-64 md:max-h-80 lg:max-h-96 overflow-y-auto text-gray-900 dark:text-gray-100">
             {cart.length === 0 ? (
               <div className="text-center py-4 md:py-6 lg:py-8">
                 <ShoppingCart className="h-8 w-8 md:h-10 md:w-10 lg:h-12 lg:w-12 text-gray-400 mx-auto mb-2 md:mb-3 lg:mb-4" />
@@ -476,10 +485,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
                 {cart.map((item) => (
                   <div key={item.productId} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                     <div className="flex-1 min-w-0 mr-2">
-                      <h4 className="font-medium text-gray-900 dark:text-white text-xs md:text-sm truncate">
+                      <h4 className="font-medium text-gray-900 dark:text-gray-100 text-xs md:text-sm truncate">
                         {item.productName}
                       </h4>
-                      <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300">
                         {item.price} Kč × {item.quantity}
         </p>
       </div>
@@ -502,7 +511,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
                     </div>
                     <div className="text-right ml-2 flex-shrink-0">
                       <p className={`font-semibold text-xs md:text-sm ${
-                        item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+                        item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
                       }`}>
                         {item.price * item.quantity} Kč
                       </p>

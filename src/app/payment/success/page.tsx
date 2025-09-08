@@ -5,17 +5,20 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle, ArrowLeft, Receipt, Home } from 'lucide-react';
 import { SumUpCallbackParams } from '@/lib/sumup';
+import { doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [callbackData, setCallbackData] = useState<SumUpCallbackParams | null>(null);
+  const [storeIdState, setStoreIdState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const status = searchParams.get('status') as SumUpCallbackParams['status'];
-    const txCode = searchParams.get('tx_code');
-    const foreignTxId = searchParams.get('foreign_tx_id');
+    const status = (searchParams.get('smp-status') || searchParams.get('status')) as SumUpCallbackParams['status'];
+    const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code');
+    const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id');
     
     if (status) {
       setCallbackData({
@@ -28,6 +31,15 @@ function PaymentSuccessContent() {
       });
     }
     
+    // Předběžně si zkusíme načíst storeId pro navigaci tlačítkem
+    try {
+      const paymentData = localStorage.getItem('uctarna_payment_data');
+      if (paymentData) {
+        const { storeId } = JSON.parse(paymentData);
+        if (storeId) setStoreIdState(storeId);
+      }
+    } catch {}
+
     // Pokud je platba úspěšná, uložíme prodej do databáze
     if (status === 'success' && foreignTxId) {
       handleSaveSale(status, txCode, foreignTxId);
@@ -49,7 +61,7 @@ function PaymentSuccessContent() {
         return;
       }
       
-      const { storeId, userId, cartItems, totalAmount } = JSON.parse(paymentData);
+      const { storeId, userId, cartItems, totalAmount, foreignTxId: storedForeign } = JSON.parse(paymentData);
       
       if (!storeId || !userId) {
         console.error('Chybí storeId nebo userId v localStorage');
@@ -65,7 +77,7 @@ function PaymentSuccessContent() {
         body: JSON.stringify({
           status,
           txCode,
-          foreignTxId,
+          foreignTxId: foreignTxId || storedForeign,
           amount: totalAmount,
           currency: 'CZK', // SumUp platby jsou vždy v CZK
           storeId,
@@ -74,19 +86,44 @@ function PaymentSuccessContent() {
         }),
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Prodej úspěšně uložen:', result);
-        
-        // Vyčistíme localStorage od zbytečností
+      try {
+        if (response.ok) {
+          const result = await response.json();
+          console.log('✅ Prodej úspěšně uložen:', result);
+        } else {
+          const text = await response.text();
+          console.error('❌ Chyba při ukládání prodeje:', response.status, text);
+        }
+      } finally {
+        // Vždy uklidit košík a vrátit se do obchodu, aby nezůstaly položky v košíku
         localStorage.removeItem('uctarna_payment_data');
-        localStorage.removeItem('uctarna_cart');
-        
-        // Zobrazíme úspěšnou zprávu
-        alert('Prodej byl úspěšně uložen do databáze!');
-      } else {
-        console.error('❌ Chyba při ukládání prodeje:', response.statusText);
-        alert('Chyba při ukládání prodeje. Kontaktujte podporu.');
+        try {
+          const key = storeId ? `uctarna_cart_${storeId}` : undefined;
+          if (!key) {
+            // Pokus o dočtení storeId z uložených payment dat (fallback)
+            const paymentData = localStorage.getItem('uctarna_payment_data');
+            if (paymentData) {
+              const parsed = JSON.parse(paymentData);
+              if (parsed && parsed.storeId) {
+                localStorage.removeItem(`uctarna_cart_${parsed.storeId}`);
+              }
+            }
+          } else {
+            localStorage.removeItem(key);
+          }
+          // Smazat Firestore košík pro daný store
+          try {
+            const sid = storeId || (JSON.parse(localStorage.getItem('uctarna_payment_data') || '{}')?.storeId);
+            const uid = userId || (JSON.parse(localStorage.getItem('uctarna_payment_data') || '{}')?.userId);
+            if (sid && uid) {
+              const cartDocRef = doc(db, 'users', uid, 'stores', sid, 'state', 'cart');
+              await deleteDoc(cartDocRef);
+            }
+          } catch (e) {
+            console.error('❌ Chyba při mazání košíku ve Firestore:', e);
+          }
+        } catch {}
+        // Neprovádět automatickou navigaci – uživatel použije tlačítka níže
       }
     } catch (error) {
       console.error('❌ Chyba při ukládání prodeje:', error);
@@ -95,26 +132,29 @@ function PaymentSuccessContent() {
   };
 
   const handleBackToStore = () => {
-    // Návrat zpět do prodejny - použijeme localStorage
+    // Navigace přímo do prodejny na záložku POS
+    const targetStoreId = storeIdState;
+    if (targetStoreId) {
+      router.push(`/store/${targetStoreId}?view=pos`);
+      return;
+    }
+    // Fallback přes localStorage
     try {
       const paymentData = localStorage.getItem('uctarna_payment_data');
       if (paymentData) {
         const { storeId } = JSON.parse(paymentData);
         if (storeId) {
-          // Přesměrujeme přímo do prodejny
-          router.push(`/store/${storeId}`);
+          router.push(`/store/${storeId}?view=pos`);
           return;
         }
       }
     } catch (error) {
       console.error('Chyba při čtení localStorage:', error);
     }
-    
-    // Fallback - návrat zpět
+    // Poslední fallback
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      // Pokud není historie, přesměrujeme na hlavní stránku
       router.push('/');
     }
   };

@@ -159,7 +159,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       #{sale.id.slice(-8)}
                     </span>
                   </div>
-                  <div className="flex items-center text-sm text-white">
+                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <div className={getPaymentColor(sale.paymentMethod)}>
                       {getPaymentIcon(sale.paymentMethod)}
                     </div>
@@ -168,7 +168,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 </div>
 
                 <div className="mb-4">
-                  <div className="flex items-center text-sm text-white mb-2">
+                  <div className="flex items-center text-sm text-gray-700 dark:text-gray-300 mb-2">
                     <Calendar className="h-4 w-4 mr-2" />
                     {formatDate(sale.createdAt)}
                   </div>
@@ -244,11 +244,11 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Datum:</span>
-                    <span className="font-medium text-white">{formatDate(selectedSale.createdAt)}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{formatDate(selectedSale.createdAt)}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Způsob platby:</span>
-                    <span className="font-medium text-white">{getPaymentLabel(selectedSale.paymentMethod)}</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{getPaymentLabel(selectedSale.paymentMethod)}</span>
                   </div>
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <h4 className="font-medium text-gray-900 dark:text-white mb-3">Položky:</h4>

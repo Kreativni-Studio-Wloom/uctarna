@@ -14,6 +14,7 @@ export interface UserSettings {
 export interface Store {
   id: string;
   name: string;
+  type: 'prodejna' | 'bistro';
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
@@ -68,6 +69,9 @@ export interface Sale {
   paidCurrency?: 'CZK' | 'EUR'; // Měna zaplacené částky
   changeAmount?: number; // Částka k vrácení v korunách
   changeAmountEUR?: number; // Částka k vrácení v eurech (pouze při platbě v eurech)
+  // Výdej (kuchyně): označení, že objednávka byla vydána
+  served?: boolean;
+  servedAt?: Date;
 }
 
 export interface SumUpTransactionData {

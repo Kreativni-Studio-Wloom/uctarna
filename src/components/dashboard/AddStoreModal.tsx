@@ -6,11 +6,12 @@ import { X, Store as StoreIcon } from 'lucide-react';
 
 interface AddStoreModalProps {
   onClose: () => void;
-  onAdd: (storeName: string) => void;
+  onAdd: (storeName: string, type: 'prodejna' | 'bistro') => void;
 }
 
 export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) => {
   const [storeName, setStoreName] = useState('');
+  const [type, setType] = useState<'prodejna' | 'bistro'>('prodejna');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,7 +20,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
 
     setLoading(true);
     try {
-      await onAdd(storeName.trim());
+      await onAdd(storeName.trim(), type);
     } finally {
       setLoading(false);
     }
@@ -79,6 +80,36 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Typ provozu
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setType('prodejna')}
+                    className={`px-4 py-3 rounded-lg border transition-colors ${
+                      type === 'prodejna'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Prodejna
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setType('bistro')}
+                    className={`px-4 py-3 rounded-lg border transition-colors ${
+                      type === 'bistro'
+                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Bistro
+                  </button>
+                </div>
+              </div>
+
               <div className="flex space-x-3 pt-4">
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -102,7 +133,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                       Vytváření...
                     </div>
                   ) : (
-                    'Vytvořit prodejnu'
+                    'Vytvořit provoz'
                   )}
                 </motion.button>
               </div>
