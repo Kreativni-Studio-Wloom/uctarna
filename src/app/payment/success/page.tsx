@@ -61,7 +61,7 @@ function PaymentSuccessContent() {
         return;
       }
       
-      const { storeId, userId, cartItems, totalAmount, foreignTxId: storedForeign } = JSON.parse(paymentData);
+      const { storeId, userId, cartItems, totalAmount, foreignTxId: storedForeign, discount, discountAmount, finalAmount } = JSON.parse(paymentData);
       
       if (!storeId || !userId) {
         console.error('Chybí storeId nebo userId v localStorage');
@@ -83,9 +83,9 @@ function PaymentSuccessContent() {
           storeId,
           userId,
           cartItems,
-          discount: paymentData?.discount || null,
-          discountAmount: paymentData?.discountAmount || 0,
-          finalAmount: paymentData?.finalAmount || totalAmount
+          discount: discount || null,
+          discountAmount: discountAmount || 0,
+          finalAmount: finalAmount || totalAmount
         }),
       });
 
