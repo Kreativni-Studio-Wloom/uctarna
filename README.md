@@ -304,3 +304,4 @@ Pro podporu kontaktujte:
 **Účtárna** - Moderní prodejní systém pro 21. století 🚀
 
 *Připraveno k produkčnímu nasazení na Vercel i Wedos!*
+# Vercel deployment fix
