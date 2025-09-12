@@ -82,7 +82,10 @@ function PaymentSuccessContent() {
           currency: 'CZK', // SumUp platby jsou vždy v CZK
           storeId,
           userId,
-          cartItems
+          cartItems,
+          discount: paymentData?.discount || null,
+          discountAmount: paymentData?.discountAmount || 0,
+          finalAmount: paymentData?.finalAmount || totalAmount
         }),
       });
 

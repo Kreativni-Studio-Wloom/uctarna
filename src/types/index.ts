@@ -70,6 +70,10 @@ export interface Sale {
   paidCurrency?: 'CZK' | 'EUR'; // Měna zaplacené částky
   changeAmount?: number; // Částka k vrácení v korunách
   changeAmountEUR?: number; // Částka k vrácení v eurech (pouze při platbě v eurech)
+  // Sleva
+  discount?: { type: 'percentage' | 'amount'; value: number } | null;
+  discountAmount?: number; // Částka slevy v Kč
+  finalAmount?: number; // Finální částka po slevě
   // Výdej (kuchyně): označení, že objednávka byla vydána
   served?: boolean;
   servedAt?: Date;

@@ -15,6 +15,9 @@ interface CheckoutModalProps {
   totalAmount: number;
   storeId: string;
   onSuccess: () => void;
+  discount?: { type: 'percentage' | 'amount'; value: number } | null;
+  discountAmount?: number;
+  finalAmount?: number;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -22,7 +25,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cart,
   totalAmount,
   storeId,
-  onSuccess
+  onSuccess,
+  discount,
+  discountAmount,
+  finalAmount
 }) => {
   const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
@@ -34,7 +40,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [payInEUR, setPayInEUR] = useState(false);
 
   const [eurRate, setEurRate] = useState<number>(25.0);
-  const eurAmount = totalAmount / eurRate;
+  // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
+  const actualTotalAmount = finalAmount !== undefined ? finalAmount : totalAmount;
+  const eurAmount = actualTotalAmount / eurRate;
 
   // Výpočet částky k vrácení
   let changeAmount: number;
@@ -49,16 +57,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   } else {
     // Při platbě v korunách: standardní výpočet
     paidAmountInCZK = paidCurrency === 'EUR' ? paidAmount * eurRate : paidAmount;
-    changeAmount = paidAmountInCZK - totalAmount;
+    changeAmount = paidAmountInCZK - actualTotalAmount;
   }
 
   // Aktuální částka pro zobrazení (v eurech pokud je vybrána platba v eurech)
-  const displayAmount = payInEUR ? eurAmount : totalAmount;
+  const displayAmount = payInEUR ? eurAmount : actualTotalAmount;
   const displayCurrency = payInEUR ? 'EUR' : 'CZK';
 
   // Kontrola, zda je to vratka (záporná částka)
-  const isRefund = totalAmount < 0;
-  const refundAmount = Math.abs(totalAmount);
+  const isRefund = actualTotalAmount < 0;
+  const refundAmount = Math.abs(actualTotalAmount);
 
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
@@ -110,14 +118,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           storeId,
           userId: user.uid,
           cartItems: cart,
-          totalAmount,
+          totalAmount: actualTotalAmount,
           currency: 'CZK',
           foreignTxId: generatedForeignTxId,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          discount: discount || null,
+          discountAmount: discountAmount || 0,
+          finalAmount: actualTotalAmount
         }));
         
         const paymentParams: SumUpPaymentParams = {
-          amount: totalAmount,
+          amount: actualTotalAmount,
           currency: 'CZK',
           title: `Nákup v obchodě`,
           foreignTxId: generatedForeignTxId,
@@ -137,7 +148,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Hotovost nebo neúspěšná SumUp platba - vytvoř prodej/vratku v Firestore
       const sale = {
         items: cart,
-        totalAmount: payInEUR ? eurAmount : totalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
+        totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
         paymentMethod,
         currency: payInEUR ? 'EUR' : 'CZK', // Přidat měnu
         eurRate: payInEUR ? eurRate : null, // Přidat kurz pokud je platba v eurech
@@ -152,6 +163,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         paidCurrency: paymentMethod === 'cash' ? (payInEUR ? 'EUR' : paidCurrency) : null,
         changeAmount: paymentMethod === 'cash' ? changeAmount : null,
         changeAmountEUR: paymentMethod === 'cash' && payInEUR ? (changeAmount / eurRate) : null,
+        // Sleva
+        discount: discount || null,
+        discountAmount: discountAmount || 0,
+        finalAmount: actualTotalAmount,
         served: false,
       };
 

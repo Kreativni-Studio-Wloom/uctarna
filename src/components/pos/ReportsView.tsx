@@ -179,6 +179,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
     totalProfit = totalSalesCZK - totalCosts;
 
+    // Výpočet celkových slev
+    const totalDiscounts = filteredSales.reduce((sum, sale) => {
+      return sum + (sale.discountAmount || 0);
+    }, 0);
+
+    // Počet prodejů se slevou
+    const salesWithDiscount = filteredSales.filter(sale => sale.discount && sale.discountAmount && sale.discountAmount > 0).length;
+
     return {
       totalSales: totalSalesCZK, // Celková tržba v korunách
       salesInCZK, // Tržby v korunách (odečtené vrácené koruny)
@@ -188,6 +196,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       customerCount,
       totalCosts, // Celkové náklady
       totalProfit, // Celkový zisk
+      totalDiscounts, // Celkové slevy
+      salesWithDiscount, // Počet prodejů se slevou
       sales: filteredSales,
     };
   };
@@ -236,6 +246,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         customerCount: reportData.customerCount,
         totalCosts: reportData.totalCosts,
         totalProfit: reportData.totalProfit,
+        totalDiscounts: reportData.totalDiscounts,
+        salesWithDiscount: reportData.salesWithDiscount,
         products: products.map(p => ({
           id: p.id,
           name: p.name,
@@ -634,7 +646,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -735,6 +747,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {reportData.customerCount}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+        >
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mr-4">
+              <TrendingUp className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Slevy
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {reportData.totalDiscounts.toLocaleString('cs-CZ')} Kč
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {reportData.salesWithDiscount} prodejů
               </p>
             </div>
           </div>

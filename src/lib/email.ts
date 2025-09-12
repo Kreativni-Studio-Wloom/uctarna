@@ -36,6 +36,8 @@ export interface ReportData {
   customerCount: number;
   totalCosts: number;
   totalProfit: number;
+  totalDiscounts?: number;
+  salesWithDiscount?: number;
   products: Array<{
     id: string;
     name: string;
@@ -156,7 +158,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
+          .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin: 20px 0; }
           .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
           .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
           .stat-label { font-size: 14px; color: #666; }
@@ -208,6 +210,12 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <div class="stat-card">
                 <div class="stat-value customer-value">${reportData.customerCount}</div>
                 <div class="stat-label">Počet zákazníků</div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-value" style="color: #dc3545;">${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Slevy</div>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">${reportData.salesWithDiscount || 0} prodejů</div>
               </div>
             </div>
             
@@ -264,6 +272,7 @@ Období: ${reportData.period === 'Denní'
 - Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
 - Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
+- Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
 - Počet různých produktů: ${productSummary.size}
 
 📋 SOUHRN PRODANÝCH POLOŽEK:

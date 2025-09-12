@@ -14,7 +14,10 @@ export async function POST(request: NextRequest) {
       currency, 
       storeId, 
       userId, 
-      cartItems 
+      cartItems,
+      discount,
+      discountAmount,
+      finalAmount
     } = body;
 
     // Validace povinných parametrů
@@ -38,6 +41,10 @@ export async function POST(request: NextRequest) {
         isRefund: false,
         refundAmount: null,
         served: false,
+        // Sleva
+        discount: discount || null,
+        discountAmount: discountAmount || 0,
+        finalAmount: finalAmount || amount || 0,
         sumUpData: {
           foreignTxId,
           sumUpTxCode: txCode,

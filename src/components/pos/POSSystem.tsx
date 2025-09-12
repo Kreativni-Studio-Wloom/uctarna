@@ -797,11 +797,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
           <CheckoutModal
             onClose={() => setShowCheckout(false)}
             cart={cart}
-            totalAmount={finalAmount}
+            totalAmount={totalAmount}
             storeId={storeId}
+            discount={discount}
+            discountAmount={discountAmount}
+            finalAmount={finalAmount}
             onSuccess={() => {
               setCart([]);
               setShowCheckout(false);
+              setDiscount(null); // Reset slevy po úspěšném prodeji
             }}
           />
         )}

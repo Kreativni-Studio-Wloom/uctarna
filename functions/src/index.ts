@@ -144,7 +144,7 @@ async function sendReportEmail(reportData: any, userEmail: string) {
           <div style="padding: 20px; background: #f8f9fa;">
             <h2 style="color: #333; margin-top: 0;">📊 Statistiky uzávěrky</h2>
             
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0;">
+            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin: 20px 0;">
               <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <div style="font-size: 24px; font-weight: bold; color: #28a745;">${reportData.totalSales.toLocaleString('cs-CZ')} Kč</div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Celková tržba</div>
@@ -171,6 +171,12 @@ async function sendReportEmail(reportData: any, userEmail: string) {
                 <div style="font-size: 24px; font-weight: bold; color: #28a745;">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
                 <div style="font-size: 14px; color: #666; margin-top: 5px;">Zisk</div>
               </div>
+              
+              <div style="background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="font-size: 24px; font-weight: bold; color: #dc3545;">${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč</div>
+                <div style="font-size: 14px; color: #666; margin-top: 5px;">Slevy</div>
+                <div style="font-size: 12px; color: #666; margin-top: 5px;">${reportData.salesWithDiscount || 0} prodejů</div>
+              </div>
             </div>
             
             <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -183,6 +189,7 @@ async function sendReportEmail(reportData: any, userEmail: string) {
               <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Slevy:</strong> ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)</p>
             </div>
           </div>
           
