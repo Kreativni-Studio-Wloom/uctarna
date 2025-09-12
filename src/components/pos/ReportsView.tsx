@@ -281,6 +281,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     cashSales: number;
     cardSales: number;
     customerCount: number;
+    totalCosts: number;
+    totalProfit: number;
+    products: Array<{
+      id: string;
+      name: string;
+      price: number;
+      cost?: number;
+    }>;
     sales: Sale[];
   }, userEmail: string, customActionName?: string) => {
     try {
