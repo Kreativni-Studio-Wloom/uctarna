@@ -34,9 +34,18 @@ export interface ReportData {
   cashSales: number;
   cardSales: number;
   customerCount: number;
+  totalCosts: number;
+  totalProfit: number;
+  products: Array<{
+    id: string;
+    name: string;
+    price: number;
+    cost?: number;
+  }>;
   sales: Array<{
     createdAt: Date | string;
     items?: Array<{
+      productId: string;
       productName: string;
       quantity: number;
       price: number;
@@ -82,22 +91,39 @@ export async function sendEmailViaService(emailData: EmailData) {
 
 // Funkce pro generování email obsahu
 export function generateEmailContent(reportData: ReportData, actionName?: string) {
-  // Agregace všech prodaných položek
-  const productSummary = new Map<string, { quantity: number; totalPrice: number; price: number }>();
+  // Vytvoření mapy produktů pro rychlé vyhledávání nákladů
+  const productMap = new Map(reportData.products.map(p => [p.id, p]));
+  
+  // Agregace všech prodaných položek s výpočtem zisku
+  const productSummary = new Map<string, { 
+    quantity: number; 
+    totalPrice: number; 
+    price: number; 
+    totalCost: number; 
+    totalProfit: number; 
+  }>();
   
   reportData.sales.forEach((sale) => {
     sale.items?.forEach((item) => {
       const key = item.productName;
+      const product = productMap.get(item.productId);
+      const itemCost = product?.cost || 0;
+      const itemProfit = (item.price - itemCost) * item.quantity;
+      
       const existing = productSummary.get(key);
       
       if (existing) {
         existing.quantity += item.quantity;
         existing.totalPrice += item.quantity * item.price;
+        existing.totalCost += itemCost * item.quantity;
+        existing.totalProfit += itemProfit;
       } else {
         productSummary.set(key, {
           quantity: item.quantity,
           totalPrice: item.quantity * item.price,
-          price: item.price
+          price: item.price,
+          totalCost: itemCost * item.quantity,
+          totalProfit: itemProfit
         });
       }
     });
@@ -111,6 +137,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.quantity}x ${productName}</td>
         <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${summary.price.toLocaleString('cs-CZ')} Kč</td>
         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #28a745;">${summary.totalPrice.toLocaleString('cs-CZ')} Kč</td>
+        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.totalProfit.toLocaleString('cs-CZ')} Kč</td>
       </tr>
     `).join('');
 
@@ -129,7 +156,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+          .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
           .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
           .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
           .stat-label { font-size: 14px; color: #666; }
@@ -164,11 +191,6 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               </div>
               
               <div class="stat-card">
-                <div class="stat-value customer-value">${reportData.customerCount}</div>
-                <div class="stat-label">Počet zákazníků</div>
-              </div>
-              
-              <div class="stat-card">
                 <div class="stat-value cash-value">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
                 <div class="stat-label">Koruny (po vrácení)</div>
               </div>
@@ -176,6 +198,16 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <div class="stat-card">
                 <div class="stat-value card-value">${reportData.salesInEUR.toFixed(2)} €</div>
                 <div class="stat-label">Eura (vybrané)</div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-value">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Zisk</div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-value customer-value">${reportData.customerCount}</div>
+                <div class="stat-label">Počet zákazníků</div>
               </div>
             </div>
             
@@ -186,6 +218,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                   <th>Položka</th>
                   <th>Cena za kus</th>
                   <th>Celková hodnota</th>
+                  <th>Zisk</th>
                 </tr>
               </thead>
               <tbody>
@@ -203,6 +236,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
+              <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -229,13 +263,14 @@ Období: ${reportData.period === 'Denní'
 - Počet zákazníků: ${reportData.customerCount}
 - Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
+- Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
 - Počet různých produktů: ${productSummary.size}
 
 📋 SOUHRN PRODANÝCH POLOŽEK:
 ${Array.from(productSummary.entries())
   .sort((a, b) => b[1].totalPrice - a[1].totalPrice)
   .map(([productName, summary]) => 
-    `${summary.quantity}x ${productName} - ${summary.totalPrice.toLocaleString('cs-CZ')} Kč`
+    `${summary.quantity}x ${productName} - ${summary.totalPrice.toLocaleString('cs-CZ')} Kč (zisk: ${summary.totalProfit.toLocaleString('cs-CZ')} Kč)`
   ).join('\n')}
 
 ---

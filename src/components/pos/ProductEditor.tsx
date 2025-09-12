@@ -19,6 +19,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editName, setEditName] = useState('');
   const [editPrice, setEditPrice] = useState(0);
+  const [editCost, setEditCost] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
           id: doc.id,
           name: data.name || 'Neznámý produkt',
           price: data.price || 0,
+          cost: data.cost,
           category: data.category,
           isPopular: data.isPopular || false,
           soldCount: data.soldCount || 0,
@@ -67,6 +69,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
     setEditingProduct(product);
     setEditName(product.name);
     setEditPrice(product.price);
+    setEditCost(product.cost);
   };
 
   // Zrušení editace
@@ -74,6 +77,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
     setEditingProduct(null);
     setEditName('');
     setEditPrice(0);
+    setEditCost(undefined);
   };
 
   // Uložení změn
@@ -87,6 +91,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
       await updateDoc(productRef, {
         name: editName.trim(),
         price: editPrice,
+        cost: editCost,
         updatedAt: new Date()
       });
 
@@ -209,6 +214,20 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                           step="0.01"
                         />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Náklady (Kč) <span className="text-gray-500 text-xs">(nepovinné)</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={editCost || ''}
+                          onChange={(e) => setEditCost(e.target.value ? Number(e.target.value) : undefined)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="0"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
                       <div className="flex space-x-2">
                         <button
                           onClick={saveProduct}
@@ -241,6 +260,11 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                         <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                           {product.price} Kč
                         </p>
+                        {product.cost !== undefined && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Náklady: {product.cost} Kč
+                          </p>
+                        )}
                       </div>
                       
                       <div className="text-sm text-gray-500 dark:text-gray-400">

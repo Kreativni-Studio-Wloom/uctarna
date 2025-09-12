@@ -24,6 +24,7 @@ export interface Product {
   id: string;
   name: string;
   price: number; // v Kč
+  cost?: number; // Náklady na produkt (nepovinné)
   category?: string;
   isPopular: boolean;
   soldCount: number; // Počet historicky prodaných kusů

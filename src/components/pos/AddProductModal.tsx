@@ -6,12 +6,13 @@ import { X, Package } from 'lucide-react';
 
 interface AddProductModalProps {
   onClose: () => void;
-  onAdd: (name: string, price: number) => void;
+  onAdd: (name: string, price: number, cost?: number) => void;
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
+  const [cost, setCost] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,9 +22,12 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd
     const priceNumber = parseFloat(price);
     if (isNaN(priceNumber) || priceNumber <= 0) return;
 
+    const costNumber = cost.trim() ? parseFloat(cost) : undefined;
+    if (costNumber !== undefined && (isNaN(costNumber) || costNumber < 0)) return;
+
     setLoading(true);
     try {
-      await onAdd(name.trim(), priceNumber);
+      await onAdd(name.trim(), priceNumber, costNumber);
     } finally {
       setLoading(false);
     }
@@ -95,6 +99,22 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   required
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="productCost" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Náklady (Kč) <span className="text-gray-500 text-sm">(nepovinné)</span>
+                </label>
+                <input
+                  id="productCost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cost}
+                  onChange={(e) => setCost(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="0.00"
                 />

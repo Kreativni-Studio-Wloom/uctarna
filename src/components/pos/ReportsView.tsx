@@ -6,9 +6,9 @@ import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { cs } from 'date-fns/locale';
-import { Sale } from '@/types';
+import { Sale, Product } from '@/types';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro } from 'lucide-react';
+import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator } from 'lucide-react';
 import { generateEmailContent } from '@/lib/email';
 
 // Rozšířený User interface s prodejnami
@@ -37,6 +37,7 @@ interface ReportsViewProps {
 export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const { user, firebaseUser } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'month' | 'total'>('day');
@@ -55,7 +56,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       orderBy('createdAt', 'desc')
     );
 
-    const unsubscribe = onSnapshot(salesQuery, (snapshot) => {
+    const productsQuery = query(
+      collection(db, 'users', user.uid, 'stores', storeId, 'products')
+    );
+
+    const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
       const salesData: Sale[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -66,10 +71,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         } as Sale);
       });
       setSales(salesData);
+    });
+
+    const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+      const productsData: Product[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        productsData.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Product);
+      });
+      setProducts(productsData);
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeSales();
+      unsubscribeProducts();
+    };
   }, [user, storeId]);
 
   const getFilteredSales = () => {
@@ -138,6 +160,25 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       }, 0);
     const customerCount = filteredSales.length;
 
+    // Výpočet celkových nákladů a zisku
+    let totalCosts = 0;
+    let totalProfit = 0;
+
+    // Vytvoření mapy produktů pro rychlé vyhledávání
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    filteredSales.forEach(sale => {
+      sale.items?.forEach(item => {
+        const product = productMap.get(item.productId);
+        if (product && product.cost !== undefined) {
+          const itemCost = product.cost * item.quantity;
+          totalCosts += itemCost;
+        }
+      });
+    });
+
+    totalProfit = totalSalesCZK - totalCosts;
+
     return {
       totalSales: totalSalesCZK, // Celková tržba v korunách
       salesInCZK, // Tržby v korunách (odečtené vrácené koruny)
@@ -145,6 +186,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       cashSales,
       cardSales,
       customerCount,
+      totalCosts, // Celkové náklady
+      totalProfit, // Celkový zisk
       sales: filteredSales,
     };
   };
@@ -191,6 +234,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         cashSales: reportData.cashSales,
         cardSales: reportData.cardSales,
         customerCount: reportData.customerCount,
+        totalCosts: reportData.totalCosts,
+        totalProfit: reportData.totalProfit,
+        products: products.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          cost: p.cost
+        })),
         sales: reportData.sales
       };
 
@@ -300,24 +351,49 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     cashSales: number;
     cardSales: number;
     customerCount: number;
+    totalCosts: number;
+    totalProfit: number;
+    products: Array<{
+      id: string;
+      name: string;
+      price: number;
+      cost?: number;
+    }>;
     sales: Sale[];
   }) => {
-    // Agregace všech prodaných položek
-    const productSummary = new Map<string, { quantity: number; totalPrice: number; price: number }>();
+    // Vytvoření mapy produktů pro rychlé vyhledávání nákladů
+    const productMap = new Map(reportData.products.map(p => [p.id, p]));
+    
+    // Agregace všech prodaných položek s výpočtem zisku
+    const productSummary = new Map<string, { 
+      quantity: number; 
+      totalPrice: number; 
+      price: number; 
+      totalCost: number; 
+      totalProfit: number; 
+    }>();
     
     reportData.sales.forEach((sale) => {
       sale.items?.forEach((item) => {
         const key = item.productName;
+        const product = productMap.get(item.productId);
+        const itemCost = product?.cost || 0;
+        const itemProfit = (item.price - itemCost) * item.quantity;
+        
         const existing = productSummary.get(key);
         
         if (existing) {
           existing.quantity += item.quantity;
           existing.totalPrice += item.quantity * item.price;
+          existing.totalCost += itemCost * item.quantity;
+          existing.totalProfit += itemProfit;
         } else {
           productSummary.set(key, {
             quantity: item.quantity,
             totalPrice: item.quantity * item.price,
-            price: item.price
+            price: item.price,
+            totalCost: itemCost * item.quantity,
+            totalProfit: itemProfit
           });
         }
       });
@@ -331,6 +407,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.quantity}x ${productName}</td>
           <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${summary.price.toLocaleString('cs-CZ')} Kč</td>
           <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #28a745;">${summary.totalPrice.toLocaleString('cs-CZ')} Kč</td>
+          <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.totalProfit.toLocaleString('cs-CZ')} Kč</td>
         </tr>
       `).join('');
 
@@ -348,7 +425,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+          .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
           .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
           .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
           .stat-label { font-size: 14px; color: #666; }
@@ -394,6 +471,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </div>
               
               <div class="stat-card">
+                <div class="stat-value">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Zisk</div>
+              </div>
+              
+              <div class="stat-card">
                 <div class="stat-value customer-value">${reportData.customerCount}</div>
                 <div class="stat-label">Počet zákazníků</div>
               </div>
@@ -406,6 +488,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                   <th>Položka</th>
                   <th>Cena za kus</th>
                   <th>Celková hodnota</th>
+                  <th>Zisk</th>
                 </tr>
               </thead>
               <tbody>
@@ -543,7 +626,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -611,6 +694,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+        >
+          <div className="flex items-center">
+            <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg flex items-center justify-center mr-4">
+              <Calculator className="h-6 w-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Zisk
+              </p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {reportData.totalProfit.toLocaleString('cs-CZ')} Kč
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
         >
           <div className="flex items-center">

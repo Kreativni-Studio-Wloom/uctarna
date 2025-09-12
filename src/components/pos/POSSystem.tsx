@@ -325,15 +325,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
   // Finální částka po slevě
   const finalAmount = totalAmount - discountAmount;
 
-  const handleAddProduct = async (name: string, price: number) => {
+  const handleAddProduct = async (name: string, price: number, cost?: number) => {
     if (!user) return;
 
     try {
-      console.log('➕ Adding product:', { name, price, storeId });
+      console.log('➕ Adding product:', { name, price, cost, storeId });
       
       const newProduct: Omit<Product, 'id'> = {
         name,
         price,
+        cost,
         isPopular: false,
         soldCount: 0, // Výchozí hodnota pro nové produkty
         createdAt: new Date(),
