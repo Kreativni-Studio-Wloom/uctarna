@@ -1,20 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Store } from '@/types';
 import { motion } from 'framer-motion';
-import { Store as StoreIcon, UtensilsCrossed, ArrowRight } from 'lucide-react';
+import { Store as StoreIcon, UtensilsCrossed, ArrowRight, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface StoreCardProps {
   store: Store;
+  onDuplicate?: (store: Store) => void;
 }
 
-export const StoreCard: React.FC<StoreCardProps> = ({ store }) => {
+export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
   const router = useRouter();
+  const [showDuplicateButton, setShowDuplicateButton] = useState(false);
 
   const handleOpenStore = () => {
     router.push(`/store/${store.id}`);
+  };
+
+  const handleDuplicate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDuplicate) {
+      onDuplicate(store);
+    }
   };
 
   const formatDate = (date: Date) => {
@@ -29,9 +38,25 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store }) => {
     <motion.div
       whileHover={{ y: -4, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer transition-all duration-200"
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer transition-all duration-200 relative"
       onClick={handleOpenStore}
+      onMouseEnter={() => setShowDuplicateButton(true)}
+      onMouseLeave={() => setShowDuplicateButton(false)}
     >
+      {/* Duplicate Button */}
+      {onDuplicate && showDuplicateButton && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          onClick={handleDuplicate}
+          className="absolute top-3 right-3 z-10 p-2 bg-white dark:bg-gray-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+          title="Duplikovat prodejnu"
+        >
+          <Copy className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+        </motion.button>
+      )}
+
       <div className="p-6">
         <div className="flex items-center mb-4">
           <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mr-4">
