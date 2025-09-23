@@ -47,7 +47,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
 
   // Odběr košíku z Firestore
   useEffect(() => {
-    if (!user || !storeId) return;
+    if (!user || !user.uid || !storeId) return;
 
     const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
     const unsubscribe = onSnapshot(cartDocRef, (snapshot) => {
@@ -60,6 +60,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
         suppressNextSaveRef.current = true;
         setCart([]);
       }
+      hasLoadedCartRef.current = true;
+    }, (error) => {
+      console.error('Error loading cart:', error);
       hasLoadedCartRef.current = true;
     });
 
@@ -149,7 +152,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
   // --- konec perzistence košíku ---
 
   useEffect(() => {
-    if (!user || !storeId) return;
+    if (!user || !user.uid || !storeId) return;
 
     console.log('🔍 Loading products for store:', storeId, 'user:', user.uid);
 
@@ -194,7 +197,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
 
   // Načítání odložených nákupů
   useEffect(() => {
-    if (!user || !storeId) return;
+    if (!user || !user.uid || !storeId) return;
 
     const pendingQuery = query(
       collection(db, 'users', user.uid, 'stores', storeId, 'pendingPurchases')

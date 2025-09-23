@@ -38,6 +38,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Funkce pro načtení prodejen uživatele
   const loadUserStores = async (userId: string): Promise<Store[]> => {
+    if (!userId) return [];
+    
     try {
       const storesQuery = query(
         collection(db, 'users', userId, 'stores'),
@@ -57,15 +59,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       return stores;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading user stores:', error);
+      // Pokud je chyba oprávnění, vrátíme prázdný seznam
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.log('Chyba oprávnění při načítání prodejen - uživatel pravděpodobně není správně přihlášen');
+        return [];
+      }
       return [];
     }
   };
 
   // Funkce pro obnovení prodejen
   const refreshUserStores = async () => {
-    if (!firebaseUser) return;
+    if (!firebaseUser || !firebaseUser.uid) return;
     
     try {
       const stores = await loadUserStores(firebaseUser.uid);
@@ -81,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setFirebaseUser(firebaseUser);
       
-      if (firebaseUser) {
+      if (firebaseUser && firebaseUser.uid) {
         try {
           // Zkus načíst uživatele z Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
@@ -126,8 +133,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               localStorage.setItem('uctarna_recent_accounts', JSON.stringify(next));
             } catch {}
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Error loading user:', error);
+          // Pokud je chyba oprávnění, zkusíme se přihlásit znovu
+          if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+            console.log('Chyba oprávnění - uživatel pravděpodobně není správně přihlášen');
+            setUser(null);
+          }
         }
       } else {
         setUser(null);

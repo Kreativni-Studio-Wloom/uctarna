@@ -49,7 +49,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const extendedUser = user as ExtendedUser | null;
 
   useEffect(() => {
-    if (!user || !storeId) return;
+    if (!user || !user.uid || !storeId) return;
 
     const salesQuery = query(
       collection(db, 'users', user.uid, 'stores', storeId, 'sales'),

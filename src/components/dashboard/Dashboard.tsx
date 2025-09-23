@@ -25,7 +25,7 @@ export const Dashboard: React.FC = () => {
   const [duplicating, setDuplicating] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.uid) return;
 
     const storesQuery = query(
       collection(db, 'users', user.uid, 'stores'),
@@ -54,6 +54,14 @@ export const Dashboard: React.FC = () => {
       setLoading(false);
       if (updates.length > 0) {
         try { await Promise.allSettled(updates); } catch {}
+      }
+    }, (error: any) => {
+      console.error('Error loading stores:', error);
+      // Pokud je chyba oprávnění, zobrazíme prázdný seznam
+      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
+        console.log('Chyba oprávnění při načítání prodejen - uživatel pravděpodobně není správně přihlášen');
+        setStores([]);
+        setLoading(false);
       }
     });
 
