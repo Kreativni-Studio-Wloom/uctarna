@@ -74,7 +74,9 @@ export interface Sale {
   discount?: { type: 'percentage' | 'amount'; value: number } | null;
   discountAmount?: number; // Částka slevy v Kč
   finalAmount?: number; // Finální částka po slevě
-  // Výdej (kuchyně): označení, že objednávka byla vydána
+  // Výdej (kuchyně): označení, že objednávka byla připravena a vydána
+  prepared?: boolean;
+  preparedAt?: Date;
   served?: boolean;
   servedAt?: Date;
 }
