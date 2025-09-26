@@ -107,7 +107,16 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 										{order.currency === 'EUR' ? `${order.totalAmount.toFixed(2)} €` : `${order.totalAmount} Kč`}
 									</div>
 								</div>
-								<div className="space-y-1 mb-4">
+					<div className="space-y-1 mb-4">
+						{order.customerName && (
+							<div className="mb-2">
+								<span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Jméno</span>
+								<div className="text-lg font-semibold text-gray-900 dark:text-white">{order.customerName}</div>
+							</div>
+						)}
+						<div className="mb-1">
+							<span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Položky</span>
+						</div>
 									{order.items.map((item, idx) => (
 										<div key={idx} className="flex justify-between items-baseline">
 											<span className="text-gray-900 dark:text-white text-lg md:text-xl font-semibold tracking-tight">{item.productName}</span>

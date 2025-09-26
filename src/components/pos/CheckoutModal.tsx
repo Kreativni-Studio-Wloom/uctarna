@@ -38,6 +38,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paidCurrency, setPaidCurrency] = useState<'CZK' | 'EUR'>('CZK');
   const [sumUpAvailable, setSumUpAvailable] = useState(false);
   const [payInEUR, setPayInEUR] = useState(false);
+  const [customerName, setCustomerName] = useState<string>('');
+  const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
@@ -83,6 +85,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (typeof data.eurRate === 'number') {
         setEurRate(data.eurRate);
       }
+      if (data.type === 'prodejna' || data.type === 'bistro') {
+        setStoreType(data.type);
+      }
     });
     return unsubscribe;
   }, [user, storeId]);
@@ -124,7 +129,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           timestamp: Date.now(),
           discount: discount || null,
           discountAmount: discountAmount || 0,
-          finalAmount: actualTotalAmount
+          finalAmount: actualTotalAmount,
+          customerName: storeType === 'bistro' ? (customerName || null) : null
         }));
         
         const paymentParams: SumUpPaymentParams = {
@@ -156,6 +162,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         createdAt: serverTimestamp(),
         storeId,
         userId: user.uid,
+        customerName: storeType === 'bistro' ? (customerName || null) : null,
         isRefund, // Přidáno pole pro identifikaci vratky
         refundAmount: isRefund ? refundAmount : null, // Přidáno pole pro částku vratky
         // Informace o vrácení při platbě v eurech
@@ -353,6 +360,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Způsob platby
               </h3>
+
+            {/* Jméno zákazníka - pouze pro bistro */}
+            {storeType === 'bistro' && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Jméno
+                </label>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Zadejte jméno zákazníka"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+            )}
               
               {/* Informace o vratce */}
               {isRefund && (

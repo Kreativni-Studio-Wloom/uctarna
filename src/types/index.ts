@@ -62,6 +62,8 @@ export interface Sale {
   createdAt: Date;
   storeId: string;
   userId: string;
+  // Jméno zákazníka (bistra)
+  customerName?: string;
   isRefund?: boolean; // Identifikace vratky
   refundAmount?: number; // Částka vratky (absolutní hodnota)
   sumUpData?: SumUpTransactionData; // SumUp specifická data (pouze při platbě kartou)

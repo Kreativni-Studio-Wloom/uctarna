@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       cartItems,
       discount,
       discountAmount,
-      finalAmount
+      finalAmount,
+      customerName
     } = body;
 
     // Validace povinných parametrů
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
         createdAt: serverTimestamp(),
         storeId,
         userId,
+        customerName: customerName || null,
         isRefund: false,
         refundAmount: null,
         served: false,

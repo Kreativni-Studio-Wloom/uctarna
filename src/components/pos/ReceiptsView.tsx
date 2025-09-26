@@ -172,6 +172,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     <Calendar className="h-4 w-4 mr-2" />
                     {formatDate(sale.createdAt)}
                   </div>
+                  {sale.customerName && (
+                    <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">
+                      <span className="text-gray-500 dark:text-gray-400 mr-2">Jméno:</span>
+                      <span className="font-medium">{sale.customerName}</span>
+                    </div>
+                  )}
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">
                     {sale.currency === 'EUR' ? 
                       `${sale.totalAmount.toFixed(2)} €` : 
@@ -246,6 +252,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     <span className="text-gray-600 dark:text-gray-400">Datum:</span>
                     <span className="font-medium text-gray-900 dark:text-white">{formatDate(selectedSale.createdAt)}</span>
                   </div>
+                  {selectedSale.customerName && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">Jméno:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{selectedSale.customerName}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Způsob platby:</span>
                     <span className="font-medium text-gray-900 dark:text-white">{getPaymentLabel(selectedSale.paymentMethod)}</span>
