@@ -117,12 +117,29 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 						<div className="mb-1">
 							<span className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Položky</span>
 						</div>
-									{order.items.map((item, idx) => (
-										<div key={idx} className="flex justify-between items-baseline">
-											<span className="text-gray-900 dark:text-white text-lg md:text-xl font-semibold tracking-tight">{item.productName}</span>
-											<span className="text-sm font-medium text-gray-900 dark:text-white">× {item.quantity}</span>
-										</div>
-									))}
+                    {order.items
+                      .filter((i: any) => !i.parentItemId)
+                      .map((item: any, idx: number) => {
+                        const children = (order.items as any[]).filter((c: any) => c.parentItemId === item.itemId);
+                        return (
+                          <div key={idx} className="mb-1">
+                            <div className="flex justify-between items-baseline">
+                              <span className="text-gray-900 dark:text-white text-lg md:text-xl font-semibold tracking-tight">{item.productName}</span>
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">× {item.quantity}</span>
+                            </div>
+                            {children.length > 0 && (
+                              <div className="mt-1 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-0.5">
+                                {children.map((ch, cidx) => (
+                                  <div key={cidx} className="flex justify-between text-sm text-gray-800 dark:text-gray-200">
+                                    <span>+ {ch.productName}</span>
+                                    <span>× {ch.quantity}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
 								</div>
 								
 								{isWaiting && (

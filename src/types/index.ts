@@ -30,13 +30,19 @@ export interface Product {
   soldCount: number; // Počet historicky prodaných kusů
   createdAt: Date;
   updatedAt: Date;
+  // Produkt může být označen jako extra (doplněk k hlavní položce)
+  isExtra?: boolean;
 }
 
 export interface CartItem {
+  // Jedinečný identifikátor položky v košíku (pro vazby parent-child)
+  itemId?: string;
   productId: string;
   productName: string;
   price: number;
   quantity: number;
+  // Pokud je položka extra, odkazuje na itemId hlavní položky
+  parentItemId?: string | null;
 }
 
 export interface PendingPurchase {

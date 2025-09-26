@@ -6,11 +6,13 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDo
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus } from 'lucide-react';
 import { AddProductModal } from './AddProductModal';
 import { CheckoutModal } from './CheckoutModal';
 import { DiscountModal } from './DiscountModal';
 import { ProductEditor } from './ProductEditor';
+import { ExtrasManagerModal } from './ExtrasManagerModal';
+import { SelectExtrasModal } from './SelectExtrasModal';
 
 interface POSSystemProps {
   storeId: string;
@@ -32,6 +34,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
   const [isReturnMode, setIsReturnMode] = useState(false);
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
+  const [showExtrasManager, setShowExtrasManager] = useState(false);
+  const [showSelectExtras, setShowSelectExtras] = useState(false);
+  const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
 
   // Funkce pro normalizaci diakritiky
   const normalizeText = (text: string): string => {
@@ -245,6 +250,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
 
   const popularProducts = products.filter(product => product.isPopular);
 
+  const generateItemId = (): string => {
+    return 'itm_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+  };
+
   // Funkce pro přidání produktu (normální nebo vratka)
   const addToCart = (product: Product) => {
     if (isReturnMode) {
@@ -259,10 +268,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
           );
         } else {
           return [...prevCart, {
+            itemId: generateItemId(),
             productId: product.id,
             productName: product.name,
             price: product.price,
-            quantity: -1
+            quantity: -1,
+            parentItemId: null,
           }];
         }
       });
@@ -270,7 +281,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
     } else {
       // Normální přidání produktu
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.productId === product.id);
+      const existingItem = prevCart.find(item => item.productId === product.id && !item.parentItemId);
       if (existingItem) {
         return prevCart.map(item =>
           item.productId === product.id
@@ -279,44 +290,76 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
         );
       } else {
         return [...prevCart, {
+          itemId: generateItemId(),
           productId: product.id,
           productName: product.name,
           price: product.price,
-          quantity: 1
+          quantity: 1,
+          parentItemId: null,
         }];
       }
     });
     }
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prevCart => prevCart.filter(item => item.productId !== productId));
+  const removeItemByItemId = (itemId: string) => {
+    setCart(prevCart => prevCart.filter(item => item.itemId !== itemId && item.parentItemId !== itemId));
   };
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    // Najdeme produkt v košíku pro určení, zda je to vratka
-    const cartItem = cart.find(item => item.productId === productId);
+  const updateQuantity = (itemId: string, quantity: number) => {
+    // Najdeme položku v košíku pro určení, zda je to vratka
+    const cartItem = cart.find(item => item.itemId === itemId);
     const isReturnItem = cartItem && cartItem.quantity < 0;
     
     // U vratek (negativní množství) povolíme záporná čísla, ale odstraníme při 0 nebo kladném
     if (isReturnItem && quantity >= 0) {
-      removeFromCart(productId);
+      if (cartItem?.itemId) removeItemByItemId(cartItem.itemId);
       return;
     }
     
     // U normálních produktů (kladné množství) odstraníme při množství <= 0
     if (!isReturnItem && quantity <= 0) {
-      removeFromCart(productId);
+      if (cartItem?.itemId) removeItemByItemId(cartItem.itemId);
       return;
     }
     
     setCart(prevCart =>
       prevCart.map(item =>
-        item.productId === productId
+        item.itemId === itemId
           ? { ...item, quantity }
           : item
       )
     );
+  };
+
+  const openSelectExtrasForItem = (parentItemId: string) => {
+    setExtrasParentItemId(parentItemId);
+    setShowSelectExtras(true);
+  };
+
+  const handleSelectExtras = (selectedExtras: Product[]) => {
+    if (!extrasParentItemId) return;
+    setCart(prev => {
+      const updated = [...prev];
+      for (const p of selectedExtras) {
+        // Pokud už existuje stejný extra pro tento parent, zvyšit množství
+        const existing = updated.find(i => i.productId === p.id && i.parentItemId === extrasParentItemId);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          updated.push({
+            itemId: generateItemId(),
+            productId: p.id,
+            productName: p.name,
+            price: p.price,
+            quantity: 1,
+            parentItemId: extrasParentItemId,
+          });
+        }
+      }
+      return updated;
+    });
+    setExtrasParentItemId(null);
   };
 
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -415,6 +458,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
             </button>
             <button
               onClick={() => {
+                setShowExtrasManager(true);
+                setShowMenu(false);
+              }}
+              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
+            >
+              <ListPlus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-green-600 flex-shrink-0" />
+              <span className="truncate">Přidat extras</span>
+            </button>
+            <button
+              onClick={() => {
                 setShowProductEditor(true);
                 setShowMenu(false);
               }}
@@ -486,45 +539,81 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
               </div>
             ) : (
               <div className="space-y-2 md:space-y-3">
-                {cart.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                    <div className="flex-1 min-w-0 mr-2">
-                      <h4 className="font-medium text-gray-900 dark:text-gray-100 text-xs md:text-sm truncate">
-                        {item.productName}
-                      </h4>
-                      <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300">
-                        {item.price} Kč × {item.quantity}
-        </p>
-      </div>
-                    <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
-                      <button
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                        className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-bold"
-                      >
-                        -
-                      </button>
-                      <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                        className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs md:text-sm font-bold"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="text-right ml-2 flex-shrink-0">
-                      <p className={`font-semibold text-xs md:text-sm ${
-                        item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                      }`}>
-                        {item.price * item.quantity} Kč
-                      </p>
-                      {item.quantity < 0 && (
-                        <p className="text-xs text-red-500">Vratka</p>
+                {cart.filter(ci => !ci.parentItemId).map((item) => {
+                  const children = cart.filter(c => c.parentItemId === item.itemId);
+                  return (
+                    <div key={item.itemId || item.productId} className="p-2 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0 mr-2">
+                          <h4 className="font-medium text-gray-900 dark:text-gray-100 text-xs md:text-sm truncate">
+                            {item.productName}
+                          </h4>
+                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300">
+                            {item.price} Kč × {item.quantity}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
+                          <button
+                            onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
+                            className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-bold"
+                          >
+                            -
+                          </button>
+                          <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
+                            className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs md:text-sm font-bold"
+                          >
+                            +
+                          </button>
+                          {!isReturnMode && (
+                            <button
+                              onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
+                              className="ml-1 px-2 py-1 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40"
+                            >
+                              Extra
+                            </button>
+                          )}
+                        </div>
+                        <div className="text-right ml-2 flex-shrink-0">
+                          <p className={`font-semibold text-xs md:text-sm ${
+                            item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                          }`}>
+                            {item.price * item.quantity} Kč
+                          </p>
+                          {item.quantity < 0 && (
+                            <p className="text-xs text-red-500">Vratka</p>
+                          )}
+                        </div>
+                      </div>
+                      {children.length > 0 && (
+                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1">
+                          {children.map(ch => (
+                            <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
+                              className="flex items-center justify-between text-xs md:text-sm text-gray-800 dark:text-gray-200">
+                              <div className="truncate">
+                                + {ch.productName} — {ch.price} Kč × {ch.quantity}
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
+                                  className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center">
+                                  -
+                                </button>
+                                <span className="w-5 text-center">{ch.quantity}</span>
+                                <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
+                                  className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center">
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 
                 {/* Sleva */}
                 {discount && (
@@ -796,6 +885,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
       </AnimatePresence>
 
       <AnimatePresence>
+        {showExtrasManager && (
+          <ExtrasManagerModal
+            storeId={storeId}
+            onClose={() => setShowExtrasManager(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showCheckout && (
           <CheckoutModal
             onClose={() => setShowCheckout(false)}
@@ -831,6 +929,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
               setDiscount(discountData);
               setShowDiscountModal(false);
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSelectExtras && extrasParentItemId && (
+          <SelectExtrasModal
+            storeId={storeId}
+            onClose={() => { setShowSelectExtras(false); setExtrasParentItemId(null); }}
+            onSelect={handleSelectExtras}
           />
         )}
       </AnimatePresence>

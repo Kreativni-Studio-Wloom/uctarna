@@ -265,16 +265,31 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <h4 className="font-medium text-gray-900 dark:text-white mb-3">Položky:</h4>
                     <div className="space-y-2">
-                      {selectedSale.items.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center text-sm">
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {item.productName} × {item.quantity}
-                          </span>
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {item.price * item.quantity} Kč
-                          </span>
-                        </div>
-                      ))}
+                      {(selectedSale.items as any[]).filter(i => !i.parentItemId).map((item: any, index: number) => {
+                        const children = (selectedSale.items as any[]).filter(c => c.parentItemId === item.itemId);
+                        return (
+                          <div key={index}>
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {item.productName} × {item.quantity}
+                              </span>
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {item.price * item.quantity} Kč
+                              </span>
+                            </div>
+                            {children.length > 0 && (
+                              <div className="mt-1 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1">
+                                {children.map((ch, cidx) => (
+                                  <div key={cidx} className="flex justify-between items-center text-xs">
+                                    <span className="text-gray-600 dark:text-gray-400">+ {ch.productName} × {ch.quantity}</span>
+                                    <span className="text-gray-700 dark:text-gray-300">{ch.price * ch.quantity} Kč</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
