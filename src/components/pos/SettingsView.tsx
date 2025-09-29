@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -15,6 +15,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user } = useAuth();
   const extendedUser = user as any; // Cast na ExtendedUser
   const [eurRate, setEurRate] = useState(25.0);
+  const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -27,6 +28,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       if (typeof data.eurRate === 'number') {
         setEurRate(data.eurRate);
       }
+      if (typeof data.redirectToSumUp === 'boolean') {
+        setRedirectToSumUp(data.redirectToSumUp);
+      }
     });
     return unsubscribe;
   }, [user, storeId]);
@@ -38,6 +42,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
     try {
       await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
         eurRate,
+        redirectToSumUp,
         updatedAt: serverTimestamp(),
       });
       setSaved(true);
@@ -89,7 +94,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       </div>
 
       {/* Settings Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* EUR Rate Setting */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -145,6 +150,77 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               </div>
               <div className="text-sm text-gray-700 dark:text-gray-300">
                 500 Kč = {(500 / eurRate).toFixed(2)} EUR
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* SumUp Redirect Setting */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
+              <CreditCard className="h-6 w-6 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Platba kartou
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Nastavení přesměrování na SumUp při platbě kartou
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  Přesměrovat na SumUp
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {redirectToSumUp ? 
+                    'Platba kartou přesměruje na SumUp aplikaci' : 
+                    'Platba kartou se pouze zaznamená do dokladu'
+                  }
+                </div>
+              </div>
+              <button
+                onClick={() => setRedirectToSumUp(!redirectToSumUp)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  redirectToSumUp ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    redirectToSumUp ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                Jak to funguje:
+              </div>
+              <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                {redirectToSumUp ? (
+                  <>
+                    <div>• Kliknutím na "Zaplatit kartou" se otevře SumUp app</div>
+                    <div>• Zákazník dokončí platbu v SumUp aplikaci</div>
+                    <div>• Po úspěšné platbě se vrátí zpět do systému</div>
+                  </>
+                ) : (
+                  <>
+                    <div>• Kliknutím na "Zaplatit kartou" se pouze zaznamená prodej</div>
+                    <div>• Žádné přesměrování na SumUp aplikaci</div>
+                    <div>• Ideální pro offline režim nebo testování</div>
+                  </>
+                )}
               </div>
             </div>
           </div>

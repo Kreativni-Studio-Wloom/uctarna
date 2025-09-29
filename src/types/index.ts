@@ -18,6 +18,7 @@ export interface Store {
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
+  redirectToSumUp?: boolean; // Nastavení pro přesměrování na SumUp při platbě kartou
 }
 
 export interface Product {

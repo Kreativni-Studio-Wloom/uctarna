@@ -42,6 +42,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [payInEUR, setPayInEUR] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
+  const [redirectToSumUp, setRedirectToSumUp] = useState(true);
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
@@ -89,6 +90,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
       if (data.type === 'prodejna' || data.type === 'bistro') {
         setStoreType(data.type);
+      }
+      if (typeof data.redirectToSumUp === 'boolean') {
+        setRedirectToSumUp(data.redirectToSumUp);
       }
     });
     return unsubscribe;
@@ -145,7 +149,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setLoading(true);
     try {
       // SumUp platba kartou - otevře se až při kliknutí "Zaplatit kartou"
-      if (paymentMethod === 'card' && !isRefund && sumUpAvailable) {
+      if (paymentMethod === 'card' && !isRefund && sumUpAvailable && redirectToSumUp) {
         // Vygenerujeme unikátní ID dokladu
         const documentId = SumUpService.generateDocumentId();
 
@@ -183,7 +187,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return; // Nezavírej modal, nech SumUp app otevřít
       }
 
-      // Hotovost nebo neúspěšná SumUp platba - vytvoř prodej/vratku v Firestore
+      // Hotovost nebo platba kartou bez přesměrování na SumUp - vytvoř prodej/vratku v Firestore
       const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
       const sale = {
         items: cart,
@@ -487,12 +491,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
               
               {/* SumUp info - pouze při platbě kartou */}
-              {paymentMethod === 'card' && sumUpAvailable && (
+              {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && (
                 <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                   <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
                     <CreditCard className="h-4 w-4 mr-2" />
                     <span>
                       Platba kartou proběhne přes SumUp aplikaci. Po kliknutí "Zaplatit" se otevře SumUp app s předvyplněnou částkou {totalAmount} Kč.
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* SumUp vypnuté - pouze při platbě kartou */}
+              {paymentMethod === 'card' && sumUpAvailable && !redirectToSumUp && (
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                  <div className="flex items-center text-sm text-green-700 dark:text-green-300">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    <span>
+                      Platba kartou se zaznamená pouze do dokladu. SumUp aplikace se neotevře.
                     </span>
                   </div>
                 </div>
