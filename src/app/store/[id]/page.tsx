@@ -78,7 +78,7 @@ export default function StorePage() {
       case 'settings':
         return <SettingsView storeId={storeId} />;
       default:
-        return <POSSystem storeId={storeId} />;
+        return <POSSystem storeId={storeId} storeName={store.name} />;
     }
   };
 
