@@ -72,7 +72,7 @@ export default function StorePage() {
       case 'receipts':
         return <ReceiptsView storeId={storeId} />;
       case 'dispatch':
-        return store.type === 'bistro' ? <DispatchView storeId={storeId} /> : <POSSystem storeId={storeId} />;
+        return store.type === 'bistro' ? <DispatchView storeId={storeId} /> : <POSSystem storeId={storeId} storeName={store.name} />;
       case 'reports':
         return <ReportsView storeId={storeId} />;
       case 'settings':
