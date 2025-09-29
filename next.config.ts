@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   
   // Optimalizace obrázků
   images: {
-    unoptimized: false, // Povoleno pro lepší kvalitu
+    unoptimized: true, // Sníží náklady na optimalizaci a stabilizuje build na Vercelu
   },
   
   // PWA podpora
@@ -37,27 +37,12 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   
-  // Environment proměnné
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
-  },
+  // Environment proměnné - ponechat prázdné pro menší client bundle
+  env: {},
   
   // Webpack konfigurace pro optimalizaci
-  webpack: (config, { dev, isServer }) => {
-    // Optimalizace pro produkci
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: 'all',
-        cacheGroups: {
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            chunks: 'all',
-          },
-        },
-      };
-    }
-    
+  webpack: (config) => {
+    // Minimalistická konfigurace bez nadbytečných zásahů do splitChunks
     return config;
   },
 }

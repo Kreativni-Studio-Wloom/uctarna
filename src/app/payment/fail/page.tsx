@@ -13,6 +13,27 @@ function PaymentFailContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Pokud se stránka otevřela v novém okně (má opener), vrať kontrolu do původního okna
+    try {
+      if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
+        window.opener.location.assign(window.location.href);
+        window.close();
+        return;
+      }
+    } catch {}
+
+    // Notifikace původního okna (bez opener)
+    try {
+      const bc = new BroadcastChannel('uctarna_payments');
+      bc.postMessage({ type: 'PAYMENT_FAIL' });
+      localStorage.setItem('uctarna_payment_result', JSON.stringify({ type: 'PAYMENT_FAIL', at: Date.now() }));
+    } catch {}
+
+    try {
+      window.open('', '_self');
+      window.close();
+    } catch {}
+
     // Získání callback parametrů z URL
     const status = searchParams.get('smp-status') as SumUpCallbackParams['status'];
     const txCode = searchParams.get('smp-tx-code');

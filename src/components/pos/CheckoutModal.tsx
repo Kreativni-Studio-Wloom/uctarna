@@ -94,6 +94,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return unsubscribe;
   }, [user, storeId]);
 
+  // Poslech výsledku platby z návratové stránky (BroadcastChannel + storage event)
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('uctarna_payments');
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type === 'PAYMENT_SUCCESS') {
+          // Zavři modal a dej vědět rodiči
+          onSuccess();
+        }
+      };
+    } catch {}
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'uctarna_payment_result' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          if (data?.type === 'PAYMENT_SUCCESS') {
+            onSuccess();
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      try { bc && bc.close(); } catch {}
+    };
+  }, [onSuccess]);
+
   // Automaticky nastavit měnu podle platby v eurech
   useEffect(() => {
     if (payInEUR) {

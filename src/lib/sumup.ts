@@ -68,13 +68,20 @@ export class SumUpService {
     // Přidáme data do callback URL
     if (params.storeId) successUrl.searchParams.set('storeId', params.storeId);
     if (params.userId) successUrl.searchParams.set('userId', params.userId);
-    if (params.foreignTxId) successUrl.searchParams.set('foreignTxId', params.foreignTxId);
+    if (params.foreignTxId) {
+      // Přidej obě varianty pro jistotu, SumUp přidá vlastní "foreign-tx-id"
+      successUrl.searchParams.set('foreignTxId', params.foreignTxId);
+      successUrl.searchParams.set('foreign-tx-id', params.foreignTxId);
+    }
     if (params.amount) successUrl.searchParams.set('amount', params.amount.toString());
     if (params.currency) successUrl.searchParams.set('currency', params.currency);
     
     if (params.storeId) failUrl.searchParams.set('storeId', params.storeId);
     if (params.userId) failUrl.searchParams.set('userId', params.userId);
-    if (params.foreignTxId) failUrl.searchParams.set('foreignTxId', params.foreignTxId);
+    if (params.foreignTxId) {
+      failUrl.searchParams.set('foreignTxId', params.foreignTxId);
+      failUrl.searchParams.set('foreign-tx-id', params.foreignTxId);
+    }
     if (params.amount) failUrl.searchParams.set('amount', params.amount.toString());
     if (params.currency) failUrl.searchParams.set('currency', params.currency);
     
@@ -97,7 +104,8 @@ export class SumUpService {
       // Otevření SumUp app přes URL scheme
       // iOS: sumupmerchant://pay/1.0
       // Android: sumupmerchant://pay/1.0
-      window.location.href = paymentUrl;
+      // Otevři SumUp ve stejném okně/záložce
+      window.location.assign(paymentUrl);
       
       console.log('🔗 Otevírám SumUp app pro platbu kartou:', paymentUrl);
     } catch (error) {

@@ -152,7 +152,7 @@ firebase functions:config:set email.password="your-app-password"
 ## 📱 PWA Deployment
 
 ### 1. Service Worker
-- `sw.js` je automaticky kopírován do `out/` složky
+- `sw.js` je poskytován přímo z `public/sw.js`
 - PWA manifest je v `public/manifest.json`
 
 ### 2. Icons

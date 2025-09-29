@@ -16,8 +16,6 @@
     "firebase:serve": "cd functions && npm run serve"
   },
   "dependencies": {
-    "@firebase/auth": "^1.6.0",
-    "@firebase/firestore": "^4.4.0",
     "@headlessui/react": "^1.7.17",
     "@hookform/resolvers": "^3.3.2",
     "date-fns": "^2.30.0",

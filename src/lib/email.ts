@@ -1,26 +1,4 @@
-import { sendEmailViaRealSMTP, SEZNAM_SMTP_CONFIG } from './real-smtp';
-
-// Email konfigurace pro Seznam SMTP
-export const EMAIL_CONFIG = {
-  from: 'info@wloom.eu',
-  smtp: {
-    host: 'smtp.seznam.cz',
-    port: 465,
-    secure: true,
-    auth: {
-      user: 'info@wloom.eu',
-      pass: 'vokhot-nigvub-vAvfy2'
-    }
-  }
-};
-
-// Interface pro email data
-export interface EmailData {
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}
+// Tento modul poskytuje pouze generování obsahu e-mailu pro uzávěrky.
 
 // Interface pro report data
 export interface ReportData {
@@ -55,40 +33,6 @@ export interface ReportData {
     paymentMethod: string;
     totalAmount: number;
   }>;
-}
-
-// Funkce pro odesílání emailu přes skutečný SMTP server
-export async function sendEmailViaService(emailData: EmailData) {
-  try {
-    console.log('📧 Sending email via real SMTP server:', {
-      from: EMAIL_CONFIG.from,
-      to: emailData.to,
-      subject: emailData.subject
-    });
-
-    // Odešli email přes skutečný SMTP server
-    const result = await sendEmailViaRealSMTP({
-      from: EMAIL_CONFIG.from,
-      to: emailData.to,
-      subject: emailData.subject,
-      html: emailData.html,
-      text: emailData.text
-    });
-
-    if (result.success) {
-      console.log('✅ Email sent successfully via real SMTP server:', result.messageId);
-      return {
-        success: true,
-        messageId: result.messageId || `email_${Date.now()}`
-      };
-    } else {
-      throw new Error(result.error || 'Unknown real SMTP server error');
-    }
-    
-  } catch (error) {
-    console.error('❌ Error sending email via real SMTP server:', error);
-    throw error;
-  }
 }
 
 // Funkce pro generování email obsahu

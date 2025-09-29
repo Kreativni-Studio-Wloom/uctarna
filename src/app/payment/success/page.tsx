@@ -16,6 +16,19 @@ function PaymentSuccessContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Dříve: vraceli jsme kontrolu do původního okna (window.opener) a zavírali záložku.
+    // Nově: necháme stránku success zůstat otevřenou kvůli jasné zpětné vazbě.
+
+    // Notifikace původního okna (bez opener) přes BroadcastChannel + storage event
+    try {
+      const bc = new BroadcastChannel('uctarna_payments');
+      bc.postMessage({ type: 'PAYMENT_SUCCESS' });
+      // storage event (jistota na Safari)
+      localStorage.setItem('uctarna_payment_result', JSON.stringify({ type: 'PAYMENT_SUCCESS', at: Date.now() }));
+    } catch {}
+
+    // Neprovádíme auto-zavření okna
+
     const status = (searchParams.get('smp-status') || searchParams.get('status')) as SumUpCallbackParams['status'];
     const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code');
     const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id');
@@ -41,8 +54,8 @@ function PaymentSuccessContent() {
     } catch {}
 
     // Pokud je platba úspěšná, uložíme prodej do databáze
-    if (status === 'success' && foreignTxId) {
-      handleSaveSale(status, txCode, foreignTxId);
+    if (status === 'success') {
+      handleSaveSale(status, txCode, foreignTxId || '');
     }
     
     setLoading(false);
@@ -157,8 +170,52 @@ function PaymentSuccessContent() {
         // Neprovádět automatickou navigaci – uživatel použije tlačítka níže
       }
     } catch (error) {
-      console.error('❌ Chyba při ukládání prodeje:', error);
-      alert('Chyba při ukládání prodeje. Kontaktujte podporu.');
+      console.error('❌ Chyba při ukládání prodeje přes API, zkouším fallback:', error);
+      try {
+        const paymentDataRaw = localStorage.getItem('uctarna_payment_data');
+        if (!paymentDataRaw) return;
+        const paymentData = JSON.parse(paymentDataRaw);
+        const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName } = paymentData;
+        if (!storeId || !userId || !Array.isArray(cartItems)) return;
+
+        const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
+        await setDoc(saleRef, {
+          items: cartItems,
+          totalAmount: totalAmount || 0,
+          paymentMethod: 'card',
+          documentId: documentId || foreignTxId,
+          createdAt: serverTimestamp(),
+          storeId,
+          userId,
+          customerName: customerName || null,
+          isRefund: false,
+          refundAmount: null,
+          served: false,
+          discount: discount || null,
+          discountAmount: discountAmount || 0,
+          finalAmount: finalAmount || totalAmount || 0,
+          sumUpData: {
+            foreignTxId: foreignTxId,
+            sumUpTxCode: txCode,
+            status: 'success',
+            callbackReceived: true,
+            callbackTimestamp: new Date()
+          }
+        }, { merge: true });
+
+        try {
+          for (const item of cartItems) {
+            const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
+            await setDoc(productRef, {
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          }
+        } catch (e) {
+          console.warn('⚠️ Fallback: aktualizace produktů se nezdařila:', e);
+        }
+      } catch (fallbackErr) {
+        console.error('❌ Fallback ukládání selhalo:', fallbackErr);
+      }
     }
   };
 

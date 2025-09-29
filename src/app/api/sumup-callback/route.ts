@@ -77,23 +77,40 @@ export async function POST(request: NextRequest) {
       const saleRef = await addDoc(collection(db, 'users', userId, 'stores', storeId, 'sales'), sale);
       console.log('✅ Prodej uložen s ID:', saleRef.id);
 
-      // Aktualizuj počet prodaných kusů pro každý produkt
-      console.log('📊 Aktualizuji počty prodaných kusů...');
-      for (const item of cartItems) {
-        console.log(`  - Produkt ${item.productId}: +${item.quantity} kusů`);
-        const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
-        await updateDoc(productRef, {
-          soldCount: increment(item.quantity),
-          updatedAt: serverTimestamp()
-        });
+      // Aktualizace produktů je best-effort: případné chyby logujeme, ale neblokují odpověď
+      let inventoryUpdated = 0;
+      let inventoryFailed = 0;
+      try {
+        console.log('📊 Aktualizuji počty prodaných kusů...');
+        for (const item of cartItems) {
+          try {
+            console.log(`  - Produkt ${item.productId}: +${item.quantity} kusů`);
+            const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
+            await updateDoc(productRef, {
+              soldCount: increment(item.quantity),
+              updatedAt: serverTimestamp()
+            });
+            inventoryUpdated += 1;
+          } catch (e) {
+            inventoryFailed += 1;
+            console.error('⚠️ Nepodařilo se aktualizovat produkt', item?.productId, e);
+          }
+        }
+      } catch (e) {
+        console.error('⚠️ Chyba při hromadné aktualizaci produktů:', e);
       }
 
-      console.log('✅ SumUp platba úspěšně uložena:', saleRef.id);
+      console.log('✅ SumUp platba úspěšně uložena:', saleRef.id, {
+        inventoryUpdated,
+        inventoryFailed,
+      });
 
       return NextResponse.json({
         success: true,
         saleId: saleRef.id,
-        message: 'Prodej byl úspěšně uložen'
+        message: 'Prodej byl úspěšně uložen',
+        inventoryUpdated,
+        inventoryFailed,
       });
 
     } else {
@@ -109,13 +126,25 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Chyba při zpracování SumUp callback:', error);
     console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
-    
+
+    // Rozlišení typických chyb Firestore
+    const message = error instanceof Error ? error.message : String(error);
+    const isPermission = /PERMISSION_DENIED/i.test(message);
+    const isNotFound = /NOT_FOUND/i.test(message);
+
+    const statusCode = isPermission ? 403 : isNotFound ? 404 : 500;
+    const statusText = isPermission
+      ? 'Nedostatečná oprávnění'
+      : isNotFound
+      ? 'Dokument nebyl nalezen'
+      : 'Interní chyba serveru';
+
     return NextResponse.json(
-      { 
-        error: 'Interní chyba serveru',
-        details: error instanceof Error ? error.message : 'Neznámá chyba'
+      {
+        error: statusText,
+        details: message,
       },
-      { status: 500 }
+      { status: statusCode }
     );
   }
 }
