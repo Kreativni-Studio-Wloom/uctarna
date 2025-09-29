@@ -6,10 +6,13 @@ import { SumUpCallbackParams } from '@/lib/sumup';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    console.log('📥 SumUp callback přijat:', JSON.stringify(body, null, 2));
+    
     const { 
       status, 
       txCode, 
       foreignTxId, 
+      documentId,
       amount, 
       currency, 
       storeId, 
@@ -23,6 +26,15 @@ export async function POST(request: NextRequest) {
 
     // Validace povinných parametrů
     if (!status || !foreignTxId || !storeId || !userId || !cartItems || amount === undefined || !currency) {
+      console.error('❌ Chybí povinné parametry:', {
+        status: !!status,
+        foreignTxId: !!foreignTxId,
+        storeId: !!storeId,
+        userId: !!userId,
+        cartItems: !!cartItems,
+        amount: amount,
+        currency: !!currency
+      });
       return NextResponse.json(
         { error: 'Chybí povinné parametry' },
         { status: 400 }
@@ -31,11 +43,14 @@ export async function POST(request: NextRequest) {
 
     // Kontrola, zda je platba úspěšná
     if (status === 'success') {
+      console.log('💳 Zpracovávám úspěšnou platbu...');
+      
       // Vytvoř prodej v Firestore
       const sale = {
         items: cartItems,
         totalAmount: amount || 0,
         paymentMethod: 'card',
+        documentId: documentId || foreignTxId, // Použij documentId nebo fallback na foreignTxId
         createdAt: serverTimestamp(),
         storeId,
         userId,
@@ -56,11 +71,16 @@ export async function POST(request: NextRequest) {
         }
       };
 
+      console.log('💾 Ukládám prodej do databáze...', { storeId, userId, itemsCount: cartItems.length });
+      
       // Ulož prodej do databáze
       const saleRef = await addDoc(collection(db, 'users', userId, 'stores', storeId, 'sales'), sale);
+      console.log('✅ Prodej uložen s ID:', saleRef.id);
 
       // Aktualizuj počet prodaných kusů pro každý produkt
+      console.log('📊 Aktualizuji počty prodaných kusů...');
       for (const item of cartItems) {
+        console.log(`  - Produkt ${item.productId}: +${item.quantity} kusů`);
         const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
         await updateDoc(productRef, {
           soldCount: increment(item.quantity),
@@ -88,9 +108,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Chyba při zpracování SumUp callback:', error);
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
     
     return NextResponse.json(
-      { error: 'Interní chyba serveru' },
+      { 
+        error: 'Interní chyba serveru',
+        details: error instanceof Error ? error.message : 'Neznámá chyba'
+      },
       { status: 500 }
     );
   }

@@ -16,9 +16,10 @@ import { SelectExtrasModal } from './SelectExtrasModal';
 
 interface POSSystemProps {
   storeId: string;
+  storeName: string;
 }
 
-export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
+export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -73,6 +74,22 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
 
     return unsubscribe;
   }, [user, storeId]);
+
+  // Posluchač pro zprávy o úspěšné platbě kartou
+  useEffect(() => {
+    const handlePaymentSuccess = (event: MessageEvent) => {
+      if (event.data?.type === 'PAYMENT_SUCCESS') {
+        // Vyčistit košík, zavřít modal a resetovat slevu
+        setCart([]);
+        setShowCheckout(false);
+        setDiscount(null);
+        console.log('✅ Úspěšná platba kartou - košík vyčištěn');
+      }
+    };
+
+    window.addEventListener('message', handlePaymentSuccess);
+    return () => window.removeEventListener('message', handlePaymentSuccess);
+  }, []);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
@@ -243,10 +260,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
     )
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 
-  // Top 12 nejprodávanějších produktů na základě soldCount
+  // Top 20 nejprodávanějších produktů na základě soldCount
   const topSellingProducts = products
     .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0))
-    .slice(0, 12);
+    .slice(0, 20);
 
   const popularProducts = products.filter(product => product.isPopular);
 
@@ -845,7 +862,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
             </div>
           )}
 
-          {/* Top 12 Nejprodávanějších */}
+          {/* Top 20 Nejprodávanějších */}
           {topSellingProducts.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -900,6 +917,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId }) => {
             cart={cart}
             totalAmount={totalAmount}
             storeId={storeId}
+            storeName={storeName}
             discount={discount}
             discountAmount={discountAmount}
             finalAmount={finalAmount}

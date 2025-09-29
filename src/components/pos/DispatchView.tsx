@@ -102,7 +102,7 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 									: 'border-gray-200 dark:border-gray-700'
 							}`}>
 								<div className="flex items-center justify-between mb-3">
-									<div className="text-sm text-gray-500 dark:text-gray-400">#{order.id.slice(-6)}</div>
+									<div className="text-sm text-gray-500 dark:text-gray-400">{order.documentId || `#${order.id.slice(-6)}`}</div>
 									<div className="text-lg font-bold text-gray-900 dark:text-white">
 										{order.currency === 'EUR' ? `${order.totalAmount.toFixed(2)} €` : `${order.totalAmount} Kč`}
 									</div>

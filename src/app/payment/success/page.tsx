@@ -61,7 +61,19 @@ function PaymentSuccessContent() {
         return;
       }
       
-      const { storeId, userId, cartItems, totalAmount, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName } = JSON.parse(paymentData);
+      const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName } = JSON.parse(paymentData);
+      
+      console.log('📋 Data z localStorage:', {
+        storeId,
+        userId,
+        cartItemsCount: cartItems?.length,
+        totalAmount,
+        foreignTxId: foreignTxId || storedForeign,
+        discount,
+        discountAmount,
+        finalAmount,
+        customerName
+      });
       
       if (!storeId || !userId) {
         console.error('Chybí storeId nebo userId v localStorage');
@@ -69,6 +81,7 @@ function PaymentSuccessContent() {
       }
  
       // Voláme API pro uložení prodeje
+      console.log('🚀 Volám API /api/sumup-callback...');
       const response = await fetch('/api/sumup-callback', {
         method: 'POST',
         headers: {
@@ -78,6 +91,7 @@ function PaymentSuccessContent() {
           status,
           txCode,
           foreignTxId: foreignTxId || storedForeign,
+          documentId: documentId || foreignTxId || storedForeign,
           amount: totalAmount,
           currency: 'CZK', // SumUp platby jsou vždy v CZK
           storeId,
@@ -94,9 +108,22 @@ function PaymentSuccessContent() {
         if (response.ok) {
           const result = await response.json();
           console.log('✅ Prodej úspěšně uložen:', result);
+          
+          // Po úspěšném uložení prodeje zavolej onSuccess callback
+          // Tím se vyčistí košík, zavře modal a resetuje sleva
+          if (typeof window !== 'undefined' && window.parent) {
+            // Pokud jsme v iframe nebo popup, zavolej callback v parent okně
+            window.parent.postMessage({ type: 'PAYMENT_SUCCESS' }, '*');
+          }
         } else {
           const text = await response.text();
           console.error('❌ Chyba při ukládání prodeje:', response.status, text);
+          try {
+            const errorData = JSON.parse(text);
+            console.error('❌ Detail chyby:', errorData);
+          } catch (e) {
+            console.error('❌ Nelze parsovat chybovou odpověď:', text);
+          }
         }
       } finally {
         // Vždy uklidit košík a vrátit se do obchodu, aby nezůstaly položky v košíku

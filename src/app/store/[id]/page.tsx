@@ -68,7 +68,7 @@ export default function StorePage() {
   const renderView = () => {
     switch (currentView) {
       case 'pos':
-        return <POSSystem storeId={storeId} />;
+        return <POSSystem storeId={storeId} storeName={store.name} />;
       case 'receipts':
         return <ReceiptsView storeId={storeId} />;
       case 'dispatch':
@@ -115,7 +115,7 @@ export default function StorePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
@@ -144,7 +144,7 @@ export default function StorePage() {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <nav className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-6 md:space-x-8 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
             {([

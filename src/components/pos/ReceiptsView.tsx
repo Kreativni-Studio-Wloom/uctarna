@@ -156,7 +156,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                   <div className="flex items-center">
                     <Receipt className="h-5 w-5 text-purple-600 mr-2" />
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      #{sale.id.slice(-8)}
+                      {sale.documentId || `#${sale.id.slice(-8)}`}
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
@@ -192,6 +192,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {sale.items.length} položek
                   </div>
+                  {sale.paymentMethod === 'card' && sale.sumUpData?.sumUpTxCode && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span className="text-gray-400 mr-1">SumUp:</span>
+                      <span className="font-mono">{sale.sumUpData.sumUpTxCode}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex space-x-2">
@@ -262,6 +268,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     <span className="text-gray-600 dark:text-gray-400">Způsob platby:</span>
                     <span className="font-medium text-gray-900 dark:text-white">{getPaymentLabel(selectedSale.paymentMethod)}</span>
                   </div>
+                  {selectedSale.paymentMethod === 'card' && selectedSale.sumUpData?.sumUpTxCode && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">SumUp kód:</span>
+                      <span className="font-mono text-sm text-gray-900 dark:text-white">{selectedSale.sumUpData.sumUpTxCode}</span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <h4 className="font-medium text-gray-900 dark:text-white mb-3">Položky:</h4>
                     <div className="space-y-2">

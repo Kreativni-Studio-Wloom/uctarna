@@ -59,6 +59,7 @@ export interface PendingPurchase {
 
 export interface Sale {
   id: string;
+  documentId?: string; // Unikátní 10místné ID dokladu
   items: CartItem[];
   totalAmount: number; // v Kč nebo EUR (může být záporné pro vratky)
   paymentMethod: 'cash' | 'card'; // SumUp funguje automaticky při platbě kartou

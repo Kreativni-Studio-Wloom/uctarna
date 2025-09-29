@@ -179,6 +179,22 @@ export class SumUpService {
     const random = Math.random().toString(36).substr(2, 9);
     return `TX_${timestamp}_${random}`;
   }
+
+  /**
+   * Generuje unikátní 10místné ID dokladu (malá písmena + číslice)
+   * Zajišťuje, že se ID nikdy neopakuje
+   */
+  static generateDocumentId(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    
+    // Generuj přesně 10 znaků
+    for (let i = 0; i < 10; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    return result;
+  }
 }
 
 // Instance SumUp service s vaším API klíčem

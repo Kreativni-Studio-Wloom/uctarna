@@ -14,6 +14,7 @@ interface CheckoutModalProps {
   cart: CartItem[];
   totalAmount: number;
   storeId: string;
+  storeName: string;
   onSuccess: () => void;
   discount?: { type: 'percentage' | 'amount'; value: number } | null;
   discountAmount?: number;
@@ -25,6 +26,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   cart,
   totalAmount,
   storeId,
+  storeName,
   onSuccess,
   discount,
   discountAmount,
@@ -115,8 +117,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       // SumUp platba kartou - otevře se až při kliknutí "Zaplatit kartou"
       if (paymentMethod === 'card' && !isRefund && sumUpAvailable) {
-        // Vygenerujeme TX id dopředu, uložíme a použijeme v payment params
-        const generatedForeignTxId = SumUpService.generateTransactionId();
+        // Vygenerujeme unikátní ID dokladu
+        const documentId = SumUpService.generateDocumentId();
 
         // Uložíme kompletní informace o platbě do localStorage pro callback navigaci a opakování
         localStorage.setItem('uctarna_payment_data', JSON.stringify({
@@ -125,7 +127,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           cartItems: cart,
           totalAmount: actualTotalAmount,
           currency: 'CZK',
-          foreignTxId: generatedForeignTxId,
+          documentId: documentId,
+          foreignTxId: documentId, // Použijeme documentId jako foreignTxId pro SumUp
           timestamp: Date.now(),
           discount: discount || null,
           discountAmount: discountAmount || 0,
@@ -136,8 +139,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const paymentParams: SumUpPaymentParams = {
           amount: actualTotalAmount,
           currency: 'CZK',
-          title: `Nákup v obchodě`,
-          foreignTxId: generatedForeignTxId,
+          title: `${documentId} - ${storeName}`,
+          foreignTxId: documentId,
           skipSuccessScreen: true,
           // Přidáno pro callback handling
           storeId,
@@ -152,6 +155,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
 
       // Hotovost nebo neúspěšná SumUp platba - vytvoř prodej/vratku v Firestore
+      const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
       const sale = {
         items: cart,
         totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
@@ -159,6 +163,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         currency: payInEUR ? 'EUR' : 'CZK', // Přidat měnu
         eurRate: payInEUR ? eurRate : null, // Přidat kurz pokud je platba v eurech
         originalAmountCZK: totalAmount, // Původní částka v korunách pro reference
+        documentId: documentId, // Unikátní ID dokladu
         createdAt: serverTimestamp(),
         storeId,
         userId: user.uid,
