@@ -56,7 +56,7 @@ Moderní online prodejní systém ve stylu ProfiÚčtenka s Firebase, offline po
 ### **Email systém**
 - **SMTP Seznam.cz**: Oficiální SMTP server
 - **Port 465**: Šifrované SSL/TLS spojení
-- **Autentifikace**: Povinná s uživatelem info@wloom.eu
+- **Autentifikace**: Povinná s uživatelem info@uctarna.fun
 - **Frontend API**: Next.js API routes pro odesílání
 
 ### **PWA & Offline**

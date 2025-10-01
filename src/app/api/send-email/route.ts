@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
-// SMTP konfigurace pro Seznam.cz
+// SMTP konfigurace pro Účtárna
 const transporter = nodemailer.createTransport({
   host: 'smtp.seznam.cz',
   port: 465,
   secure: true, // SSL/TLS
   auth: {
-    user: 'info@wloom.eu',
-    pass: 'vokhot-nigvub-vAvfy2'
+    user: 'info@uctarna.fun',
+    pass: 'xeQvep-coccec-watza7'
   },
   tls: {
     rejectUnauthorized: false
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Email data pro uživatele
     const userMailOptions = {
-      from: 'info@wloom.eu',
+      from: 'info@uctarna.fun',
       to: to,
       subject: subject,
       html: html,

@@ -53,8 +53,8 @@ firebase deploy --only functions
 ### Seznam SMTP nastavení
 - **Server**: smtp.seznam.cz
 - **Port**: 465 (SSL/TLS)
-- **Email**: info@wloom.eu
-- **Heslo**: vokhot-nigvub-vAvfy2
+- **Email**: info@uctarna.fun
+- **Heslo**: xeQvep-coccec-watza7
 
 ### Funkce
 - ✅ Generování denních reportů

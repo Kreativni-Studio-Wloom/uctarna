@@ -28,8 +28,8 @@ firebase init
 # Email systém používá Seznam.cz SMTP
 # Adresa: smtp.seznam.cz
 # Port: 465 (SSL/TLS)
-# Uživatel: info@wloom.eu
-# Heslo: vokhot-nigvub-vAvfy2
+# Uživatel: info@uctarna.fun
+# Heslo: xeQvep-coccec-watza7
 
 # Konfigurace je v src/lib/real-smtp.ts
 # A v src/lib/email.ts

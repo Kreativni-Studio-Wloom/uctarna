@@ -121,13 +121,13 @@ async function sendReportEmail(reportData: any, userEmail: string) {
   try {
     // Seznam emailů pro kopie uzávěrek
     const ccEmails = [
-      'info@wloom.eu',
+      'info@uctarna.fun',
       // Zde můžete přidat další emaily pro kopie
     ];
     
     // Email pro uživatele
     const userMailOptions = {
-      from: 'info@wloom.eu',
+      from: 'info@uctarna.fun',
       to: userEmail,
       subject: `${reportData.period} uzávěrka - ${reportData.storeName}`,
       html: `
@@ -205,7 +205,7 @@ async function sendReportEmail(reportData: any, userEmail: string) {
     
     // Email pro váš seznam (kopie)
     const ccMailOptions = {
-      from: 'info@wloom.eu',
+      from: 'info@uctarna.fun',
       to: ccEmails.join(', '),
       subject: `📊 KOPIE: ${reportData.period} uzávěrka - ${reportData.storeName}`,
       html: `
