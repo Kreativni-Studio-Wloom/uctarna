@@ -46,6 +46,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const [customEndDate, setCustomEndDate] = useState(new Date());
   const [showActionNameModal, setShowActionNameModal] = useState(false);
   const [actionName, setActionName] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successCountdown, setSuccessCountdown] = useState(5);
 
   // Cast user na ExtendedUser
   const extendedUser = user as ExtendedUser | null;
@@ -279,7 +281,19 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       // Odešli email uzávěrky přes SMTP
       await sendReportEmail(reportDataForPDF, user.email || '', customActionName);
 
-      alert('Uzávěrka byla úspěšně vygenerována a odeslána na váš email!');
+      // Zobraz potvrzovací modal s odpočtem a automatickým zavřením
+      setShowSuccessModal(true);
+      setSuccessCountdown(5);
+      const intervalId = setInterval(() => {
+        setSuccessCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(intervalId);
+            setShowSuccessModal(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
       
     } catch (error: unknown) {
       console.error('❌ Error generating report:', error);
@@ -716,22 +730,22 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
-              <DollarSign className="h-6 w-6 text-blue-600" />
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-3">
+              <DollarSign className="h-5 w-5 text-blue-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Celková tržba
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.totalSales.toLocaleString('cs-CZ')} Kč
               </p>
             </div>
@@ -742,17 +756,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mr-4">
-              <Banknote className="h-6 w-6 text-green-600" />
+            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Banknote className="h-5 w-5 text-green-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Koruny (po vrácení)
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
               </p>
             </div>
@@ -763,17 +777,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-              <Euro className="h-6 w-6 text-purple-600" />
+            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Euro className="h-5 w-5 text-purple-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Eura (vybrané)
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.salesInEUR.toFixed(2)} €
               </p>
             </div>
@@ -784,17 +798,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg flex items-center justify-center mr-4">
-              <Calculator className="h-6 w-6 text-emerald-600" />
+            <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Calculator className="h-5 w-5 text-emerald-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Zisk
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.totalProfit.toLocaleString('cs-CZ')} Kč
               </p>
             </div>
@@ -805,18 +819,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mr-4">
-              <Users className="h-6 w-6 text-orange-600" />
+            <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center mr-3">
+              <CreditCard className="h-5 w-5 text-indigo-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Zákazníci
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                Karty
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {reportData.customerCount}
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.cardSales.toLocaleString('cs-CZ')} Kč
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {reportData.sales.filter(sale => sale.paymentMethod === 'card').length} prodejů
               </p>
             </div>
           </div>
@@ -826,20 +843,65 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mr-4">
-              <TrendingUp className="h-6 w-6 text-red-600" />
+            <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Banknote className="h-5 w-5 text-yellow-600" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                Hotovost
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.cashSales.toLocaleString('cs-CZ')} Kč
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {reportData.sales.filter(sale => sale.paymentMethod === 'cash').length} prodejů
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Users className="h-5 w-5 text-orange-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                Zákazníci
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.customerCount}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mr-3">
+              <TrendingUp className="h-5 w-5 text-red-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Slevy
               </p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.totalDiscounts.toLocaleString('cs-CZ')} Kč
               </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                 {reportData.salesWithDiscount} prodejů
               </p>
             </div>
@@ -940,6 +1002,45 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               >
                 Generovat uzávěrku
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4"
+          >
+            <div className="flex items-start">
+              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mr-4">
+                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Uzávěrka odeslána</h3>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">Uzávěrka byla úspěšně vygenerována a odeslána na váš email.</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Zavřít
+              </button>
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Zavírám za {successCountdown}s
+              </div>
             </div>
           </motion.div>
         </div>

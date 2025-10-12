@@ -78,6 +78,53 @@ input, textarea, select {
   font-size: 16px;
 }
 
+/* Touch optimization */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in inputs and textareas */
+input, textarea, [contenteditable] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Touch-friendly buttons */
+button, [role="button"], .clickable {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Prevent double-tap zoom */
+* {
+  touch-action: manipulation;
+}
+
+/* Improve touch responsiveness */
+@media (hover: none) and (pointer: coarse) {
+  button, [role="button"], .clickable {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  /* Larger touch targets for mobile */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 12px;
+  }
+}
+
 /* Support for safe areas */
 @supports (padding: max(0px)) {
   body {

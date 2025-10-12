@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit, Trash2, Save, X, Package } from 'lucide-react';
+// use pointer events for touch responsiveness
 
 interface ProductEditorProps {
   storeId: string;
@@ -277,16 +278,16 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
 
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => startEditing(product)}
-                          className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
+                          onPointerUp={() => startEditing(product)}
+                          className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center justify-center touch-target"
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           Upravit
                         </button>
                         <button
-                          onClick={() => deleteProduct(product.id)}
+                          onPointerUp={() => deleteProduct(product.id)}
                           disabled={deleting === product.id}
-                          className="flex-1 bg-red-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                          className="flex-1 bg-red-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center touch-target"
                         >
                           {deleting === product.id ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

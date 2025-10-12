@@ -75,6 +75,10 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
     });
   });
 
+  // Agregace prodejů dle způsobu platby
+  const numCardSales = reportData.sales.filter(s => s.paymentMethod === 'card').length;
+  const numCashSales = reportData.sales.filter(s => s.paymentMethod === 'cash').length;
+
   // Vytvoření řádků pro souhrn položek
   const productSummaryRows = Array.from(productSummary.entries())
     .sort((a, b) => b[1].totalPrice - a[1].totalPrice) // Seřadit podle celkové hodnoty (sestupně)
@@ -102,13 +106,14 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin: 20px 0; }
+          .stats-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 15px; margin: 20px 0; }
           .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
           .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
           .stat-label { font-size: 14px; color: #666; }
           .cash-value { color: #ffc107; }
           .card-value { color: #6f42c1; }
           .customer-value { color: #007bff; }
+          .muted { font-size: 12px; color: #666; margin-top: 5px; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; }
           th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; color: #495057; font-weight: bold; }
           td { padding: 12px; border-bottom: 1px solid #dee2e6; }
@@ -130,38 +135,51 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
           <div class="content">
             <h2>📊 Statistiky uzávěrky</h2>
             
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-value">${reportData.totalSales.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Celková tržba</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value cash-value">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Koruny (po vrácení)</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value card-value">${reportData.salesInEUR.toFixed(2)} €</div>
-                <div class="stat-label">Eura (vybrané)</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Zisk</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value customer-value">${reportData.customerCount}</div>
-                <div class="stat-label">Počet zákazníků</div>
-              </div>
-              
-              <div class="stat-card">
-                <div class="stat-value" style="color: #dc3545;">${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Slevy</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">${reportData.salesWithDiscount || 0} prodejů</div>
-              </div>
-            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse: collapse; margin: 20px 0;">
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#28a745; margin-bottom:5px;">${reportData.totalSales.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Celková tržba</div>
+                </td>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#ffc107; margin-bottom:5px;">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Koruny (po vrácení)</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#6f42c1; margin-bottom:5px;">${reportData.salesInEUR.toFixed(2)} €</div>
+                  <div style="font-size:14px; color:#666;">Eura (vybrané)</div>
+                </td>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#28a745; margin-bottom:5px;">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Zisk</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#007bff; margin-bottom:5px;">${reportData.customerCount}</div>
+                  <div style="font-size:14px; color:#666;">Počet zákazníků</div>
+                </td>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#6f42c1; margin-bottom:5px;">${reportData.cardSales.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Karty</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${numCardSales} prodejů</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#ffc107; margin-bottom:5px;">${reportData.cashSales.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Hotovost</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${numCashSales} prodejů</div>
+                </td>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#dc3545; margin-bottom:5px;">${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Slevy</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.salesWithDiscount || 0} prodejů</div>
+                </td>
+              </tr>
+            </table>
             
             <h3>📋 Souhrn prodaných položek</h3>
             <table>
@@ -188,6 +206,8 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
+              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
+              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
               <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
@@ -215,6 +235,8 @@ Období: ${reportData.period === 'Denní'
 - Počet zákazníků: ${reportData.customerCount}
 - Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
+- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)
+- Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)
 - Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
 - Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
 - Počet různých produktů: ${productSummary.size}

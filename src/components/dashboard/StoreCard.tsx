@@ -5,6 +5,7 @@ import { Store } from '@/types';
 import { motion } from 'framer-motion';
 import { Store as StoreIcon, UtensilsCrossed, ArrowRight, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+// use pointer events instead of custom touch hook
 
 interface StoreCardProps {
   store: Store;
@@ -18,6 +19,8 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
   const handleOpenStore = () => {
     router.push(`/store/${store.id}`);
   };
+
+  const handlePointerUp = () => handleOpenStore();
 
   const handleDuplicate = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -38,8 +41,8 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
     <motion.div
       whileHover={{ y: -4, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer transition-all duration-200 relative"
-      onClick={handleOpenStore}
+      className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer transition-all duration-200 relative touch-target"
+      onPointerUp={handlePointerUp}
       onMouseEnter={() => setShowDuplicateButton(true)}
       onMouseLeave={() => setShowDuplicateButton(false)}
     >

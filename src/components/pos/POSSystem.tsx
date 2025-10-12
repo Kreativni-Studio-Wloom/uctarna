@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus } from 'lucide-react';
+// removed touch hook usage inside maps; using pointer events instead
 import { AddProductModal } from './AddProductModal';
 import { CheckoutModal } from './CheckoutModal';
 import { DiscountModal } from './DiscountModal';
@@ -38,6 +39,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showExtrasManager, setShowExtrasManager] = useState(false);
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
+  const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Funkce pro normalizaci diakritiky
   const normalizeText = (text: string): string => {
@@ -172,6 +175,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   }, [cart, user, storeId]);
 
   // --- konec perzistence košíku ---
+
+  // Zavřít vyhledávač po kliknutí mimo oblast vyhledávání/popupu
+  useEffect(() => {
+    if (!showAllProducts) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowAllProducts(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAllProducts]);
 
   useEffect(() => {
     if (!user || !user.uid || !storeId) return;
@@ -317,6 +332,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       }
     });
     }
+    // Trigger mini highlight animation on clicked product
+    setAddedHighlightId(product.id);
+    window.setTimeout(() => {
+      setAddedHighlightId((current) => (current === product.id ? null : current));
+    }, 400);
   };
 
   const removeItemByItemId = (itemId: string) => {
@@ -397,7 +417,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       const newProduct: Omit<Product, 'id'> = {
         name,
         price,
-        cost,
+        cost: typeof cost === 'number' ? cost : 0,
         isPopular: false,
         soldCount: 0, // Výchozí hodnota pro nové produkty
         createdAt: new Date(),
@@ -572,7 +592,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
                           <button
                             onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                            className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-bold"
+                            className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-bold"
                           >
                             -
                           </button>
@@ -581,14 +601,14 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           </span>
                           <button
                             onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                            className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs md:text-sm font-bold"
+                            className="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs md:text-sm font-bold"
                           >
                             +
                           </button>
                           {!isReturnMode && (
                             <button
                               onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                              className="ml-1 px-2 py-1 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40"
+                              className="ml-1 px-2 py-1 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
                             >
                               Extra
                             </button>
@@ -615,12 +635,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               </div>
                               <div className="flex items-center space-x-1">
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
-                                  className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center">
+                                  className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-xs">
                                   -
                                 </button>
                                 <span className="w-5 text-center">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
-                                  className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 flex items-center justify-center">
+                                  className="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-xs">
                                   +
                                 </button>
                               </div>
@@ -702,7 +722,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         {/* Left Column - Products (na mobilu dole, na desktopu vlevo) */}
         <div className="lg:col-span-2 lg:order-1 space-y-3 md:space-y-4 lg:space-y-6">
           {/* Search */}
-          <div className="relative">
+          <div className="relative" ref={searchContainerRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <input
               type="text"
@@ -747,17 +767,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
-                      {filteredProducts.map((product) => (
-                        <motion.button
-                          key={product.id}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => {
-                            addToCart(product);
-                            setShowAllProducts(false);
-                            setSearchTerm('');
-                          }}
-                          className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all duration-200 text-left group"
+                      {filteredProducts.map((product) => {
+                        const isHighlighted = addedHighlightId === product.id;
+                        return (
+                          <motion.button
+                            key={product.id}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onPointerUp={() => {
+                              addToCart(product);
+                              // nech vyhledávač otevřený; zavře se kliknutím mimo
+                            }}
+                            className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all duration-200 text-left group touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
@@ -772,7 +793,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             </div>
                           </div>
                         </motion.button>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -869,22 +891,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 Nejprodávanější
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {topSellingProducts.map((product) => (
-                  <motion.button
-                    key={product.id}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => addToCart(product)}
-                    className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left"
-                  >
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
-                      {product.name}
-                    </h4>
-                    <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                      {product.price} Kč
-                    </p>
-                  </motion.button>
-                ))}
+                {topSellingProducts.map((product) => {
+                  const isHighlighted = addedHighlightId === product.id;
+                  return (
+                    <motion.button
+                      key={product.id}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onPointerUp={() => addToCart(product)}
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
+                    >
+                      <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
+                        {product.name}
+                      </h4>
+                      <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                        {product.price} Kč
+                      </p>
+                    </motion.button>
+                  );
+                })}
               </div>
             </div>
           )}

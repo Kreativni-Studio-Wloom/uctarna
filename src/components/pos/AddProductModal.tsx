@@ -22,8 +22,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd
     const priceNumber = parseFloat(price);
     if (isNaN(priceNumber) || priceNumber <= 0) return;
 
-    const costNumber = cost.trim() ? parseFloat(cost) : undefined;
-    if (costNumber !== undefined && (isNaN(costNumber) || costNumber < 0)) return;
+    const costNumber = cost.trim() ? parseFloat(cost) : 0;
+    if (isNaN(costNumber) || costNumber < 0) return;
 
     setLoading(true);
     try {
