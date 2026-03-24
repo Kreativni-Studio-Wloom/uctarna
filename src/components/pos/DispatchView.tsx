@@ -14,6 +14,7 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 	const [orders, setOrders] = useState<Sale[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [updatingId, setUpdatingId] = useState<string | null>(null);
+	const [bulkAction, setBulkAction] = useState<'prepare' | 'serve' | null>(null);
 
 	useEffect(() => {
 		if (!user || !storeId) return;
@@ -65,6 +66,48 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 		}
 	};
 
+	const markAllPrepared = async () => {
+		if (!user) return;
+		const waitingOrders = orders.filter((o) => !o.prepared && !o.served);
+		if (waitingOrders.length === 0) return;
+
+		setBulkAction('prepare');
+		try {
+			await Promise.all(
+				waitingOrders.map((order) =>
+					updateDoc(doc(db, 'users', user.uid, 'stores', storeId, 'sales', order.id), {
+						prepared: true,
+						preparedAt: new Date(),
+					})
+				)
+			);
+		} finally {
+			setBulkAction(null);
+		}
+	};
+
+	const markAllServed = async () => {
+		if (!user) return;
+		const queuedOrders = orders.filter((o) => !o.served);
+		if (queuedOrders.length === 0) return;
+
+		setBulkAction('serve');
+		try {
+			await Promise.all(
+				queuedOrders.map((order) =>
+					updateDoc(doc(db, 'users', user.uid, 'stores', storeId, 'sales', order.id), {
+						prepared: true,
+						preparedAt: (order as any).preparedAt || new Date(),
+						served: true,
+						servedAt: new Date(),
+					})
+				)
+			);
+		} finally {
+			setBulkAction(null);
+		}
+	};
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center py-12">
@@ -82,6 +125,27 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 					Čekající: {orders.filter(o => !o.prepared && !o.served).length}
 				</div>
 			</div>
+
+			{orders.length > 0 && (
+				<div className="flex flex-wrap gap-3">
+					<button
+						onClick={markAllPrepared}
+						disabled={bulkAction !== null || orders.every((o) => o.prepared || o.served)}
+						className="inline-flex items-center justify-center bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+					>
+						<Clock className="h-5 w-5 mr-2" />
+						{bulkAction === 'prepare' ? 'Připravuji vše...' : 'Připravit vše'}
+					</button>
+					<button
+						onClick={markAllServed}
+						disabled={bulkAction !== null || orders.every((o) => o.served)}
+						className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+					>
+						<CheckCircle2 className="h-5 w-5 mr-2" />
+						{bulkAction === 'serve' ? 'Vydávám vše...' : 'Vydat vše'}
+					</button>
+				</div>
+			)}
 
 			{orders.length === 0 ? (
 				<div className="text-center py-12">
