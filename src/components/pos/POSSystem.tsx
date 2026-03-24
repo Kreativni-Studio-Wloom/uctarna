@@ -579,16 +579,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 {cart.filter(ci => !ci.parentItemId).map((item) => {
                   const children = cart.filter(c => c.parentItemId === item.itemId);
                   return (
-                    <div key={item.itemId || item.productId} className="p-2.5 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight">
+                    <div key={item.itemId || item.productId} className="p-2.5 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+                      <div className="space-y-2 min-w-0">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
                         </h4>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {item.price} Kč × {item.quantity}
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0">
+                            {item.price} Kč × {item.quantity} ks
                           </p>
-                          <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 whitespace-nowrap">
                             <div className="flex items-center space-x-1 md:space-x-1.5">
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
@@ -614,7 +614,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                                 Extra
                               </button>
                             )}
-                            <div className="text-right min-w-[72px]">
+                            <div className="text-right min-w-[78px]">
                               <p className={`font-semibold text-xs md:text-sm whitespace-nowrap ${
                                 item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
                               }`}>
@@ -628,27 +628,27 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         </div>
                       </div>
                       {children.length > 0 && (
-                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5">
+                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5 min-w-0">
                           {children.map(ch => (
                             <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
-                              className="flex items-center justify-between gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200">
-                              <div className="flex-1 min-w-0 whitespace-nowrap">
+                              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200 min-w-0">
+                              <div className="min-w-0 whitespace-nowrap">
                                 + {ch.productName}
                               </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 whitespace-nowrap">
                                 <span className="whitespace-nowrap text-gray-700 dark:text-gray-300">
                                   {ch.price} Kč × {ch.quantity}
                                 </span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
-                                  className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-xs">
+                                  className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-[10px] md:text-xs">
                                   -
                                 </button>
-                                <span className="w-5 text-center whitespace-nowrap">{ch.quantity}</span>
+                                <span className="w-[18px] md:w-5 text-center whitespace-nowrap">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
-                                  className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-xs">
+                                  className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-[10px] md:text-xs">
                                   +
                                 </button>
-                                <span className="min-w-[56px] text-right font-medium whitespace-nowrap">
+                                <span className="min-w-[52px] md:min-w-[56px] text-right font-medium whitespace-nowrap">
                                   {ch.price * ch.quantity} Kč
                                 </span>
                               </div>
