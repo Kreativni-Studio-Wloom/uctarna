@@ -631,14 +631,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5 min-w-0">
                           {children.map(ch => (
                             <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
-                              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200 min-w-0">
-                              <div className="min-w-0 whitespace-nowrap">
-                                + {ch.productName}
-                              </div>
-                              <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 whitespace-nowrap">
+                              className="flex items-center justify-between gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200 min-w-0">
+                              <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
+                                <span className="min-w-0 w-full whitespace-nowrap">
+                                  + {ch.productName}
+                                </span>
                                 <span className="whitespace-nowrap text-gray-700 dark:text-gray-300">
                                   {ch.price} Kč × {ch.quantity}
                                 </span>
+                              </div>
+                              <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 whitespace-nowrap">
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
                                   className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-[10px] md:text-xs">
                                   -
