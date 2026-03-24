@@ -584,15 +584,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
                         </h4>
-                        <div className="flex items-center justify-between gap-2 min-w-0">
-                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0 leading-none m-0">
+                        <div className="flex items-center justify-between gap-3 min-w-0">
+                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap flex-1 min-w-0 leading-none m-0">
                             {item.price} Kč × {item.quantity} ks
                           </span>
-                          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 whitespace-nowrap">
+                          <div className="flex items-center gap-2 md:gap-2.5 flex-shrink-0 whitespace-nowrap ml-1">
                             <div className="flex items-center space-x-1 md:space-x-1.5">
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                                className="w-[18px] h-[18px] rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-rose-400 dark:text-rose-300 inline-flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-[10px] font-semibold"
+                                className="w-7 h-7 flex-shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/25 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center hover:bg-rose-200 dark:hover:bg-rose-900/40 transition-colors text-sm font-semibold leading-none"
                               >
                                 -
                               </button>
@@ -601,7 +601,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               </span>
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                                className="w-[18px] h-[18px] rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-emerald-400 dark:text-emerald-300 inline-flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-[10px] font-semibold"
+                                className="w-7 h-7 flex-shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/25 text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center hover:bg-emerald-200 dark:hover:bg-emerald-900/40 transition-colors text-sm font-semibold leading-none"
                               >
                                 +
                               </button>
@@ -642,12 +642,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               </div>
                               <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 whitespace-nowrap">
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
-                                  className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-[10px] md:text-xs">
+                                  className="w-7 h-7 flex-shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/25 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-sm font-semibold leading-none hover:bg-rose-200 dark:hover:bg-rose-900/40 transition-colors">
                                   -
                                 </button>
-                                <span className="w-[18px] md:w-5 text-center whitespace-nowrap leading-none">{ch.quantity}</span>
+                                <span className="w-5 text-center whitespace-nowrap leading-none">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
-                                  className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-[10px] md:text-xs">
+                                  className="w-7 h-7 flex-shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/25 text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center text-sm font-semibold leading-none hover:bg-emerald-200 dark:hover:bg-emerald-900/40 transition-colors">
                                   +
                                 </button>
                                 <span className="min-w-[52px] md:min-w-[56px] text-right font-medium whitespace-nowrap leading-none">
