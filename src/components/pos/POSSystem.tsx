@@ -584,11 +584,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
                         </h4>
-                        <div className="flex items-center justify-between w-full min-w-0">
-                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap leading-none m-0 flex-shrink-0">
+                        <div className="flex items-center justify-between w-full min-w-0 box-border gap-2">
+                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-normal leading-none m-0 flex-[1_1_auto] min-w-0">
                             {item.price} Kč × {item.quantity} ks
                           </span>
-                          <div className="flex items-center gap-1 flex-shrink-0 whitespace-nowrap min-w-0">
+                          <div className="flex items-center gap-1 flex-shrink-0 whitespace-nowrap">
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
@@ -614,10 +614,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                                 Extra
                               </button>
                             )}
-                            <div className="text-right min-w-[78px] h-6 inline-flex items-center justify-end">
+                            <div className="text-right min-w-max h-6 inline-flex items-center justify-end flex-shrink-0 whitespace-nowrap">
                               <span className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none m-0 ${
                                 item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                              } flex-shrink-0`}>
+                              } flex-shrink-0 min-w-max`}>
                                 {item.price * item.quantity} Kč
                               </span>
                             </div>
