@@ -90,14 +90,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (firebaseUser && firebaseUser.uid) {
         try {
+          // Nevyžaduj nucené obnovení tokenu při každém startu (zbytečně zpomaluje první načtení).
+          await firebaseUser.getIdToken();
+
           // Zkus načíst uživatele z Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
-            // Načti prodejny uživatele
-            const stores = await loadUserStores(firebaseUser.uid);
-            setUser({ ...userData, stores });
+            // Nečekej na pomalejší načtení prodejen, aby se appka otevřela hned.
+            setUser({ ...userData, stores: [] });
+            setLoading(false);
+            // Prodejny dotáhni až na pozadí.
+            loadUserStores(firebaseUser.uid)
+              .then((stores) => {
+                setUser((prev) => (prev ? { ...prev, stores } : prev));
+              })
+              .catch((storesError) => {
+                console.error('Error loading user stores:', storesError);
+              });
             // Ulož do seznamu nedávných účtů (localStorage)
             try {
               const recentRaw = localStorage.getItem('uctarna_recent_accounts');
@@ -123,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
             setUser(newUser);
+            setLoading(false);
             // Ulož do seznamu nedávných účtů (localStorage)
             try {
               const recentRaw = localStorage.getItem('uctarna_recent_accounts');
@@ -135,14 +147,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } catch (error: any) {
           console.error('Error loading user:', error);
-          // Pokud je chyba oprávnění, zkusíme se přihlásit znovu
+          // Pokud je chyba oprávnění nebo dočasné selhání načtení profilu, neshazuj session.
+          // Fallback na Firebase user zajistí okamžitý přechod z loginu.
           if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
             console.log('Chyba oprávnění - uživatel pravděpodobně není správně přihlášen');
-            setUser(null);
+          }
+
+          const fallbackUser: ExtendedUser = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || null,
+            createdAt: new Date(),
+            settings: {
+              eurRate: 25.0,
+              theme: 'auto',
+            },
+            stores: [],
+          };
+          setUser(fallbackUser);
+
+          // Pokus o tiché dočtení prodejen na pozadí
+          try {
+            const stores = await loadUserStores(firebaseUser.uid);
+            setUser((prev) => (prev ? { ...prev, stores } : prev));
+          } catch (storesError) {
+            console.error('Error loading stores after fallback:', storesError);
           }
         }
       } else {
         setUser(null);
+        setLoading(false);
       }
       
       setLoading(false);

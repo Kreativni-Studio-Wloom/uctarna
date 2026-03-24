@@ -584,8 +584,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
                         </h4>
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0 leading-none">
                             {item.price} Kč × {item.quantity} ks
                           </p>
                           <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 whitespace-nowrap">
@@ -596,7 +596,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               >
                                 -
                               </button>
-                              <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm whitespace-nowrap">
+                              <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm whitespace-nowrap leading-none">
                                 {item.quantity}
                               </span>
                               <button
@@ -615,7 +615,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               </button>
                             )}
                             <div className="text-right min-w-[78px]">
-                              <p className={`font-semibold text-xs md:text-sm whitespace-nowrap ${
+                              <p className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none ${
                                 item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
                               }`}>
                                 {item.price * item.quantity} Kč
@@ -636,7 +636,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                                 <span className="min-w-0 w-full whitespace-nowrap">
                                   + {ch.productName}
                                 </span>
-                                <span className="whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                <span className="whitespace-nowrap text-gray-700 dark:text-gray-300 leading-none">
                                   {ch.price} Kč × {ch.quantity}
                                 </span>
                               </div>
@@ -645,12 +645,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                                   className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-[10px] md:text-xs">
                                   -
                                 </button>
-                                <span className="w-[18px] md:w-5 text-center whitespace-nowrap">{ch.quantity}</span>
+                                <span className="w-[18px] md:w-5 text-center whitespace-nowrap leading-none">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
                                   className="w-[18px] h-[18px] md:w-5 md:h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-[10px] md:text-xs">
                                   +
                                 </button>
-                                <span className="min-w-[52px] md:min-w-[56px] text-right font-medium whitespace-nowrap">
+                                <span className="min-w-[52px] md:min-w-[56px] text-right font-medium whitespace-nowrap leading-none">
                                   {ch.price * ch.quantity} Kč
                                 </span>
                               </div>

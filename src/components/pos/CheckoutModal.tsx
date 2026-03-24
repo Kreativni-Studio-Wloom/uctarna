@@ -39,6 +39,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [paidAmount, setPaidAmount] = useState<number>(0);
   const [paidCurrency, setPaidCurrency] = useState<'CZK' | 'EUR'>('CZK');
   const [sumUpAvailable, setSumUpAvailable] = useState(false);
+  const [sumUpAffiliateKeyConfigured, setSumUpAffiliateKeyConfigured] = useState(false);
   const [payInEUR, setPayInEUR] = useState(false);
   const [customerName, setCustomerName] = useState<string>('');
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
@@ -81,6 +82,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!user || !storeId) return;
     if (typeof window !== 'undefined') {
       SumUpService.detectSumUpApp().then(setSumUpAvailable);
+      setSumUpAffiliateKeyConfigured(sumUpService.hasAffiliateKeyConfigured());
     }
     const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
     const unsubscribe = onSnapshot(storeRef, (snap) => {
@@ -497,6 +499,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <CreditCard className="h-4 w-4 mr-2" />
                     <span>
                       Platba kartou proběhne přes SumUp aplikaci. Po kliknutí "Zaplatit" se otevře SumUp app s předvyplněnou částkou {totalAmount} Kč.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Chybějící affiliate key - může způsobit chybu při volbě terminálu */}
+              {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured && (
+                <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                  <div className="flex items-center text-sm text-red-700 dark:text-red-300">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    <span>
+                      Chybí SumUp affiliate key. Tap to Pay může fungovat, ale platba přes terminál často selže chybou připojení k serveru.
                     </span>
                   </div>
                 </div>

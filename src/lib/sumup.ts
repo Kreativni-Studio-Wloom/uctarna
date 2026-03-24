@@ -26,7 +26,11 @@ export class SumUpService {
   private baseUrl = 'sumupmerchant://pay/1.0';
   
   constructor(affiliateKey: string) {
-    this.affiliateKey = affiliateKey;
+    this.affiliateKey = affiliateKey.trim();
+  }
+
+  hasAffiliateKeyConfigured(): boolean {
+    return this.affiliateKey.length > 0;
   }
   
   /**
@@ -39,9 +43,9 @@ export class SumUpService {
     // Povinné parametry podle dokumentace
     url.searchParams.set('amount', params.amount.toFixed(2));
     url.searchParams.set('currency', params.currency);
-    // affiliate-key je volitelný pro běžné merchant nasazení.
-    // Pokud je k dispozici (partner integrace), pošleme ho.
-    if (this.affiliateKey && !this.affiliateKey.startsWith('sup_pk_')) {
+    // Pro stabilní chování (hlavně při "Pay with terminal") posílej affiliate-key vždy,
+    // pokud je v aplikaci nakonfigurovaný.
+    if (this.hasAffiliateKeyConfigured()) {
       url.searchParams.set('affiliate-key', this.affiliateKey);
     }
     
