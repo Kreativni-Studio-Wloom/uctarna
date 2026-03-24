@@ -579,80 +579,85 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 {cart.filter(ci => !ci.parentItemId).map((item) => {
                   const children = cart.filter(c => c.parentItemId === item.itemId);
                   return (
-                    <div key={item.itemId || item.productId} className="p-2.5 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
-                      <div className="space-y-2 min-w-0">
-                        <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
+                    <div key={item.itemId || item.productId} className="flex flex-col gap-2 w-full p-2 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+                      <div className="flex justify-between items-start w-full gap-2 min-w-0">
+                        <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
                         </h4>
-                        <div className="flex items-center justify-between w-full min-w-0 box-border gap-2">
-                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-normal leading-none m-0 flex-[1_1_auto] min-w-0">
-                            {item.price} Kč × {item.quantity} ks
-                          </span>
-                          <div className="flex items-center gap-1 flex-shrink-0 whitespace-nowrap">
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                                className="w-6 h-6 flex-shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/25 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center hover:bg-rose-200 dark:hover:bg-rose-900/40 transition-colors text-xs font-semibold leading-none"
-                              >
-                                -
-                              </button>
-                              <span className="w-5 text-center font-medium text-gray-900 dark:text-white text-xs whitespace-nowrap leading-none">
-                                {item.quantity}
-                              </span>
-                              <button
-                                onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                                className="w-6 h-6 flex-shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/25 text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center hover:bg-emerald-200 dark:hover:bg-emerald-900/40 transition-colors text-xs font-semibold leading-none"
-                              >
-                                +
-                              </button>
-                            </div>
-                            {!isReturnMode && (
-                              <button
-                                onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                                className="h-6 px-2 rounded-md text-[11px] leading-none bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap flex-shrink-0"
-                              >
-                                Extra
-                              </button>
-                            )}
-                            <div className="text-right min-w-max h-6 inline-flex items-center justify-end flex-shrink-0 whitespace-nowrap">
-                              <span className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none m-0 ${
-                                item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                              } flex-shrink-0 min-w-max`}>
-                                {item.price * item.quantity} Kč
-                              </span>
-                            </div>
+                        <span className={`font-semibold text-sm md:text-base whitespace-nowrap flex-shrink-0 ${
+                          item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                        }`}>
+                          {item.price * item.quantity} Kč
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center w-full mt-1 gap-2 min-w-0">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex items-center flex-shrink-0">
+                            <button
+                              onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
+                              className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-sm font-semibold leading-none flex-shrink-0"
+                            >
+                              -
+                            </button>
+                            <span className="w-8 text-center font-medium text-gray-900 dark:text-white text-sm whitespace-nowrap">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
+                              className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center text-sm font-semibold leading-none flex-shrink-0"
+                            >
+                              +
+                            </button>
                           </div>
+                          <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                            {item.price} Kč / ks
+                          </span>
                         </div>
-                        {item.quantity < 0 && (
-                          <p className="text-xs text-red-500 whitespace-nowrap leading-none m-0">Vratka</p>
+
+                        {!isReturnMode && (
+                          <button
+                            onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
+                            className="h-7 px-2.5 rounded-md text-xs leading-none bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap flex-shrink-0"
+                          >
+                            Extra
+                          </button>
                         )}
                       </div>
+
+                      {item.quantity < 0 && (
+                        <p className="text-xs text-red-500 whitespace-nowrap leading-none m-0">Vratka</p>
+                      )}
                       {children.length > 0 && (
-                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5 min-w-0">
+                        <div className="mt-1 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-2 min-w-0">
                           {children.map(ch => (
                             <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
-                              className="flex items-center justify-between gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200 min-w-0">
-                              <div className="flex flex-col items-start gap-0.5 flex-1 min-w-0">
-                                <span className="min-w-0 w-full whitespace-nowrap">
+                              className="flex flex-col gap-1.5 w-full p-2 bg-white/60 dark:bg-gray-800/40 rounded-md min-w-0">
+                              <div className="flex justify-between items-start w-full gap-2 min-w-0 text-xs md:text-sm text-gray-800 dark:text-gray-200">
+                                <span className="min-w-0 break-words">
                                   + {ch.productName}
                                 </span>
-                                <span className="whitespace-nowrap text-gray-700 dark:text-gray-300 leading-none">
-                                  {ch.price} Kč × {ch.quantity}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 whitespace-nowrap">
-                                <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
-                                  className="w-6 h-6 flex-shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/25 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-xs font-semibold leading-none hover:bg-rose-200 dark:hover:bg-rose-900/40 transition-colors">
-                                  -
-                                </button>
-                                <span className="w-5 text-center whitespace-nowrap leading-none">{ch.quantity}</span>
-                                <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
-                                  className="w-6 h-6 flex-shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/25 text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center text-xs font-semibold leading-none hover:bg-emerald-200 dark:hover:bg-emerald-900/40 transition-colors">
-                                  +
-                                </button>
-                                <span className="min-w-[52px] md:min-w-[56px] text-right font-medium whitespace-nowrap leading-none">
+                                <span className="font-medium whitespace-nowrap flex-shrink-0">
                                   {ch.price * ch.quantity} Kč
                                 </span>
+                              </div>
+                              <div className="flex justify-between items-center w-full gap-2 min-w-0">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="bg-gray-100 dark:bg-gray-800 rounded-full p-1 flex items-center flex-shrink-0">
+                                    <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
+                                      className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-sm font-semibold leading-none flex-shrink-0">
+                                      -
+                                    </button>
+                                    <span className="w-8 text-center text-sm whitespace-nowrap">{ch.quantity}</span>
+                                    <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
+                                      className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm text-emerald-600 dark:text-emerald-300 inline-flex items-center justify-center text-sm font-semibold leading-none flex-shrink-0">
+                                      +
+                                    </button>
+                                  </div>
+                                  <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                    {ch.price} Kč / ks
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           ))}
