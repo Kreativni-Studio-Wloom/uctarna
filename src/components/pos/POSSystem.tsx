@@ -588,8 +588,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap leading-none m-0 flex-shrink-0">
                             {item.price} Kč × {item.quantity} ks
                           </span>
-                          <div className="flex items-center gap-2 mx-3 flex-shrink-0 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 flex-shrink-0 whitespace-nowrap min-w-0">
+                            <div className="flex items-center gap-1">
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
                                 className="w-6 h-6 flex-shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/25 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center hover:bg-rose-200 dark:hover:bg-rose-900/40 transition-colors text-xs font-semibold leading-none"
@@ -617,7 +617,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             <div className="text-right min-w-[78px] h-6 inline-flex items-center justify-end">
                               <span className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none m-0 ${
                                 item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                              }`}>
+                              } flex-shrink-0`}>
                                 {item.price * item.quantity} Kč
                               </span>
                             </div>
