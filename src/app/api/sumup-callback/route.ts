@@ -3,40 +3,185 @@ import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from '
 import { db } from '@/lib/firebase';
 import { SumUpCallbackParams } from '@/lib/sumup';
 
+// Funkce pro ukládání všech SumUp odpovědí do Firebase
+async function saveSumUpResponseToFirebase(body: any, request: NextRequest) {
+  try {
+    // Pokusíme se najít userId a storeId z různých zdrojů
+    let userId = body.userId || body['user_id'];
+    let storeId = body.storeId || body['store_id'];
+    
+    console.log('🔍 Hledám userId a storeId v datech:', { 
+      userId, 
+      storeId, 
+      bodyKeys: Object.keys(body) 
+    });
+    
+    // Pokud nemáme userId nebo storeId, použijeme fallback
+    if (!userId) {
+      userId = 'debug-user';
+      console.log('⚠️ Používám fallback userId:', userId);
+    }
+    
+    if (!storeId) {
+      storeId = 'debug-store';
+      console.log('⚠️ Používám fallback storeId:', storeId);
+    }
+    
+    const sumUpResponse = {
+      timestamp: serverTimestamp(),
+      requestMethod: request.method,
+      requestUrl: request.url,
+      userAgent: request.headers.get('user-agent'),
+      contentType: request.headers.get('content-type'),
+      rawBody: body,
+      extractedData: {
+        status: body.status || body['smp-status'] || body['payment_status'] || body['transaction_status'],
+        txCode: body.txCode || body['smp-tx-code'] || body['tx_code'] || body['transaction_code'],
+        foreignTxId: body.foreignTxId || body['foreign-tx-id'] || body['foreign_tx_id'] || body['transaction_id'],
+        amount: body.amount || body['payment_amount'] || body['total_amount'],
+        currency: body.currency || body['payment_currency'] || 'CZK',
+        storeId: body.storeId || body['store_id'],
+        userId: body.userId || body['user_id'],
+        cartItems: body.cartItems || body['cart_items'] || body['items'],
+        discount: body.discount || body['discount_info'],
+        discountAmount: body.discountAmount || body['discount_amount'],
+        finalAmount: body.finalAmount || body['final_amount'],
+        customerName: body.customerName || body['customer_name']
+      },
+      allKeys: Object.keys(body),
+      processedAt: new Date().toISOString()
+    };
+    
+    // Uložíme do správné struktury: users/{userId}/stores/{storeId}/sumup
+    const docRef = await addDoc(collection(db, 'users', userId, 'stores', storeId, 'sumup'), sumUpResponse);
+    console.log('💾 SumUp odpověď uložena do Firebase:', docRef.id);
+    console.log('💾 Cesta:', `users/${userId}/stores/${storeId}/sumup`);
+    
+    // Také uložíme do obecné složky pro debugging
+    try {
+      const debugDocRef = await addDoc(collection(db, 'sumup-debug'), sumUpResponse);
+      console.log('💾 SumUp odpověď uložena do Firebase (debug složka):', debugDocRef.id);
+    } catch (debugError) {
+      console.error('❌ Chyba při ukládání do debug složky:', debugError);
+    }
+    
+  } catch (error) {
+    console.error('❌ Chyba při ukládání SumUp odpovědi do Firebase:', error);
+    // Nevyhodíme chybu, aby se neblokoval hlavní proces
+  }
+}
+
 export async function POST(request: NextRequest) {
+  console.log('🚀 SumUp callback endpoint byl zavolán');
+  console.log('🚀 Request method:', request.method);
+  console.log('🚀 Request headers:', Object.fromEntries(request.headers.entries()));
+  console.log('🚀 Request URL:', request.url);
+  console.log('🚀 Request timestamp:', new Date().toISOString());
+  console.log('🚀 User-Agent:', request.headers.get('user-agent'));
+  console.log('🚀 Content-Type:', request.headers.get('content-type'));
+  
   try {
     const body = await request.json();
     console.log('📥 SumUp callback přijat:', JSON.stringify(body, null, 2));
+    console.log('📥 Raw body type:', typeof body);
+    console.log('📥 Body keys:', Object.keys(body));
     
-    const { 
-      status, 
-      txCode, 
-      foreignTxId, 
-      documentId,
-      amount, 
-      currency, 
-      storeId, 
-      userId, 
-      cartItems,
-      discount,
-      discountAmount,
-      finalAmount,
-      customerName
-    } = body;
+    // Uložíme všechny příchozí data do Firebase pro debugging
+    await saveSumUpResponseToFirebase(body, request);
+    
+    // Zkusíme různé názvy parametrů pro různé typy plateb
+    const status = body.status || body['smp-status'] || body['payment_status'] || body['transaction_status'];
+    const txCode = body.txCode || body['smp-tx-code'] || body['tx_code'] || body['transaction_code'];
+    const foreignTxId = body.foreignTxId || body['foreign-tx-id'] || body['foreign_tx_id'] || body['transaction_id'];
+    const documentId = body.documentId || body['document_id'] || foreignTxId;
+    const amount = body.amount || body['payment_amount'] || body['total_amount'];
+    const currency = body.currency || body['payment_currency'] || 'CZK';
+    const storeId = body.storeId || body['store_id'];
+    const userId = body.userId || body['user_id'];
+    const cartItems = body.cartItems || body['cart_items'] || body['items'];
+    const discount = body.discount || body['discount_info'];
+    const discountAmount = body.discountAmount || body['discount_amount'];
+    const finalAmount = body.finalAmount || body['final_amount'] || amount;
+    const customerName = body.customerName || body['customer_name'];
 
-    // Validace povinných parametrů
-    if (!status || !foreignTxId || !storeId || !userId || !cartItems || amount === undefined || !currency) {
-      console.error('❌ Chybí povinné parametry:', {
-        status: !!status,
-        foreignTxId: !!foreignTxId,
-        storeId: !!storeId,
-        userId: !!userId,
-        cartItems: !!cartItems,
-        amount: amount,
-        currency: !!currency
+    // Rozšířené logování pro debugging
+    console.log('📊 Extrahované parametry:', {
+      status: status,
+      txCode: txCode,
+      foreignTxId: foreignTxId,
+      documentId: documentId,
+      amount: amount,
+      currency: currency,
+      storeId: storeId,
+      userId: userId,
+      cartItemsLength: cartItems?.length,
+      discount: discount,
+      discountAmount: discountAmount,
+      finalAmount: finalAmount,
+      customerName: customerName
+    });
+
+    // Validace povinných parametrů - více flexibilní pro různé typy plateb
+    if (!status) {
+      console.error('❌ Chybí status parametr');
+      console.error('❌ Dostupné parametry:', Object.keys(body));
+      console.error('❌ Celé body:', body);
+      console.error('❌ Možné alternativní názvy:', {
+        'smp-status': body['smp-status'],
+        'status': body['status'],
+        'payment_status': body['payment_status'],
+        'transaction_status': body['transaction_status']
       });
       return NextResponse.json(
-        { error: 'Chybí povinné parametry' },
+        { error: 'Chybí status parametr', availableParams: Object.keys(body) },
+        { status: 400 }
+      );
+    }
+
+    if (!foreignTxId) {
+      console.error('❌ Chybí foreignTxId parametr');
+      return NextResponse.json(
+        { error: 'Chybí foreignTxId parametr' },
+        { status: 400 }
+      );
+    }
+
+    if (!storeId) {
+      console.error('❌ Chybí storeId parametr');
+      return NextResponse.json(
+        { error: 'Chybí storeId parametr' },
+        { status: 400 }
+      );
+    }
+
+    if (!userId) {
+      console.error('❌ Chybí userId parametr');
+      return NextResponse.json(
+        { error: 'Chybí userId parametr' },
+        { status: 400 }
+      );
+    }
+
+    if (!cartItems || !Array.isArray(cartItems) || cartItems.length === 0) {
+      console.error('❌ Chybí nebo neplatné cartItems:', cartItems);
+      return NextResponse.json(
+        { error: 'Chybí nebo neplatné cartItems' },
+        { status: 400 }
+      );
+    }
+
+    if (amount === undefined || amount === null) {
+      console.error('❌ Chybí amount parametr:', amount);
+      return NextResponse.json(
+        { error: 'Chybí amount parametr' },
+        { status: 400 }
+      );
+    }
+
+    if (!currency) {
+      console.error('❌ Chybí currency parametr');
+      return NextResponse.json(
+        { error: 'Chybí currency parametr' },
         { status: 400 }
       );
     }
@@ -126,25 +271,71 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Chyba při zpracování SumUp callback:', error);
     console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
+    console.error('❌ Error type:', typeof error);
+    console.error('❌ Error constructor:', error?.constructor?.name);
+    console.error('❌ Request URL:', request.url);
+    console.error('❌ Request method:', request.method);
 
     // Rozlišení typických chyb Firestore
     const message = error instanceof Error ? error.message : String(error);
     const isPermission = /PERMISSION_DENIED/i.test(message);
     const isNotFound = /NOT_FOUND/i.test(message);
+    const isInvalidArgument = /INVALID_ARGUMENT/i.test(message);
+    const isUnavailable = /UNAVAILABLE/i.test(message);
+    const isDeadlineExceeded = /DEADLINE_EXCEEDED/i.test(message);
 
-    const statusCode = isPermission ? 403 : isNotFound ? 404 : 500;
-    const statusText = isPermission
-      ? 'Nedostatečná oprávnění'
-      : isNotFound
-      ? 'Dokument nebyl nalezen'
-      : 'Interní chyba serveru';
+    let statusCode = 500;
+    let statusText = 'Interní chyba serveru';
+
+    if (isPermission) {
+      statusCode = 403;
+      statusText = 'Nedostatečná oprávnění';
+    } else if (isNotFound) {
+      statusCode = 404;
+      statusText = 'Dokument nebyl nalezen';
+    } else if (isInvalidArgument) {
+      statusCode = 400;
+      statusText = 'Neplatné argumenty';
+    } else if (isUnavailable) {
+      statusCode = 503;
+      statusText = 'Služba není dostupná';
+    } else if (isDeadlineExceeded) {
+      statusCode = 504;
+      statusText = 'Vypršel časový limit';
+    }
+
+    console.error('❌ Vracím chybu:', { statusCode, statusText, message });
 
     return NextResponse.json(
       {
         error: statusText,
         details: message,
+        timestamp: new Date().toISOString(),
+        errorType: error?.constructor?.name || 'Unknown'
       },
       { status: statusCode }
     );
   }
+}
+
+export async function GET(request: NextRequest) {
+  console.log('🚀 SumUp callback GET endpoint byl zavolán');
+  console.log('🚀 Request URL:', request.url);
+  console.log('🚀 Request timestamp:', new Date().toISOString());
+  console.log('🚀 User-Agent:', request.headers.get('user-agent'));
+  
+  const url = new URL(request.url);
+  const params = Object.fromEntries(url.searchParams.entries());
+  
+  console.log('📥 GET parametry:', JSON.stringify(params, null, 2));
+  
+  // Uložíme i GET parametry do Firebase
+  await saveSumUpResponseToFirebase(params, request);
+  
+  return NextResponse.json({
+    success: true,
+    message: 'GET callback received',
+    params: params,
+    timestamp: new Date().toISOString()
+  });
 }

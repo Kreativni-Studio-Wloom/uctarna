@@ -593,6 +593,47 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   }
 
   const reportData = getReportData();
+  const productMap = new Map(products.map((product) => [product.id, product]));
+  const soldProductsSummary = Array.from(
+    reportData.sales.reduce((acc, sale) => {
+      sale.items?.forEach((item) => {
+        const key = item.productId || item.productName;
+        const product = productMap.get(item.productId);
+        const unitCost = product?.cost || 0;
+        const revenue = item.price * item.quantity;
+        const costs = unitCost * item.quantity;
+        const profit = revenue - costs;
+
+        const existing = acc.get(key);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.revenue += revenue;
+          existing.costs += costs;
+          existing.profit += profit;
+          return;
+        }
+
+        acc.set(key, {
+          name: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          revenue,
+          costs,
+          profit,
+        });
+      });
+
+      return acc;
+    }, new Map<string, {
+      name: string;
+      quantity: number;
+      unitPrice: number;
+      revenue: number;
+      costs: number;
+      profit: number;
+    }>())
+  )
+    .sort((a, b) => b[1].revenue - a[1].revenue);
 
   return (
     <div className="space-y-6">
@@ -909,44 +950,109 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         </motion.div>
       </div>
 
-      {/* Recent Sales */}
-      {reportData.sales.length > 0 ? (
+      {/* Recent Sales + Detailed Product Breakdown */}
+      <div className="space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Poslední prodeje
           </h3>
-          <div className="space-y-3">
-            {reportData.sales.slice(0, 5).map((sale) => (
-              <div key={sale.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center">
-                  <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {format(sale.createdAt, 'HH:mm')}
-                  </span>
-                  <span className="mx-2 text-gray-400">•</span>
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    {sale.items.length} položek
-                  </span>
+          {reportData.sales.length > 0 ? (
+            <div className="space-y-3">
+              {reportData.sales.slice(0, 5).map((sale) => (
+                <div key={sale.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center">
+                    <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {format(sale.createdAt, 'HH:mm')}
+                    </span>
+                    <span className="mx-2 text-gray-400">•</span>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {sale.items.length} položek
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {sale.paymentMethod === 'cash' ? 'Hotovost' : 'Karta'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {sale.currency === 'EUR' ? 'EUR' : 'CZK'}
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {sale.currency === 'EUR' ?
+                        `${sale.totalAmount.toFixed(2)} €` :
+                        `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
+                      }
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {sale.paymentMethod === 'cash' ? 'Hotovost' : 'Karta'}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {sale.currency === 'EUR' ? 'EUR' : 'CZK'}
-                  </span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {sale.currency === 'EUR' ? 
-                      `${sale.totalAmount.toFixed(2)} €` : 
-                      `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
-                    }
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-400">
+              Pro vybrané období nejsou žádné prodeje.
+            </p>
+          )}
         </div>
-      ) : (
+
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Rozpis prodaných produktů
+          </h3>
+
+          {soldProductsSummary.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 dark:border-gray-700">
+                    <th className="text-left py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Produkt</th>
+                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Počet ks</th>
+                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Cena / ks</th>
+                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Tržba celkem</th>
+                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Náklady</th>
+                    <th className="text-right py-3 px-2 font-semibold text-gray-600 dark:text-gray-300">Zisk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {soldProductsSummary.map(([key, item]) => (
+                    <tr key={key} className="border-b border-gray-100 dark:border-gray-700/70">
+                      <td className="py-3 px-2 font-medium text-gray-900 dark:text-white">{item.name}</td>
+                      <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{item.quantity}</td>
+                      <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{item.unitPrice.toLocaleString('cs-CZ')} Kč</td>
+                      <td className="py-3 px-2 text-right font-medium text-gray-900 dark:text-white">{item.revenue.toLocaleString('cs-CZ')} Kč</td>
+                      <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{item.costs.toLocaleString('cs-CZ')} Kč</td>
+                      <td className="py-3 px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{item.profit.toLocaleString('cs-CZ')} Kč</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 dark:bg-gray-700/60">
+                    <td className="py-3 px-2 font-semibold text-gray-900 dark:text-white">Celkem</td>
+                    <td className="py-3 px-2 text-right font-semibold text-gray-900 dark:text-white">
+                      {soldProductsSummary.reduce((sum, [, item]) => sum + item.quantity, 0)}
+                    </td>
+                    <td className="py-3 px-2" />
+                    <td className="py-3 px-2 text-right font-semibold text-gray-900 dark:text-white">
+                      {soldProductsSummary.reduce((sum, [, item]) => sum + item.revenue, 0).toLocaleString('cs-CZ')} Kč
+                    </td>
+                    <td className="py-3 px-2 text-right font-semibold text-gray-900 dark:text-white">
+                      {soldProductsSummary.reduce((sum, [, item]) => sum + item.costs, 0).toLocaleString('cs-CZ')} Kč
+                    </td>
+                    <td className="py-3 px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                      {soldProductsSummary.reduce((sum, [, item]) => sum + item.profit, 0).toLocaleString('cs-CZ')} Kč
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <p className="text-gray-600 dark:text-gray-400">
+              V tomto období nejsou prodané položky k rozepsání.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {reportData.sales.length === 0 && (
         <div className="text-center py-12">
           <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">

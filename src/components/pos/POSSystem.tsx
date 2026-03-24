@@ -592,7 +592,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
                           <button
                             onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                            className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs md:text-sm font-bold"
+                            className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs font-bold"
                           >
                             -
                           </button>
@@ -601,14 +601,14 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           </span>
                           <button
                             onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                            className="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs md:text-sm font-bold"
+                            className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs font-bold"
                           >
                             +
                           </button>
                           {!isReturnMode && (
                             <button
                               onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                              className="ml-1 px-2 py-1 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
+                              className="ml-1 h-6 px-2 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
                             >
                               Extra
                             </button>
@@ -635,12 +635,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               </div>
                               <div className="flex items-center space-x-1">
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
-                                  className="px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-xs">
+                                  className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-xs">
                                   -
                                 </button>
                                 <span className="w-5 text-center">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
-                                  className="px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-xs">
+                                  className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-xs">
                                   +
                                 </button>
                               </div>

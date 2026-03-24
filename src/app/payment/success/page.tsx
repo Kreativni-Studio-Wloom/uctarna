@@ -30,8 +30,23 @@ function PaymentSuccessContent() {
     // Neprovádíme auto-zavření okna
 
     const status = (searchParams.get('smp-status') || searchParams.get('status')) as SumUpCallbackParams['status'];
-    const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code');
-    const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id');
+    const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code') || searchParams.get('txCode');
+    const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id') || searchParams.get('foreignTxId');
+    
+    // Debug logování pro různé typy plateb
+    console.log('🔍 URL parametry:', {
+      'smp-status': searchParams.get('smp-status'),
+      'status': searchParams.get('status'),
+      'smp-tx-code': searchParams.get('smp-tx-code'),
+      'tx_code': searchParams.get('tx_code'),
+      'txCode': searchParams.get('txCode'),
+      'foreign-tx-id': searchParams.get('foreign-tx-id'),
+      'foreign_tx_id': searchParams.get('foreign_tx_id'),
+      'foreignTxId': searchParams.get('foreignTxId'),
+      'všechny parametry': Object.fromEntries(searchParams.entries())
+    });
+    
+    console.log('📊 Extrahované hodnoty:', { status, txCode, foreignTxId });
     
     if (status) {
       setCallbackData({
@@ -94,7 +109,34 @@ function PaymentSuccessContent() {
       }
  
       // Voláme API pro uložení prodeje
+      // Validace dat před odesláním
+      if (!storeId || !userId || !cartItems || cartItems.length === 0) {
+        console.error('❌ Chybí kritická data pro uložení prodeje:', {
+          storeId: !!storeId,
+          userId: !!userId,
+          cartItems: cartItems?.length || 0
+        });
+        alert('Chyba: Chybí data pro uložení prodeje. Zkuste to znovu.');
+        return;
+      }
+
       console.log('🚀 Volám API /api/sumup-callback...');
+      console.log('📤 Odesílaná data:', {
+        status,
+        txCode,
+        foreignTxId: foreignTxId || storedForeign,
+        documentId: documentId || foreignTxId || storedForeign,
+        amount: totalAmount,
+        currency: 'CZK',
+        storeId,
+        userId,
+        cartItemsCount: cartItems.length,
+        discount: discount || null,
+        discountAmount: discountAmount || 0,
+        finalAmount: finalAmount || totalAmount,
+        customerName: customerName || null
+      });
+
       const response = await fetch('/api/sumup-callback', {
         method: 'POST',
         headers: {
@@ -134,8 +176,12 @@ function PaymentSuccessContent() {
           try {
             const errorData = JSON.parse(text);
             console.error('❌ Detail chyby:', errorData);
+            
+            // Zobrazit uživatelsky přívětivou chybovou zprávu
+            alert(`Chyba při ukládání prodeje: ${errorData.error || 'Neznámá chyba'}`);
           } catch (e) {
             console.error('❌ Nelze parsovat chybovou odpověď:', text);
+            alert(`Chyba při ukládání prodeje (${response.status}): ${text}`);
           }
         }
       } finally {

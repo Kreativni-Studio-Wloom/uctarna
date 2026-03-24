@@ -39,7 +39,11 @@ export class SumUpService {
     // Povinné parametry podle dokumentace
     url.searchParams.set('amount', params.amount.toFixed(2));
     url.searchParams.set('currency', params.currency);
-    url.searchParams.set('affiliate-key', this.affiliateKey);
+    // affiliate-key je volitelný pro běžné merchant nasazení.
+    // Pokud je k dispozici (partner integrace), pošleme ho.
+    if (this.affiliateKey && !this.affiliateKey.startsWith('sup_pk_')) {
+      url.searchParams.set('affiliate-key', this.affiliateKey);
+    }
     
     // Volitelné parametry podle dokumentace
     if (params.title) {
@@ -61,32 +65,25 @@ export class SumUpService {
     // Callback URL pro zpětnou vazbu podle dokumentace
     const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
     
-    // Přidáme potřebná data do callback URL pro uložení prodeje
+    // Pro maximální kompatibilitu necháváme callback URL bez vlastních query parametrů.
+    // Stav platby a kontext objednávky držíme v localStorage (uctarna_payment_data).
     const successUrl = new URL(`${currentOrigin}/payment/success`);
     const failUrl = new URL(`${currentOrigin}/payment/fail`);
     
-    // Přidáme data do callback URL
-    if (params.storeId) successUrl.searchParams.set('storeId', params.storeId);
-    if (params.userId) successUrl.searchParams.set('userId', params.userId);
-    if (params.foreignTxId) {
-      // Přidej obě varianty pro jistotu, SumUp přidá vlastní "foreign-tx-id"
-      successUrl.searchParams.set('foreignTxId', params.foreignTxId);
-      successUrl.searchParams.set('foreign-tx-id', params.foreignTxId);
-    }
-    if (params.amount) successUrl.searchParams.set('amount', params.amount.toString());
-    if (params.currency) successUrl.searchParams.set('currency', params.currency);
+    // Debug URL pro testování
+    const debugUrl = new URL(`${currentOrigin}/api/debug-sumup`);
     
-    if (params.storeId) failUrl.searchParams.set('storeId', params.storeId);
-    if (params.userId) failUrl.searchParams.set('userId', params.userId);
-    if (params.foreignTxId) {
-      failUrl.searchParams.set('foreignTxId', params.foreignTxId);
-      failUrl.searchParams.set('foreign-tx-id', params.foreignTxId);
-    }
-    if (params.amount) failUrl.searchParams.set('amount', params.amount.toString());
-    if (params.currency) failUrl.searchParams.set('currency', params.currency);
+    // Pro debugování použijeme debug endpoint
+    const useDebug = typeof window !== 'undefined' && window.location.hostname === 'localhost';
     
-    url.searchParams.set('callbacksuccess', successUrl.toString());
-    url.searchParams.set('callbackfail', failUrl.toString());
+    if (useDebug) {
+      console.log('🔍 DEBUG MODE: Používám debug endpoint');
+      url.searchParams.set('callbacksuccess', debugUrl.toString());
+      url.searchParams.set('callbackfail', debugUrl.toString());
+    } else {
+      url.searchParams.set('callbacksuccess', successUrl.toString());
+      url.searchParams.set('callbackfail', failUrl.toString());
+    }
     
     return url.toString();
   }
@@ -206,4 +203,4 @@ export class SumUpService {
 }
 
 // Instance SumUp service s vaším API klíčem
-export const sumUpService = new SumUpService('sup_pk_FM9pSDgv9KUXVkFrcGOdw3xyRhgHU8yTS');
+export const sumUpService = new SumUpService(process.env.NEXT_PUBLIC_SUMUP_AFFILIATE_KEY || '');
