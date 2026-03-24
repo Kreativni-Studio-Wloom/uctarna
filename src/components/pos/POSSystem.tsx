@@ -579,70 +579,78 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 {cart.filter(ci => !ci.parentItemId).map((item) => {
                   const children = cart.filter(c => c.parentItemId === item.itemId);
                   return (
-                    <div key={item.itemId || item.productId} className="p-2 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <h4 className="font-medium text-gray-900 dark:text-gray-100 text-xs md:text-sm truncate">
-                            {item.productName}
-                          </h4>
-                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300">
+                    <div key={item.itemId || item.productId} className="p-2.5 md:p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight">
+                          {item.productName}
+                        </h4>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             {item.price} Kč × {item.quantity}
                           </p>
-                        </div>
-                        <div className="flex items-center space-x-1 md:space-x-2 flex-shrink-0">
-                          <button
-                            onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                            className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs font-bold"
-                          >
-                            -
-                          </button>
-                          <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm">
-                            {item.quantity}
-                          </span>
-                          <button
-                            onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                            className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs font-bold"
-                          >
-                            +
-                          </button>
-                          {!isReturnMode && (
-                            <button
-                              onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                              className="ml-1 h-6 px-2 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
-                            >
-                              Extra
-                            </button>
-                          )}
-                        </div>
-                        <div className="text-right ml-2 flex-shrink-0">
-                          <p className={`font-semibold text-xs md:text-sm ${
-                            item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                          }`}>
-                            {item.price * item.quantity} Kč
-                          </p>
-                          {item.quantity < 0 && (
-                            <p className="text-xs text-red-500">Vratka</p>
-                          )}
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex items-center space-x-1 md:space-x-1.5">
+                              <button
+                                onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
+                                className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs font-bold"
+                              >
+                                -
+                              </button>
+                              <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm whitespace-nowrap">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
+                                className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                            {!isReturnMode && (
+                              <button
+                                onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
+                                className="h-6 px-2 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
+                              >
+                                Extra
+                              </button>
+                            )}
+                            <div className="text-right min-w-[72px]">
+                              <p className={`font-semibold text-xs md:text-sm whitespace-nowrap ${
+                                item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                              }`}>
+                                {item.price * item.quantity} Kč
+                              </p>
+                              {item.quantity < 0 && (
+                                <p className="text-xs text-red-500 whitespace-nowrap">Vratka</p>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                       {children.length > 0 && (
-                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1">
+                        <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5">
                           {children.map(ch => (
                             <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
-                              className="flex items-center justify-between text-xs md:text-sm text-gray-800 dark:text-gray-200">
-                              <div className="truncate">
-                                + {ch.productName} — {ch.price} Kč × {ch.quantity}
+                              className="flex items-center justify-between gap-2 text-xs md:text-sm text-gray-800 dark:text-gray-200">
+                              <div className="flex-1 min-w-0 whitespace-nowrap">
+                                + {ch.productName}
                               </div>
-                              <div className="flex items-center space-x-1">
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {ch.price} Kč × {ch.quantity}
+                                </span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity - 1)}
                                   className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center text-xs">
                                   -
                                 </button>
-                                <span className="w-5 text-center">{ch.quantity}</span>
+                                <span className="w-5 text-center whitespace-nowrap">{ch.quantity}</span>
                                 <button onClick={() => ch.itemId && updateQuantity(ch.itemId, ch.quantity + 1)}
                                   className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center text-xs">
                                   +
                                 </button>
+                                <span className="min-w-[56px] text-right font-medium whitespace-nowrap">
+                                  {ch.price * ch.quantity} Kč
+                                </span>
                               </div>
                             </div>
                           ))}
