@@ -76,6 +76,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
+  const requiresSumUpRedirect = paymentMethod === 'card' && sumUpAvailable && redirectToSumUp;
+  const canProceedWithCard = !requiresSumUpRedirect || sumUpAffiliateKeyConfigured;
 
   // Načtení kurzu pro store z Firestore a detekce SumUp
   useEffect(() => {
@@ -150,6 +152,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     setLoading(true);
     try {
+      if (paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured) {
+        alert('Chybí SumUp affiliate key. Nastavte NEXT_PUBLIC_SUMUP_AFFILIATE_KEY a restartujte aplikaci.');
+        return;
+      }
+
       // SumUp platba kartou - otevře se až při kliknutí "Zaplatit kartou"
       if (paymentMethod === 'card' && !isRefund && sumUpAvailable && redirectToSumUp) {
         // Vygenerujeme unikátní ID dokladu
@@ -556,7 +563,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handlePayment}
-                disabled={loading}
+                disabled={loading || (paymentMethod === 'card' && !canProceedWithCard)}
                 className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {loading ? (

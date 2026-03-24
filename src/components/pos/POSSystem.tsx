@@ -585,23 +585,23 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           {item.productName}
                         </h4>
                         <div className="flex items-center justify-between gap-2 min-w-0">
-                          <p className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0 leading-none">
+                          <span className="text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0 leading-none m-0">
                             {item.price} Kč × {item.quantity} ks
-                          </p>
+                          </span>
                           <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 whitespace-nowrap">
                             <div className="flex items-center space-x-1 md:space-x-1.5">
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity - 1)}
-                                className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 inline-flex items-center justify-center hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors text-xs font-bold"
+                                className="w-[18px] h-[18px] rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-rose-400 dark:text-rose-300 inline-flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-[10px] font-semibold"
                               >
                                 -
                               </button>
-                              <span className="w-6 md:w-8 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm whitespace-nowrap leading-none">
+                              <span className="w-5 md:w-6 text-center font-medium text-gray-900 dark:text-white text-xs md:text-sm whitespace-nowrap leading-none">
                                 {item.quantity}
                               </span>
                               <button
                                 onClick={() => item.itemId && updateQuantity(item.itemId, item.quantity + 1)}
-                                className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 inline-flex items-center justify-center hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors text-xs font-bold"
+                                className="w-[18px] h-[18px] rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-emerald-400 dark:text-emerald-300 inline-flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-[10px] font-semibold"
                               >
                                 +
                               </button>
@@ -609,23 +609,23 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             {!isReturnMode && (
                               <button
                                 onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                                className="h-6 px-2 rounded-md text-xs bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
+                                className="h-6 px-2 rounded-md text-xs leading-none bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap"
                               >
                                 Extra
                               </button>
                             )}
-                            <div className="text-right min-w-[78px]">
-                              <p className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none ${
+                            <div className="text-right min-w-[78px] h-6 inline-flex items-center justify-end">
+                              <span className={`font-semibold text-xs md:text-sm whitespace-nowrap leading-none m-0 ${
                                 item.quantity < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
                               }`}>
                                 {item.price * item.quantity} Kč
-                              </p>
-                              {item.quantity < 0 && (
-                                <p className="text-xs text-red-500 whitespace-nowrap">Vratka</p>
-                              )}
+                              </span>
                             </div>
                           </div>
                         </div>
+                        {item.quantity < 0 && (
+                          <p className="text-xs text-red-500 whitespace-nowrap leading-none m-0">Vratka</p>
+                        )}
                       </div>
                       {children.length > 0 && (
                         <div className="mt-2 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-1.5 min-w-0">
