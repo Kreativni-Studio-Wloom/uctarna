@@ -189,34 +189,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                   }
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <button
+                onClick={() => setRedirectToSumUp(!redirectToSumUp)}
+                aria-pressed={redirectToSumUp}
+                className={`relative inline-flex h-5 w-9 shrink-0 self-center items-center rounded-full p-0.5 transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-700 ${
+                  redirectToSumUp
+                    ? 'bg-purple-600'
+                    : 'bg-gray-300 dark:bg-gray-500'
+                }`}
+                title={redirectToSumUp ? 'Zapnuto' : 'Vypnuto'}
+              >
                 <span
-                  className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
-                    redirectToSumUp
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                      : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-200'
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${
+                    redirectToSumUp ? 'translate-x-4' : 'translate-x-0'
                   }`}
-                >
-                  {redirectToSumUp ? 'Zapnuto' : 'Vypnuto'}
-                </span>
-                <button
-                  onClick={() => setRedirectToSumUp(!redirectToSumUp)}
-                  aria-pressed={redirectToSumUp}
-                  aria-label="Přepnout přesměrování na SumUp"
-                  className={`relative inline-flex h-8 w-14 items-center rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                    redirectToSumUp
-                      ? 'bg-purple-600 border-purple-600 shadow-sm shadow-purple-500/30'
-                      : 'bg-gray-300 border-gray-300 dark:bg-gray-600 dark:border-gray-500'
-                  }`}
-                  title={redirectToSumUp ? 'Zapnuto' : 'Vypnuto'}
-                >
-                  <span
-                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-1 ring-black/5 transition-transform duration-200 ease-out ${
-                      redirectToSumUp ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
+                />
+              </button>
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
