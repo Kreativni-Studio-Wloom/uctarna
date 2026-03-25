@@ -510,7 +510,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               }}
               className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
             >
-              <Plus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-blue-500 flex-shrink-0" />
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-5 h-5 text-blue-500" />
+              </span>
               <span className="truncate">Nový produkt</span>
             </button>
             <button
@@ -520,7 +522,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               }}
               className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
             >
-              <ListPlus className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-green-600 flex-shrink-0" />
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <ListPlus className="w-5 h-5 text-green-600" />
+              </span>
               <span className="truncate">Přidat extras</span>
             </button>
             <button
@@ -530,7 +534,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               }}
               className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
             >
-              <Package className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-purple-500 flex-shrink-0" />
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <Package className="w-5 h-5 text-purple-500" />
+              </span>
               <span className="truncate">Editor</span>
             </button>
             <button
@@ -540,18 +546,22 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               }}
               className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
             >
-              <svg className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                </svg>
+              </span>
               <span className="truncate">Sleva</span>
             </button>
             <button
               onClick={activateReturnMode}
               className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
             >
-              <svg className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </span>
               <span className="truncate">Vratka</span>
             </button>
             {cart.length > 0 && (
@@ -559,9 +569,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 onClick={savePendingPurchase}
                 className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
               >
-                <svg className="h-3 w-3 md:h-4 md:w-4 mr-2 md:mr-3 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <span className="w-8 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </span>
                 <span className="truncate">Odložit nákup</span>
               </button>
             )}
