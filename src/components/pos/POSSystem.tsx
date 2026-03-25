@@ -579,7 +579,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 {cart.filter(ci => !ci.parentItemId).map((item) => {
                   const children = cart.filter(c => c.parentItemId === item.itemId);
                   return (
-                    <div key={item.itemId || item.productId} className="flex flex-col gap-2 w-full p-2 bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+                    <div key={item.itemId || item.productId} className="flex flex-col gap-2 w-full p-2 bg-white dark:bg-gray-800 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm">
                       <div className="flex justify-between items-start w-full gap-2 min-w-0">
                         <h4 className="font-semibold text-gray-900 dark:text-gray-100 text-sm md:text-base leading-tight min-w-0 break-words">
                           {item.productName}
@@ -632,7 +632,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <div className="mt-1 pl-3 border-l border-gray-300 dark:border-gray-600 space-y-2 min-w-0">
                           {children.map(ch => (
                             <div key={ch.itemId || `${item.itemId}-${ch.productId}`}
-                              className="flex flex-col gap-1.5 w-full p-2 bg-white/60 dark:bg-gray-800/40 rounded-md min-w-0">
+                              className="flex flex-col gap-1.5 w-full p-2 bg-transparent rounded-md min-w-0">
                               <div className="flex justify-between items-start w-full gap-2 min-w-0 text-xs md:text-sm text-gray-800 dark:text-gray-200">
                                 <span className="min-w-0 break-words">
                                   + {ch.productName}
