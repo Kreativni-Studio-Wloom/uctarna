@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Calendar, Eye, DollarSign, CreditCard, Smartphone, Trash2, AlertTriangle } from 'lucide-react';
+import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle } from 'lucide-react';
 import { Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
@@ -19,6 +19,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -52,38 +53,52 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }).format(dateObj);
   };
 
-  const getPaymentIcon = (method: 'cash' | 'card') => {
+  const getPaymentIcon = (method: Sale['paymentMethod']) => {
     switch (method) {
       case 'cash':
         return <DollarSign className="h-4 w-4" />;
       case 'card':
         return <CreditCard className="h-4 w-4" />;
+      case 'qr':
+        return <QrCode className="h-4 w-4" />;
       default:
         return <CreditCard className="h-4 w-4" />;
     }
   };
 
-  const getPaymentLabel = (method: 'cash' | 'card') => {
+  const getPaymentLabel = (method: Sale['paymentMethod']) => {
     switch (method) {
       case 'cash':
         return 'Hotovost';
       case 'card':
         return 'Karta'; // Zahrnuje i SumUp platby
+      case 'qr':
+        return 'QR kód';
       default:
         return 'Neznámé';
     }
   };
 
-  const getPaymentColor = (method: 'cash' | 'card') => {
+  const getPaymentColor = (method: Sale['paymentMethod']) => {
     switch (method) {
       case 'cash':
         return 'text-green-600 dark:text-green-400';
       case 'card':
         return 'text-purple-600 dark:text-purple-400'; // Zahrnuje i SumUp platby
+      case 'qr':
+        return 'text-blue-600 dark:text-blue-400';
       default:
         return 'text-gray-600 dark:text-gray-400';
     }
   };
+
+  const filteredSales = sales.filter((sale) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const docId = (sale.documentId || '').toString().toLowerCase();
+    const id = (sale.id || '').toString().toLowerCase();
+    return docId.includes(q) || id.includes(q);
+  });
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
@@ -127,24 +142,33 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           Doklady
         </h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          Celkem: {sales.length} dokladů
+          Celkem: {filteredSales.length} dokladů
         </div>
       </div>
 
-      {sales.length === 0 ? (
+      <div className="flex items-center gap-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Hledat podle ID nebo čísla dokladu…"
+          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+        />
+      </div>
+
+      {filteredSales.length === 0 ? (
         <div className="text-center py-12">
           <Receipt className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            Zatím nejsou žádné doklady
+            {sales.length === 0 ? 'Zatím nejsou žádné doklady' : 'Nenalezeny žádné doklady'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Po prvním prodeji se zde zobrazí doklady
+            {sales.length === 0 ? 'Po prvním prodeji se zde zobrazí doklady' : 'Zkuste upravit hledaný výraz'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {sales.map((sale, index) => (
+            {filteredSales.map((sale, index) => (
               <motion.div
                 key={sale.id}
                 initial={{ opacity: 0, y: 20 }}

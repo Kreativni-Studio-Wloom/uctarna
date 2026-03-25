@@ -46,7 +46,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [iban, setIban] = useState<string>('');
-  const [qrDocumentId, setQrDocumentId] = useState<string>('');
+  const [qrDocumentId, setQrDocumentId] = useState<string>(''); // numeric only
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
@@ -161,13 +161,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (paymentMethod !== 'qr') return;
     if (qrDocumentId) return;
-    setQrDocumentId(SumUpService.generateDocumentId());
+    setQrDocumentId(SumUpService.generateDocumentId().replace(/\D/g, ''));
   }, [paymentMethod, qrDocumentId]);
 
   const getSpaydString = () => {
     const acc = (iban || '').trim();
     const amount = Math.abs(actualTotalAmount).toFixed(2); // dot separator
-    const vs = (qrDocumentId || '').replace(/\D/g, '');
+    const vs = qrDocumentId;
     const msg = (storeName || '').trim();
     return `SPD*1.0*ACC:${acc}*AM:${amount}*CC:CZK*X-VS:${vs}*MSG:${msg}`;
   };
@@ -179,7 +179,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       if (paymentMethod === 'qr') {
         if (!hasIban) return;
-        const documentId = (qrDocumentId || SumUpService.generateDocumentId()).replace(/\D/g, '');
+        const documentId = qrDocumentId;
         const sale = {
           items: cart,
           totalAmount: actualTotalAmount,
