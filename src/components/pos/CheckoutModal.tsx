@@ -566,12 +566,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
               </div>
               
-              {/* Spodní řada: Platba v eurech + QR kód (jen při hotovosti, QR jen když je IBAN) */}
-              {paymentMethod === 'cash' && (
+              {/* Spodní řada: Platba v eurech + QR kód (QR jen když je IBAN) */}
+              {(paymentMethod === 'cash' || paymentMethod === 'qr') && (
                 <div className="mt-3">
                   <div className={`grid grid-cols-2 gap-3 ${hasIban && !isRefund ? '' : 'grid-cols-1'}`}>
                     <button
-                      onClick={() => setPayInEUR(!payInEUR)}
+                      onClick={() => { setPaymentMethod('cash'); setPayInEUR(!payInEUR); }}
                       className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
                         payInEUR
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
