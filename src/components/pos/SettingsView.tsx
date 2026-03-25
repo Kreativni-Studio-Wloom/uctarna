@@ -16,6 +16,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const extendedUser = user as any; // Cast na ExtendedUser
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
+  const [iban, setIban] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -31,6 +32,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       if (typeof data.redirectToSumUp === 'boolean') {
         setRedirectToSumUp(data.redirectToSumUp);
       }
+      if (typeof data.iban === 'string') {
+        setIban(data.iban);
+      }
     });
     return unsubscribe;
   }, [user, storeId]);
@@ -43,6 +47,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
         eurRate,
         redirectToSumUp,
+        iban: iban.trim(),
         updatedAt: serverTimestamp(),
       });
       setSaved(true);
@@ -202,6 +207,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               >
                 <span className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm" />
               </button>
+            </div>
+
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <label htmlFor="iban" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                IBAN
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                Bankovní účet pro platby QR kódem (SPAYD).
+              </p>
+              <input
+                id="iban"
+                type="text"
+                value={iban}
+                onChange={(e) => setIban(e.target.value)}
+                placeholder="CZ6508000000192000145399"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+              />
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
