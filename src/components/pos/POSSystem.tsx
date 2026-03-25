@@ -477,7 +477,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   }
 
   return (
-    <div className="pos-system min-h-screen w-full bg-gray-50 dark:bg-gray-900 p-3 md:p-4 lg:p-6">
+    <div className="pos-system w-full p-3 md:p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 md:mb-6">
         <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
