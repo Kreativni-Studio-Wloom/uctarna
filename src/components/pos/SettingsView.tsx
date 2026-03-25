@@ -193,16 +193,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 onClick={() => setRedirectToSumUp(!redirectToSumUp)}
                 aria-pressed={redirectToSumUp}
                 aria-label="Přepnout přesměrování na SumUp"
-                className={`relative inline-flex h-5 w-10 shrink-0 self-center rounded-full transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-700 ${
+                className={`relative inline-flex w-12 h-6 shrink-0 self-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-700 ${
                   redirectToSumUp
                     ? 'bg-purple-600'
-                    : 'bg-gray-300 dark:bg-gray-500/90'
+                    : 'bg-gray-100 dark:bg-gray-800'
                 }`}
                 title={redirectToSumUp ? 'Zapnuto' : 'Vypnuto'}
               >
                 <span
-                  className={`absolute left-0.5 top-0.5 h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${
-                    redirectToSumUp ? 'translate-x-5' : 'translate-x-0'
+                  className={`absolute left-0.5 top-0.5 w-5 h-5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ease-in-out ${
+                    redirectToSumUp ? 'translate-x-6' : 'translate-x-0'
                   }`}
                 />
               </button>
