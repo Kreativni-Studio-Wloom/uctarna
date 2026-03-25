@@ -41,6 +41,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuDropdownRef = useRef<HTMLDivElement | null>(null);
 
   // Funkce pro normalizaci diakritiky
   const normalizeText = (text: string): string => {
@@ -187,6 +189,23 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAllProducts]);
+
+  // Zavřít menu po kliknutí mimo
+  useEffect(() => {
+    if (!showMenu) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuDropdownRef.current?.contains(target)) return;
+      setShowMenu(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [showMenu]);
 
   useEffect(() => {
     if (!user || !user.uid || !storeId) return;
@@ -469,19 +488,20 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
             onClick={() => setShowMenu(!showMenu)}
-            className="bg-gray-600 text-white w-10 h-10 md:w-11 md:h-11 rounded-lg font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center text-xs md:text-sm lg:text-base"
+            ref={menuButtonRef}
+            className="bg-gray-600 text-white w-10 h-10 md:w-11 md:h-11 sm:w-auto sm:h-auto sm:px-3 md:sm:px-4 sm:py-2 rounded-lg font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center sm:justify-start text-xs md:text-sm lg:text-base"
           >
-            <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 md:h-5 md:w-5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-            <span className="hidden sm:inline ml-2">Menu</span>
+            <span className="hidden sm:inline">Menu</span>
         </motion.button>
         </div>
       </div>
 
       {/* Menu dropdown - responzivní pozice */}
       {showMenu && (
-        <div className="absolute top-16 md:top-20 right-2 md:right-4 lg:right-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-40 md:min-w-48 max-w-xs">
+        <div ref={menuDropdownRef} className="absolute top-16 md:top-20 right-2 md:right-4 lg:right-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-40 md:min-w-48 max-w-xs">
           <div className="p-2">
             <button
               onClick={() => {
