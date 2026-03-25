@@ -217,12 +217,12 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                   ? `Uzávěrka za měsíc ${reportData.startDate}`
                   : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
-              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
-              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
-              <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)</p>
               <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
+              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
+              <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)</p>
+              <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
+              <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -246,13 +246,13 @@ Období: ${reportData.period === 'Denní'
 
 📊 STATISTIKY:
 - Celková tržba: ${reportData.totalSales.toLocaleString('cs-CZ')} Kč
-- Počet zákazníků: ${reportData.customerCount}
-- Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
-- Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
-- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)
 - Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)
+- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)
 - QR kód: ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)
 - Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
+- Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
+- Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
+- Zákazníci: ${reportData.customerCount}
 - Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
 - Počet různých produktů: ${productSummary.size}
 
