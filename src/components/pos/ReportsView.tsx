@@ -8,7 +8,7 @@ import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterva
 import { cs } from 'date-fns/locale';
 import { Sale, Product } from '@/types';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator } from 'lucide-react';
+import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
 import { generateEmailContent } from '@/lib/email';
 
 // Rozšířený User interface s prodejnami
@@ -170,6 +170,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         }
         return sum + sale.totalAmount;
       }, 0);
+    const qrSales = filteredSales
+      .filter(sale => sale.paymentMethod === 'qr')
+      .reduce((sum, sale) => {
+        if (sale.currency === 'EUR' && sale.eurRate) {
+          return sum + (sale.totalAmount * sale.eurRate);
+        }
+        return sum + sale.totalAmount;
+      }, 0);
     const customerCount = filteredSales.length;
 
     // Výpočet celkových nákladů a zisku
@@ -205,6 +213,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       salesInEUR, // Skutečně vybrané eura
       cashSales,
       cardSales,
+      qrSales,
       customerCount,
       totalCosts, // Celkové náklady
       totalProfit, // Celkový zisk
@@ -259,6 +268,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         salesInEUR: reportData.salesInEUR,
         cashSales: reportData.cashSales,
         cardSales: reportData.cardSales,
+        qrSales: reportData.qrSales,
         customerCount: reportData.customerCount,
         totalCosts: reportData.totalCosts,
         totalProfit: reportData.totalProfit,
@@ -320,6 +330,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     salesInEUR: number;
     cashSales: number;
     cardSales: number;
+    qrSales: number;
     customerCount: number;
     totalCosts: number;
     totalProfit: number;
@@ -398,6 +409,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     salesInEUR: number;
     cashSales: number;
     cardSales: number;
+    qrSales: number;
     customerCount: number;
     totalCosts: number;
     totalProfit: number;
@@ -796,6 +808,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-3">
+              <QrCode className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                QR kód
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.qrSales.toLocaleString('cs-CZ')} Kč
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {reportData.sales.filter(sale => sale.paymentMethod === 'qr').length} prodejů
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
@@ -972,7 +1008,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                   </div>
                   <div className="flex items-center space-x-3">
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {sale.paymentMethod === 'cash' ? 'Hotovost' : 'Karta'}
+                      {sale.paymentMethod === 'cash' ? 'Hotovost' : sale.paymentMethod === 'card' ? 'Karta' : 'QR kód'}
                     </span>
                     <span className="text-xs text-gray-400">
                       {sale.currency === 'EUR' ? 'EUR' : 'CZK'}

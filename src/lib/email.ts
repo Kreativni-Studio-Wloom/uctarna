@@ -11,6 +11,7 @@ export interface ReportData {
   salesInEUR: number;
   cashSales: number;
   cardSales: number;
+  qrSales: number;
   customerCount: number;
   totalCosts: number;
   totalProfit: number;
@@ -78,6 +79,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
   // Agregace prodejů dle způsobu platby
   const numCardSales = reportData.sales.filter(s => s.paymentMethod === 'card').length;
   const numCashSales = reportData.sales.filter(s => s.paymentMethod === 'cash').length;
+  const numQrSales = reportData.sales.filter(s => s.paymentMethod === 'qr').length;
 
   // Vytvoření řádků pro souhrn položek
   const productSummaryRows = Array.from(productSummary.entries())
@@ -174,9 +176,20 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                   <div style="font-size:12px; color:#666; margin-top:5px;">${numCashSales} prodejů</div>
                 </td>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#0d6efd; margin-bottom:5px;">${reportData.qrSales.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">QR kód</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${numQrSales} prodejů</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#dc3545; margin-bottom:5px;">${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">Slevy</div>
                   <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.salesWithDiscount || 0} prodejů</div>
+                </td>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#28a745; margin-bottom:5px;">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Zisk</div>
                 </td>
               </tr>
             </table>
@@ -208,6 +221,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
               <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
+              <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)</p>
               <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
@@ -237,6 +251,7 @@ Období: ${reportData.period === 'Denní'
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
 - Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)
 - Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)
+- QR kód: ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)
 - Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
 - Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
 - Počet různých produktů: ${productSummary.size}
