@@ -46,7 +46,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [iban, setIban] = useState<string>('');
-  const [qrDocumentId, setQrDocumentId] = useState<string>(''); // numeric only
+  const [qrDocumentId, setQrDocumentId] = useState<string>(''); // 10 chars (existing format)
+  const [qrVariableSymbol, setQrVariableSymbol] = useState<string>(''); // numeric only
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
@@ -160,15 +161,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   // Při volbě QR vygeneruj documentId, pokud ještě není
   useEffect(() => {
     if (paymentMethod !== 'qr') return;
-    if (qrDocumentId) return;
-    setQrDocumentId(SumUpService.generateDocumentId().replace(/\D/g, ''));
-  }, [paymentMethod, qrDocumentId]);
+    if (qrDocumentId && qrVariableSymbol) return;
+    if (!qrDocumentId) setQrDocumentId(SumUpService.generateDocumentId());
+    if (!qrVariableSymbol) {
+      // 10 číslic pro maximální kompatibilitu bank u SPAYD X-VS
+      const digits = Array.from({ length: 10 }, () => Math.floor(Math.random() * 10)).join('');
+      setQrVariableSymbol(digits);
+    }
+  }, [paymentMethod, qrDocumentId, qrVariableSymbol]);
+
+  const normalizeIban = (value: string) => value.replace(/\s+/g, '').toUpperCase();
+  const normalizeSpaydMsg = (value: string) => {
+    const ascii = value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7E]/g, ''); // only ASCII
+    return ascii.replace(/\*/g, ' ').trim().slice(0, 60);
+  };
 
   const getSpaydString = () => {
-    const acc = (iban || '').trim();
+    const acc = normalizeIban(iban || '');
     const amount = Math.abs(actualTotalAmount).toFixed(2); // dot separator
-    const vs = qrDocumentId;
-    const msg = (storeName || '').trim();
+    const vs = qrVariableSymbol;
+    const msg = normalizeSpaydMsg(storeName || '');
     return `SPD*1.0*ACC:${acc}*AM:${amount}*CC:CZK*X-VS:${vs}*MSG:${msg}`;
   };
 
@@ -179,7 +194,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     try {
       if (paymentMethod === 'qr') {
         if (!hasIban) return;
-        const documentId = qrDocumentId;
+        const documentId = qrDocumentId || SumUpService.generateDocumentId();
+        const variableSymbol = qrVariableSymbol;
         const sale = {
           items: cart,
           totalAmount: actualTotalAmount,
@@ -188,6 +204,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           eurRate: null,
           originalAmountCZK: totalAmount,
           documentId,
+          variableSymbol,
           createdAt: serverTimestamp(),
           storeId,
           userId: user.uid,
@@ -482,6 +499,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
                   <QRCode value={getSpaydString()} size={220} />
+                </div>
+                <div className="mt-3 text-xs text-gray-600 dark:text-gray-300 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Doklad:</span>
+                    <span className="font-mono">{qrDocumentId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VS:</span>
+                    <span className="font-mono">{qrVariableSymbol}</span>
+                  </div>
                 </div>
 
                 <div className="mt-4">

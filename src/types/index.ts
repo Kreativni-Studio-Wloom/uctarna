@@ -62,6 +62,7 @@ export interface PendingPurchase {
 export interface Sale {
   id: string;
   documentId?: string; // Unikátní 10místné ID dokladu
+  variableSymbol?: string; // Variabilní symbol (numeric) pro SPAYD/QR
   items: CartItem[];
   totalAmount: number; // v Kč nebo EUR (může být záporné pro vratky)
   paymentMethod: 'cash' | 'card' | 'qr'; // SumUp funguje automaticky při platbě kartou, QR pro SPAYD

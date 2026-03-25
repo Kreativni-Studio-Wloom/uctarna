@@ -96,8 +96,9 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     const docId = (sale.documentId || '').toString().toLowerCase();
+    const vs = ((sale as any).variableSymbol || '').toString().toLowerCase();
     const id = (sale.id || '').toString().toLowerCase();
-    return docId.includes(q) || id.includes(q);
+    return docId.includes(q) || vs.includes(q) || id.includes(q);
   });
 
   const handleDeleteSale = async (sale: Sale) => {
