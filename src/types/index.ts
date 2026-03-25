@@ -19,6 +19,7 @@ export interface Store {
   updatedAt: Date;
   isActive: boolean;
   redirectToSumUp?: boolean; // Nastavení pro přesměrování na SumUp při platbě kartou
+  iban?: string; // IBAN pro platby QR kódem (SPAYD)
 }
 
 export interface Product {
@@ -63,7 +64,7 @@ export interface Sale {
   documentId?: string; // Unikátní 10místné ID dokladu
   items: CartItem[];
   totalAmount: number; // v Kč nebo EUR (může být záporné pro vratky)
-  paymentMethod: 'cash' | 'card'; // SumUp funguje automaticky při platbě kartou
+  paymentMethod: 'cash' | 'card' | 'qr'; // SumUp funguje automaticky při platbě kartou, QR pro SPAYD
   currency: 'CZK' | 'EUR'; // Měna platby
   eurRate?: number; // Kurz EUR při platbě v eurech
   originalAmountCZK?: number; // Původní částka v korunách pro reference

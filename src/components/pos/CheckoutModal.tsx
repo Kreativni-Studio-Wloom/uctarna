@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CreditCard, DollarSign, Euro, Calculator } from 'lucide-react';
+import { X, CreditCard, DollarSign, Euro, Calculator, QrCode } from 'lucide-react';
 import { CartItem } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { addDoc, collection, serverTimestamp, doc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
+import QRCode from 'react-qr-code';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -33,7 +34,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   finalAmount
 }) => {
   const { user } = useAuth();
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'qr'>('cash');
   const [loading, setLoading] = useState(false);
   const [showEurConversion, setShowEurConversion] = useState(false);
   const [paidAmount, setPaidAmount] = useState<number>(0);
@@ -44,6 +45,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerName, setCustomerName] = useState<string>('');
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
+  const [iban, setIban] = useState<string>('');
+  const [qrDocumentId, setQrDocumentId] = useState<string>('');
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
@@ -78,6 +81,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const canUseCard = !isRefund;
   const requiresSumUpRedirect = paymentMethod === 'card' && sumUpAvailable && redirectToSumUp;
   const canProceedWithCard = !requiresSumUpRedirect || sumUpAffiliateKeyConfigured;
+  const hasIban = Boolean(iban && iban.trim().length > 0);
+  const canUseQr = !isRefund && displayCurrency === 'CZK' && paymentMethod !== 'card' ? hasIban : hasIban && !isRefund; // guard; UI also checks
 
   // Načtení kurzu pro store z Firestore a detekce SumUp
   useEffect(() => {
@@ -97,6 +102,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
       if (typeof data.redirectToSumUp === 'boolean') {
         setRedirectToSumUp(data.redirectToSumUp);
+      }
+      if (typeof data.iban === 'string') {
+        setIban(data.iban);
+      } else {
+        setIban('');
       }
     });
     return unsubscribe;
@@ -147,11 +157,67 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [paymentMethod]);
 
+  // Při volbě QR vygeneruj documentId, pokud ještě není
+  useEffect(() => {
+    if (paymentMethod !== 'qr') return;
+    if (qrDocumentId) return;
+    setQrDocumentId(SumUpService.generateDocumentId());
+  }, [paymentMethod, qrDocumentId]);
+
+  const getSpaydString = () => {
+    const acc = (iban || '').trim();
+    const amount = Math.abs(actualTotalAmount).toFixed(2); // dot separator
+    const vs = (qrDocumentId || '').replace(/\D/g, '');
+    const msg = (storeName || '').trim();
+    return `SPD*1.0*ACC:${acc}*AM:${amount}*CC:CZK*X-VS:${vs}*MSG:${msg}`;
+  };
+
   const handlePayment = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
+      if (paymentMethod === 'qr') {
+        if (!hasIban) return;
+        const documentId = (qrDocumentId || SumUpService.generateDocumentId()).replace(/\D/g, '');
+        const sale = {
+          items: cart,
+          totalAmount: actualTotalAmount,
+          paymentMethod: 'qr',
+          currency: 'CZK',
+          eurRate: null,
+          originalAmountCZK: totalAmount,
+          documentId,
+          createdAt: serverTimestamp(),
+          storeId,
+          userId: user.uid,
+          customerName: storeType === 'bistro' ? (customerName || null) : null,
+          isRefund,
+          refundAmount: isRefund ? refundAmount : null,
+          paidAmount: null,
+          paidCurrency: null,
+          changeAmount: null,
+          changeAmountEUR: null,
+          discount: discount || null,
+          discountAmount: discountAmount || 0,
+          finalAmount: actualTotalAmount,
+          served: false,
+        };
+
+        await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+
+        for (const item of cart) {
+          const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
+          await updateDoc(productRef, {
+            soldCount: increment(item.quantity),
+            updatedAt: serverTimestamp(),
+          });
+        }
+
+        onSuccess();
+        return;
+      }
+
       if (paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured) {
         alert('Chybí SumUp affiliate key. Nastavte NEXT_PUBLIC_SUMUP_AFFILIATE_KEY a restartujte aplikaci.');
         return;
@@ -402,6 +468,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
+            {/* QR kód obrazovka */}
+            {paymentMethod === 'qr' && hasIban && !isRefund && (
+              <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm">
+                <div className="flex items-center mb-4">
+                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-3">
+                    <QrCode className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                  </div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Platba QR kódem
+                  </h4>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
+                  <QRCode value={getSpaydString()} size={220} />
+                </div>
+
+                <div className="mt-4">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handlePayment}
+                    disabled={loading}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  >
+                    Dokončit prodej
+                  </motion.button>
+                </div>
+              </div>
+            )}
+
             {/* Payment Method */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
@@ -470,22 +566,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </button>
               </div>
               
-              {/* Tlačítko platba v eurech - pouze při platbě hotovostí */}
+              {/* Spodní řada: Platba v eurech + QR kód (jen při hotovosti, QR jen když je IBAN) */}
               {paymentMethod === 'cash' && (
                 <div className="mt-3">
-                  <button
-                    onClick={() => setPayInEUR(!payInEUR)}
-                    className={`w-full p-3 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
-                      payInEUR
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                    }`}
-                  >
-                    <Euro className="h-5 w-5 mr-2 text-blue-600" />
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {payInEUR ? 'Platba v eurech (zapnuto)' : 'Platba v eurech'}
-                    </span>
-                  </button>
+                  <div className={`grid grid-cols-2 gap-3 ${hasIban && !isRefund ? '' : 'grid-cols-1'}`}>
+                    <button
+                      onClick={() => setPayInEUR(!payInEUR)}
+                      className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                        payInEUR
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      <Euro className="h-5 w-5 mr-2 text-blue-600" />
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {payInEUR ? 'Platba v eurech (zapnuto)' : 'Platba v eurech'}
+                      </span>
+                    </button>
+
+                    {hasIban && !isRefund && (
+                      <button
+                        onClick={() => { setPayInEUR(false); setPaymentMethod('qr'); }}
+                        className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
+                          paymentMethod === 'qr'
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                            : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                        }`}
+                      >
+                        <QrCode className="h-5 w-5 mr-2 text-purple-600" />
+                        <span className="font-medium text-gray-900 dark:text-white">QR kód</span>
+                      </button>
+                    )}
+                  </div>
                   {payInEUR && (
                     <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                       <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
