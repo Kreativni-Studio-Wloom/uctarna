@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard, QrCode } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -209,23 +209,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               </button>
             </div>
 
-            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <label htmlFor="iban" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
-                IBAN
-              </label>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                Bankovní účet pro platby QR kódem (SPAYD).
-              </p>
-              <input
-                id="iban"
-                type="text"
-                value={iban}
-                onChange={(e) => setIban(e.target.value)}
-                placeholder="CZ6508000000192000145399"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
-              />
-            </div>
-
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
               <div className="text-sm text-blue-700 dark:text-blue-300 mb-2">
                 Jak to funguje:
@@ -245,6 +228,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                   </>
                 )}
               </div>
+            </div>
+
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
+                <QrCode className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Platba QR kódem
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Po zadání IBAN se volba automaticky zobrazí v checkoutu.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <label htmlFor="iban" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                IBAN
+              </label>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                Bankovní účet pro platby QR kódem (SPAYD).
+              </p>
+              <input
+                id="iban"
+                type="text"
+                value={iban}
+                onChange={(e) => setIban(e.target.value)}
+                placeholder="CZ6508000000192000145399"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+              />
             </div>
           </div>
         </motion.div>
