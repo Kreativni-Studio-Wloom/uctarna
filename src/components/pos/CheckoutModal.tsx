@@ -500,16 +500,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
                   <QRCode value={getSpaydString()} size={220} />
                 </div>
-                <div className="mt-3 text-xs text-gray-600 dark:text-gray-300 space-y-1">
-                  <div className="flex justify-between">
-                    <span>Doklad:</span>
-                    <span className="font-mono">{qrDocumentId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>VS:</span>
-                    <span className="font-mono">{qrVariableSymbol}</span>
-                  </div>
-                </div>
 
                 <div className="mt-4">
                   <motion.button
