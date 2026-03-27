@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, deleteDoc, updateDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -23,6 +23,7 @@ export const Dashboard: React.FC = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [storeToDuplicate, setStoreToDuplicate] = useState<Store | null>(null);
   const [duplicating, setDuplicating] = useState(false);
+  const userMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!user || !user.uid) return;
@@ -67,6 +68,22 @@ export const Dashboard: React.FC = () => {
 
     return unsubscribe;
   }, [user]);
+
+  // Zavřít user menu po kliknutí mimo
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (userMenuContainerRef.current?.contains(target)) return;
+      setShowUserMenu(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [showUserMenu]);
 
   const handleAddStore = async (storeName: string, type: 'prodejna' | 'bistro') => {
     if (!user) return;
@@ -243,7 +260,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="relative">
+              <div ref={userMenuContainerRef} className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
