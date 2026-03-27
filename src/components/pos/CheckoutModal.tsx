@@ -415,9 +415,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="flex-1 relative">
                     <input
-                      type="number"
-                      value={paidAmount || ''}
-                      onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={paidAmount ? String(Math.trunc(paidAmount)) : ''}
+                      onChange={(e) => {
+                        const digitsOnly = e.target.value.replace(/\D/g, '');
+                        setPaidAmount(digitsOnly ? parseInt(digitsOnly, 10) : 0);
+                      }}
                       placeholder="0"
                       className="w-full px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
