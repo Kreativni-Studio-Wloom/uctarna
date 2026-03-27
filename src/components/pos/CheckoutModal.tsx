@@ -354,7 +354,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
               <button
                 onClick={onClose}
-                className="text-white hover:text-gray-200 transition-colors p-1 rounded-lg hover:bg-white hover:bg-opacity-20"
+                className="w-9 h-9 text-white hover:text-gray-200 transition-colors rounded-lg hover:bg-white hover:bg-opacity-20 flex items-center justify-center"
               >
                 <X className="h-5 w-5" />
               </button>
