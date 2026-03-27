@@ -121,7 +121,7 @@ export default function StorePage() {
             <div className="flex items-center">
               <button
                 onClick={() => router.push('/')}
-                className="mr-4 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="mr-4 w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
               >
                 <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </button>
