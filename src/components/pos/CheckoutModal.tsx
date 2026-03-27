@@ -602,7 +602,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     >
                       <Euro className="h-5 w-5 mr-2 text-blue-600" />
                       <span className="font-medium text-gray-900 dark:text-white">
-                        {payInEUR ? 'Platba v eurech (zapnuto)' : 'Platba v eurech'}
+                        {payInEUR ? 'Eura (zapnuto)' : 'Eura'}
                       </span>
                     </button>
 
