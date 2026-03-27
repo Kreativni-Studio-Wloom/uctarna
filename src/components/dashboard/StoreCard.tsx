@@ -53,7 +53,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           onClick={handleDuplicate}
-          className="absolute top-3 right-3 z-10 p-2 bg-white dark:bg-gray-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+          className="absolute top-3 right-3 z-10 w-9 h-9 bg-white dark:bg-gray-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center justify-center"
           title="Duplikovat prodejnu"
         >
           <Copy className="h-4 w-4 text-gray-600 dark:text-gray-300" />
