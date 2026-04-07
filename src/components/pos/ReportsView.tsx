@@ -388,7 +388,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   };
 
   const handleActionNameSubmit = () => {
-    generatePDFReport(actionName.trim() || undefined);
+    const trimmedActionName = actionName.trim();
+    if (selectedPeriod === 'custom') {
+      generatePDFReport(trimmedActionName || 'vlastni obdobi uzaverka');
+    } else {
+      generatePDFReport(trimmedActionName || undefined);
+    }
     setShowActionNameModal(false);
     setActionName('');
   };
@@ -658,7 +663,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => {
-              if (selectedPeriod === 'day') {
+              if (selectedPeriod === 'day' || selectedPeriod === 'custom') {
                 setShowActionNameModal(true);
               } else {
                 generatePDFReport();
