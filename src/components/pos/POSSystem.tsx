@@ -39,6 +39,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showExtrasManager, setShowExtrasManager] = useState(false);
   const [showPinnedManager, setShowPinnedManager] = useState(false);
   const [pinnedProductIds, setPinnedProductIds] = useState<string[]>([]);
+  const [pinnedSearchTerm, setPinnedSearchTerm] = useState('');
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
@@ -316,6 +317,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const pinnedProducts = products
     .filter((p) => pinnedProductIds.includes(p.id))
     .sort((a, b) => pinnedProductIds.indexOf(a.id) - pinnedProductIds.indexOf(b.id));
+
+  const filteredPinnedManagerProducts = products
+    .filter((product) =>
+      normalizeText(product.name).includes(normalizeText(pinnedSearchTerm))
+    )
+    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 
   const popularProducts = products.filter(product => product.isPopular);
 
@@ -1109,7 +1116,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowPinnedManager(false)}
+            onClick={() => { setShowPinnedManager(false); setPinnedSearchTerm(''); }}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -1124,17 +1131,26 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Připnuté položky</h3>
                 </div>
                 <button
-                  onClick={() => setShowPinnedManager(false)}
+                  onClick={() => { setShowPinnedManager(false); setPinnedSearchTerm(''); }}
                   className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
                 >
                   ✕
                 </button>
               </div>
-              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
-                {products
-                  .slice()
-                  .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
-                  .map((product) => {
+              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={pinnedSearchTerm}
+                    onChange={(e) => setPinnedSearchTerm(e.target.value)}
+                    placeholder="Hledat položku..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  />
+                </div>
+              </div>
+              <div className="p-4 max-h-[52vh] overflow-y-auto space-y-2">
+                {filteredPinnedManagerProducts.map((product) => {
                     const isPinned = pinnedProductIds.includes(product.id);
                     return (
                       <button
@@ -1153,6 +1169,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       </button>
                     );
                   })}
+                {filteredPinnedManagerProducts.length === 0 && (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">
+                    Žádné položky pro hledaný výraz.
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
