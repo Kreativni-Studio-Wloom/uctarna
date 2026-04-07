@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus, Pin } from 'lucide-react';
 // removed touch hook usage inside maps; using pointer events instead
 import { AddProductModal } from './AddProductModal';
 import { CheckoutModal } from './CheckoutModal';
@@ -37,6 +37,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
   const [showExtrasManager, setShowExtrasManager] = useState(false);
+  const [showPinnedManager, setShowPinnedManager] = useState(false);
+  const [pinnedProductIds, setPinnedProductIds] = useState<string[]>([]);
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
@@ -77,6 +79,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       hasLoadedCartRef.current = true;
     });
 
+    return unsubscribe;
+  }, [user, storeId]);
+
+  // Načtení připnutých položek prodejny
+  useEffect(() => {
+    if (!user || !storeId) return;
+    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
+    const unsubscribe = onSnapshot(storeRef, (snapshot) => {
+      const data: any = snapshot.data() || {};
+      const pinned = Array.isArray(data.pinnedProductIds) ? data.pinnedProductIds : [];
+      setPinnedProductIds(pinned);
+    });
     return unsubscribe;
   }, [user, storeId]);
 
@@ -299,6 +313,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0))
     .slice(0, 20);
 
+  const pinnedProducts = products
+    .filter((p) => pinnedProductIds.includes(p.id))
+    .sort((a, b) => pinnedProductIds.indexOf(a.id) - pinnedProductIds.indexOf(b.id));
+
   const popularProducts = products.filter(product => product.isPopular);
 
   const generateItemId = (): string => {
@@ -416,6 +434,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       return updated;
     });
     setExtrasParentItemId(null);
+  };
+
+  const togglePinnedProduct = async (productId: string) => {
+    if (!user || !storeId) return;
+    const isPinned = pinnedProductIds.includes(productId);
+    const next = isPinned
+      ? pinnedProductIds.filter((id) => id !== productId)
+      : [...pinnedProductIds, productId];
+
+    setPinnedProductIds(next);
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
+        pinnedProductIds: next,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('❌ Chyba při ukládání připnutých položek:', error);
+      setPinnedProductIds(pinnedProductIds);
+    }
   };
 
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -538,6 +575,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 <Package className="w-5 h-5 text-purple-500" />
               </span>
               <span className="truncate">Editor</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowPinnedManager(true);
+                setShowMenu(false);
+              }}
+              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
+            >
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <Pin className="w-5 h-5 text-indigo-500" />
+              </span>
+              <span className="truncate">Připnuté položky</span>
             </button>
             <button
               onClick={() => {
@@ -931,6 +980,36 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             </div>
           )}
 
+          {/* Připnuté položky */}
+          {pinnedProducts.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Připnuté položky
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {pinnedProducts.map((product) => {
+                  const isHighlighted = addedHighlightId === product.id;
+                  return (
+                    <motion.button
+                      key={product.id}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onPointerUp={() => addToCart(product)}
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
+                    >
+                      <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
+                        {product.name}
+                      </h4>
+                      <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                        {product.price} Kč
+                      </p>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Top 20 Nejprodávanějších */}
           {topSellingProducts.length > 0 && (
             <div>
@@ -1020,6 +1099,63 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               setShowDiscountModal(false);
             }}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showPinnedManager && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowPinnedManager(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div className="flex items-center">
+                  <Pin className="w-5 h-5 text-indigo-500 mr-2" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Připnuté položky</h3>
+                </div>
+                <button
+                  onClick={() => setShowPinnedManager(false)}
+                  className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
+                {products
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name, 'cs'))
+                  .map((product) => {
+                    const isPinned = pinnedProductIds.includes(product.id);
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => togglePinnedProduct(product.id)}
+                        className={`w-full px-4 py-3 rounded-lg border text-left transition-colors ${
+                          isPinned
+                            ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
+                            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium break-words">{product.name}</span>
+                          <span className="text-sm whitespace-nowrap">{product.price} Kč</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
