@@ -62,10 +62,6 @@ export class SumUpService {
       url.searchParams.set('receipt-email', params.receiptEmail);
     }
     
-    if (params.skipSuccessScreen) {
-      url.searchParams.set('skip-screen-success', 'true');
-    }
-    
     // Callback URL pro zpětnou vazbu podle dokumentace
     const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
     
