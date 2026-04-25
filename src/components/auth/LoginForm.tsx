@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, UserPlus, LogIn } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+  const { rememberAccountSession } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,6 +39,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
       }
+      rememberAccountSession(email, password);
       onSuccess();
     } catch (error: any) {
       setError(error.message);

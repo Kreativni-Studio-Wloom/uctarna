@@ -4,20 +4,13 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogOut, User as UserIcon, Users } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 interface UserMenuProps {
   onClose: () => void;
 }
 
 export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
-  const { user, signOutUser } = useAuth();
-  const router = useRouter();
-  let recentAccounts: Array<{ email: string; displayName: string | null }> = [];
-  try {
-    const raw = typeof window !== 'undefined' ? localStorage.getItem('uctarna_recent_accounts') : null;
-    if (raw) recentAccounts = JSON.parse(raw);
-  } catch {}
+  const { user, signOutUser, switchableAccounts, switchAccount } = useAuth();
 
   const handleSignOut = async () => {
     await signOutUser();
@@ -55,24 +48,21 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
 
         {/* Menu Items */}
         <div className="py-1">
-          {recentAccounts.length > 1 && (
+          {switchableAccounts.filter(a => a.email !== user?.email).length > 0 && (
             <div className="px-4 py-2">
               <div className="flex items-center text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                 <Users className="h-3 w-3 mr-2" />
-                Nedávné účty
+                Přepnout účet
               </div>
               <div className="space-y-1">
-                {recentAccounts
+                {switchableAccounts
                   .filter(a => a.email !== user?.email)
                   .map((acc) => (
                   <button
                     key={acc.email}
                     onClick={async () => {
-                      await signOutUser();
+                      await switchAccount(acc.email);
                       onClose();
-                      const url = new URL(window.location.origin);
-                      url.searchParams.set('email', acc.email);
-                      router.push(url.pathname + url.search);
                     }}
                     className="w-full px-3 py-2 rounded-lg text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
@@ -90,7 +80,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
             className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors"
           >
             <LogOut className="h-4 w-4 mr-3" />
-            Odhlásit se
+            Odhlásit aktuální účet
           </button>
         </div>
       </motion.div>

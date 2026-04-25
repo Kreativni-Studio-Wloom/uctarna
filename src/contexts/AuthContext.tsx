@@ -1,17 +1,35 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserSettings, Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const ACCOUNT_SESSIONS_STORAGE_KEY = 'uctarna_account_sessions_v1';
+
+interface StoredAccountSession {
+  email: string;
+  password: string;
+  displayName: string | null;
+  lastUsedAt: number;
+}
+
+interface SwitchableAccount {
+  email: string;
+  displayName: string | null;
+  lastUsedAt: number;
+}
 
 interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   signOutUser: () => Promise<void>;
+  rememberAccountSession: (email: string, password: string) => void;
+  switchAccount: (email: string) => Promise<void>;
+  switchableAccounts: SwitchableAccount[];
   updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
   refreshUserStores: () => Promise<void>;
 }
@@ -35,6 +53,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [switchableAccounts, setSwitchableAccounts] = useState<SwitchableAccount[]>([]);
+
+  const loadStoredSessions = (): StoredAccountSession[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem(ACCOUNT_SESSIONS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as StoredAccountSession[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((entry) => entry?.email && entry?.password);
+    } catch {
+      return [];
+    }
+  };
+
+  const saveStoredSessions = (sessions: StoredAccountSession[]) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(ACCOUNT_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+    setSwitchableAccounts(
+      sessions
+        .map(({ email, displayName, lastUsedAt }) => ({ email, displayName, lastUsedAt }))
+        .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+    );
+  };
+
+  const rememberAccountSession = (email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) return;
+    const sessions = loadStoredSessions();
+    const existing = sessions.find((entry) => entry.email === normalizedEmail);
+    const updated: StoredAccountSession = {
+      email: normalizedEmail,
+      password,
+      displayName: existing?.displayName || null,
+      lastUsedAt: Date.now(),
+    };
+    const next = [updated, ...sessions.filter((entry) => entry.email !== normalizedEmail)].slice(0, 10);
+    saveStoredSessions(next);
+  };
+
+  const switchAccount = async (email: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+    if ((auth.currentUser?.email || '').toLowerCase() === normalizedEmail) return;
+    const sessions = loadStoredSessions();
+    const target = sessions.find((entry) => entry.email === normalizedEmail);
+    if (!target) throw new Error('Účet není uložený pro rychlé přepnutí.');
+
+    setLoading(true);
+    await signInWithEmailAndPassword(auth, target.email, target.password);
+  };
 
   // Funkce pro načtení prodejen uživatele
   const loadUserStores = async (userId: string): Promise<Store[]> => {
@@ -85,6 +154,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    const sessions = loadStoredSessions();
+    setSwitchableAccounts(
+      sessions
+        .map(({ email, displayName, lastUsedAt }) => ({ email, displayName, lastUsedAt }))
+        .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+    );
+  }, []);
+
+  useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setFirebaseUser(firebaseUser);
       
@@ -109,15 +187,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .catch((storesError) => {
                 console.error('Error loading user stores:', storesError);
               });
-            // Ulož do seznamu nedávných účtů (localStorage)
-            try {
-              const recentRaw = localStorage.getItem('uctarna_recent_accounts');
-              const recent = recentRaw ? JSON.parse(recentRaw) as Array<{ email: string; displayName: string | null }> : [];
-              const entry = { email: firebaseUser.email || '', displayName: userData.displayName || null };
-              const filtered = recent.filter(a => a.email !== entry.email);
-              const next = [entry, ...filtered].slice(0, 5);
-              localStorage.setItem('uctarna_recent_accounts', JSON.stringify(next));
-            } catch {}
+            const sessions = loadStoredSessions();
+            const idx = sessions.findIndex((entry) => entry.email === (firebaseUser.email || '').toLowerCase());
+            if (idx >= 0) {
+              sessions[idx] = {
+                ...sessions[idx],
+                displayName: userData.displayName || null,
+                lastUsedAt: Date.now(),
+              };
+              saveStoredSessions(sessions);
+            }
           } else {
             // Vytvoř nového uživatele - opraveno pro undefined displayName
             const newUser: ExtendedUser = {
@@ -135,15 +214,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
             setUser(newUser);
             setLoading(false);
-            // Ulož do seznamu nedávných účtů (localStorage)
-            try {
-              const recentRaw = localStorage.getItem('uctarna_recent_accounts');
-              const recent = recentRaw ? JSON.parse(recentRaw) as Array<{ email: string; displayName: string | null }> : [];
-              const entry = { email: firebaseUser.email || '', displayName: newUser.displayName || null };
-              const filtered = recent.filter(a => a.email !== entry.email);
-              const next = [entry, ...filtered].slice(0, 5);
-              localStorage.setItem('uctarna_recent_accounts', JSON.stringify(next));
-            } catch {}
+            const sessions = loadStoredSessions();
+            const idx = sessions.findIndex((entry) => entry.email === (firebaseUser.email || '').toLowerCase());
+            if (idx >= 0) {
+              sessions[idx] = {
+                ...sessions[idx],
+                displayName: newUser.displayName || null,
+                lastUsedAt: Date.now(),
+              };
+              saveStoredSessions(sessions);
+            }
           }
         } catch (error: any) {
           console.error('Error loading user:', error);
@@ -211,6 +291,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     firebaseUser,
     loading,
     signOutUser,
+    rememberAccountSession,
+    switchAccount,
+    switchableAccounts,
     updateUserSettings,
     refreshUserStores,
   };
