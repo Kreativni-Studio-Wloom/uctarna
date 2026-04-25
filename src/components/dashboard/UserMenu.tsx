@@ -80,7 +80,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
             className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors"
           >
             <LogOut className="h-4 w-4 mr-3" />
-            Odhlásit aktuální účet
+            Přepnout na jiný účet
           </button>
         </div>
       </motion.div>
