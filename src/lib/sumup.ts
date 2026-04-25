@@ -23,10 +23,12 @@ export interface SumUpCallbackParams {
 
 export class SumUpService {
   private affiliateKey: string;
+  private appId: string;
   private baseUrl = 'sumupmerchant://pay/1.0';
   
   constructor(affiliateKey: string) {
     this.affiliateKey = affiliateKey.trim();
+    this.appId = (process.env.NEXT_PUBLIC_SUMUP_APP_ID || '').trim();
   }
 
   hasAffiliateKeyConfigured(): boolean {
@@ -47,6 +49,9 @@ export class SumUpService {
     // pokud je v aplikaci nakonfigurovaný.
     if (this.hasAffiliateKeyConfigured()) {
       url.searchParams.set('affiliate-key', this.affiliateKey);
+    }
+    if (this.appId.length > 0) {
+      url.searchParams.set('app-id', this.appId);
     }
     
     // Volitelné parametry podle dokumentace
