@@ -111,6 +111,7 @@ export class SumUpService {
       // iOS: sumupmerchant://pay/1.0
       // Android: sumupmerchant://pay/1.0
       // Otevři SumUp ve stejném okně/záložce
+      alert(paymentUrl);
       window.location.assign(paymentUrl);
       
       console.log('🔗 Otevírám SumUp app pro platbu kartou:', paymentUrl);
