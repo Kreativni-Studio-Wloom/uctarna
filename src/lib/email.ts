@@ -93,16 +93,6 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
       </tr>
     `).join('');
   
-  const productSummaryCopyText = [
-    '📋 Souhrn prodaných položek',
-    'Položka | Cena za kus | Celková hodnota | Zisk',
-    ...Array.from(productSummary.entries())
-      .sort((a, b) => b[1].totalPrice - a[1].totalPrice)
-      .map(([productName, summary]) =>
-        `${summary.quantity}x ${productName} | ${summary.price.toLocaleString('cs-CZ')} Kč | ${summary.totalPrice.toLocaleString('cs-CZ')} Kč | ${summary.totalProfit.toLocaleString('cs-CZ')} Kč`
-      ),
-  ].join('\\n');
-
   return {
     html: `
       <!DOCTYPE html>
@@ -218,14 +208,6 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                 ${productSummaryRows}
               </tbody>
             </table>
-            <button
-              type="button"
-              style="display:inline-block; margin-top:10px; padding:10px 14px; background:#667eea; color:#ffffff; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer;"
-              onclick="navigator.clipboard.writeText(${JSON.stringify(productSummaryCopyText)}).then(function(){alert('Souhrn prodaných položek byl zkopírován.');})"
-            >
-              Kopírovat položky
-            </button>
-            
             <div class="summary">
               <h4>📊 Souhrn tržeb</h4>
               <p><strong>Období:</strong> ${reportData.period === 'Denní' 
