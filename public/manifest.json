@@ -1,7 +1,7 @@
 {
   "name": "Účtárna - Profesionální prodejní systém",
   "short_name": "Účtárna",
-  "description": "Moderní online prodejní systém ve stylu ProfiÚčtenka s Firebase a offline podporou",
+  "description": "Moderní online prodejní systém s Firebase a offline podporou",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Účtárna - Profesionální prodejní systém',
-  description: 'Moderní online prodejní systém ve stylu ProfiÚčtenka s Firebase a SumUp integrací',
+  description: 'Moderní online prodejní systém s Firebase a SumUp integrací',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
