@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle } from 'lucide-react';
+import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Sale, Store } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
@@ -14,6 +14,7 @@ interface ReceiptsViewProps {
 }
 
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
+  const ITEMS_PER_PAGE = 10;
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +22,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
   const [sharingPdfForSaleId, setSharingPdfForSaleId] = useState<string | null>(null);
@@ -117,6 +119,22 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     const id = (sale.id || '').toString().toLowerCase();
     return docId.includes(q) || vs.includes(q) || id.includes(q);
   });
+
+  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
+  const paginatedSales = filteredSales.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  useEffect(() => {
+    if (totalPages === 0 && currentPage !== 1) {
+      setCurrentPage(1);
+      return;
+    }
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
@@ -236,7 +254,10 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       <div className="flex items-center gap-3">
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setCurrentPage(1);
+          }}
           placeholder="Hledat podle ID nebo čísla dokladu…"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
@@ -255,7 +276,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {filteredSales.map((sale, index) => (
+            {paginatedSales.map((sale, index) => (
               <motion.div
                 key={sale.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -357,6 +378,44 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               </motion.div>
             ))}
           </AnimatePresence>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center mt-6">
+          <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-2 shadow-sm">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Předchozí
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`min-w-[2.25rem] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  currentPage === page
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
+            >
+              Další
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </button>
+          </div>
         </div>
       )}
 
