@@ -23,6 +23,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [search, setSearch] = useState('');
   const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
+  const [sharingPdfForSaleId, setSharingPdfForSaleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -173,6 +174,46 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
+  const handleShareReceiptPdf = async (sale: Sale) => {
+    if (sharingPdfForSaleId) return;
+    setSharingPdfForSaleId(sale.id);
+    try {
+      const pdfBlob = await generateReceiptPdfBlob(sale, {
+        companyName: store?.companyName,
+        ico: store?.ico,
+        companyAddress: store?.companyAddress,
+      });
+
+      const file = new File([pdfBlob], `doklad-${sale.documentId || sale.id}.pdf`, {
+        type: 'application/pdf',
+      });
+
+      const nav = window.navigator as Navigator & {
+        canShare?: (data?: ShareData) => boolean;
+      };
+      const canShareFiles = typeof nav.canShare === 'function' && nav.canShare({ files: [file] });
+
+      if (canShareFiles) {
+        await nav.share({
+          files: [file],
+          title: 'Uctenka',
+        });
+        return;
+      }
+
+      await handleOpenReceiptPdf(sale);
+    } catch (error) {
+      const errorName = (error as { name?: string })?.name;
+      if (errorName === 'AbortError') {
+        return;
+      }
+      console.error('❌ Chyba při sdílení PDF dokladu:', error);
+      await handleOpenReceiptPdf(sale);
+    } finally {
+      setSharingPdfForSaleId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -273,7 +314,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => handleOpenReceiptPdf(sale)}
-                    disabled={generatingPdfForSaleId === sale.id}
+                    disabled={generatingPdfForSaleId === sale.id || sharingPdfForSaleId === sale.id}
                     className="flex-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2 px-3 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {generatingPdfForSaleId === sale.id ? (
@@ -283,6 +324,20 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       </>
                     ) : (
                       <>Doklad</>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleShareReceiptPdf(sale)}
+                    disabled={sharingPdfForSaleId === sale.id || generatingPdfForSaleId === sale.id}
+                    className="flex-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 py-2 px-3 rounded-lg font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {sharingPdfForSaleId === sale.id ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400 mr-2"></div>
+                        Připravuji...
+                      </>
+                    ) : (
+                      <>Tisk</>
                     )}
                   </button>
                   <button
@@ -405,20 +460,36 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     </div>
                   </div>
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                    <button
-                      onClick={() => handleOpenReceiptPdf(selectedSale)}
-                      disabled={generatingPdfForSaleId === selectedSale.id}
-                      className="w-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2.5 px-4 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {generatingPdfForSaleId === selectedSale.id ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400 mr-2"></div>
-                          Generuji...
-                        </>
-                      ) : (
-                        <>Doklad</>
-                      )}
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleOpenReceiptPdf(selectedSale)}
+                        disabled={generatingPdfForSaleId === selectedSale.id || sharingPdfForSaleId === selectedSale.id}
+                        className="w-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2.5 px-4 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {generatingPdfForSaleId === selectedSale.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400 mr-2"></div>
+                            Generuji...
+                          </>
+                        ) : (
+                          <>Doklad</>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleShareReceiptPdf(selectedSale)}
+                        disabled={sharingPdfForSaleId === selectedSale.id || generatingPdfForSaleId === selectedSale.id}
+                        className="w-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 py-2.5 px-4 rounded-lg font-medium hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {sharingPdfForSaleId === selectedSale.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400 mr-2"></div>
+                            Připravuji...
+                          </>
+                        ) : (
+                          <>Tisk</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
