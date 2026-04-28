@@ -230,7 +230,9 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={() => {
+        if (!showReauthModal) onClose();
+      }}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 12 }}
@@ -357,8 +359,19 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       </motion.div>
 
       {showReauthModal && (
-        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-5">
+        <div
+          className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowReauthModal(false);
+            setReauthPassword('');
+            setPendingEmail(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center mb-3">
               <Lock className="h-5 w-5 text-red-600 mr-2" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Potvrzení identity</h3>
