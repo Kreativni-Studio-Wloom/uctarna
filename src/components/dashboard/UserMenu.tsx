@@ -54,7 +54,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose, onOpenSettings }) =
               onOpenSettings();
               onClose();
             }}
-            className="w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-xl flex items-center justify-center transition-colors"
+            className="w-full px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl flex items-center justify-center transition-colors border border-gray-200 dark:border-gray-600"
           >
             <Settings className="h-4 w-4 mr-3" />
             Nastavení uživatele
