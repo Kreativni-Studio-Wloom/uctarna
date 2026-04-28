@@ -7,10 +7,11 @@ type ReceiptStoreData = {
 };
 
 const RECEIPT_WIDTH_MM = 80;
+const CENTER_X = 40;
 const PADDING_MM = 5;
 const LINE_HEIGHT = 4.2;
 const SECTION_SPACING = 2;
-const DIVIDER_GAP = 2.2;
+const DIVIDER_PADDING = 3;
 const MIN_RECEIPT_HEIGHT_MM = 70;
 const FONT_REGULAR_FILE = 'Roboto-Regular.ttf';
 const FONT_BOLD_FILE = 'Roboto-Bold.ttf';
@@ -19,8 +20,14 @@ const NAME_COL_GAP = 2;
 const QTY_COL_WIDTH = 10;
 const PRICE_COL_WIDTH = 22;
 const FONT_CDN_URLS = {
-  regular: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-ext-400-normal.ttf',
-  bold: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-ext-700-normal.ttf',
+  regular: [
+    'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-ext-400-normal.ttf',
+    'https://raw.githubusercontent.com/google/fonts/main/apache/roboto/Roboto-Regular.ttf',
+  ],
+  bold: [
+    'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-ext-700-normal.ttf',
+    'https://raw.githubusercontent.com/google/fonts/main/apache/roboto/Roboto-Bold.ttf',
+  ],
 };
 
 type FirestoreLikeTimestamp = {
@@ -80,12 +87,21 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
 };
 
 const fetchFontAsBase64 = async (url: string): Promise<string> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Font fetch failed: ${response.status}`);
+  const response = await fetch(url, { cache: 'force-cache' });
+  if (!response.ok) throw new Error(`Font fetch failed: ${response.status}`);
+  return arrayBufferToBase64(await response.arrayBuffer());
+};
+
+const fetchFirstAvailableFontAsBase64 = async (urls: string[]): Promise<string> => {
+  let lastError: unknown = null;
+  for (const url of urls) {
+    try {
+      return await fetchFontAsBase64(url);
+    } catch (error) {
+      lastError = error;
+    }
   }
-  const fontArrayBuffer = await response.arrayBuffer();
-  return arrayBufferToBase64(fontArrayBuffer);
+  throw lastError instanceof Error ? lastError : new Error('All font sources failed');
 };
 
 const loadRobotoFontPayload = async (): Promise<FontPayload | null> => {
@@ -93,8 +109,8 @@ const loadRobotoFontPayload = async (): Promise<FontPayload | null> => {
     fontPayloadPromise = (async () => {
       try {
         const [regularBase64, boldBase64] = await Promise.all([
-          fetchFontAsBase64(FONT_CDN_URLS.regular),
-          fetchFontAsBase64(FONT_CDN_URLS.bold),
+          fetchFirstAvailableFontAsBase64(FONT_CDN_URLS.regular),
+          fetchFirstAvailableFontAsBase64(FONT_CDN_URLS.bold),
         ]);
         return { regularBase64, boldBase64 };
       } catch (error) {
@@ -134,12 +150,10 @@ const withFont = (doc: any, useRoboto: boolean, weight: 'normal' | 'bold') => {
   }
 };
 
-const drawDashedDivider = (doc: any, y: number) => {
+const drawDividerLine = (doc: any, y: number) => {
   doc.setDrawColor(160);
   doc.setLineWidth(0.2);
-  doc.setLineDashPattern([1, 1.4], 0);
   doc.line(PADDING_MM, y, RECEIPT_WIDTH_MM - PADDING_MM, y);
-  doc.setLineDashPattern([], 0);
 };
 
 const getLayout = () => {
@@ -182,9 +196,9 @@ export const generateReceiptPdfBlob = async (
   addTextBlockHeight(companyAddress, 8.4);
   addTextBlockHeight(ico ? `IČ: ${ico}` : '', 8.4);
   addTextBlockHeight('Neplátce DPH', 8.4);
-  estimatedHeight += SECTION_SPACING + DIVIDER_GAP;
-  estimatedHeight += LINE_HEIGHT * 2 + SECTION_SPACING + DIVIDER_GAP;
-  estimatedHeight += LINE_HEIGHT + DIVIDER_GAP;
+  estimatedHeight += SECTION_SPACING + DIVIDER_PADDING * 2;
+  estimatedHeight += LINE_HEIGHT * 2 + SECTION_SPACING + DIVIDER_PADDING * 2;
+  estimatedHeight += LINE_HEIGHT + DIVIDER_PADDING * 2;
 
   sale.items.forEach((item) => {
     measurementDoc.setFontSize(8.2);
@@ -192,7 +206,7 @@ export const generateReceiptPdfBlob = async (
     estimatedHeight += Math.max(1, nameLines.length) * LINE_HEIGHT;
   });
 
-  estimatedHeight += DIVIDER_GAP;
+  estimatedHeight += DIVIDER_PADDING * 2;
   estimatedHeight += LINE_HEIGHT + SECTION_SPACING;
   estimatedHeight += LINE_HEIGHT + 1;
   estimatedHeight += LINE_HEIGHT + PADDING_MM;
@@ -214,7 +228,7 @@ export const generateReceiptPdfBlob = async (
     if (!text) return;
     withFont(doc, hasCustomFont, bold ? 'bold' : 'normal');
     doc.setFontSize(size);
-    doc.text(text, pageWidth / 2, y, { align: 'center' });
+    doc.text(text, CENTER_X, y, { align: 'center' });
     y += LINE_HEIGHT;
   };
 
@@ -228,8 +242,9 @@ export const generateReceiptPdfBlob = async (
   };
 
   const drawDivider = () => {
-    drawDashedDivider(doc, y);
-    y += DIVIDER_GAP;
+    y += DIVIDER_PADDING;
+    drawDividerLine(doc, y);
+    y += DIVIDER_PADDING;
   };
 
   if (companyName) drawCentered(companyName, 10, true);
@@ -238,7 +253,7 @@ export const generateReceiptPdfBlob = async (
     doc.setFontSize(8.4);
     const lines = doc.splitTextToSize(companyAddress, layout.contentWidth);
     lines.forEach((line: string) => {
-      doc.text(line, pageWidth / 2, y, { align: 'center' });
+      doc.text(line, CENTER_X, y, { align: 'center' });
       y += LINE_HEIGHT;
     });
   }
@@ -299,7 +314,9 @@ export const generateReceiptPdfBlob = async (
   y += LINE_HEIGHT + 1;
 
   y += 2;
-  drawCentered('Děkujeme za váš nákup', 9, true);
+  withFont(doc, hasCustomFont, 'bold');
+  doc.setFontSize(9);
+  doc.text('Děkujeme za váš nákup', CENTER_X, y, { align: 'center' });
 
   return doc.output('blob');
 };
