@@ -323,7 +323,7 @@ export const Dashboard: React.FC = () => {
               <button
                 onClick={() => setShowMenu(!showMenu)}
                 ref={menuButtonRef}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center text-gray-600 dark:text-gray-300"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors flex items-center justify-center text-gray-600 dark:text-gray-300"
               >
                 <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

@@ -531,7 +531,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         <button
             onClick={() => setShowMenu(!showMenu)}
             ref={menuButtonRef}
-            className="w-10 h-10 md:w-auto md:h-10 md:px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center md:gap-2 text-gray-600 dark:text-gray-300 text-xs md:text-sm lg:text-base"
+            className="w-10 h-10 md:w-auto md:h-10 md:px-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors flex items-center justify-center md:gap-2 text-gray-600 dark:text-gray-300 text-xs md:text-sm lg:text-base"
           >
             <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
