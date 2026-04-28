@@ -222,30 +222,17 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         companyAddress: store?.companyAddress,
       });
 
-      const file = new File([pdfBlob], `doklad-${sale.documentId || sale.id}.pdf`, {
-        type: 'application/pdf',
-      });
-
-      const nav = window.navigator as Navigator & {
-        canShare?: (data?: ShareData) => boolean;
-      };
-      const canShareFiles = typeof nav.canShare === 'function' && nav.canShare({ files: [file] });
-
-      if (canShareFiles) {
-        await nav.share({
-          files: [file],
-          title: 'Uctenka',
-        });
-        return;
-      }
-
-      await handleOpenReceiptPdf(sale);
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'uctenka.pdf';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch (error) {
-      const errorName = (error as { name?: string })?.name;
-      if (errorName === 'AbortError') {
-        return;
-      }
-      console.error('❌ Chyba při sdílení PDF dokladu:', error);
+      console.error('❌ Chyba při přípravě PDF pro tisk:', error);
       await handleOpenReceiptPdf(sale);
     } finally {
       setSharingPdfForSaleId(null);
