@@ -92,6 +92,9 @@ export const Dashboard: React.FC = () => {
       const newStore: Omit<Store, 'id'> = {
         name: storeName,
         type,
+        companyName: '',
+        ico: '',
+        companyAddress: '',
         createdAt: new Date(),
         updatedAt: new Date(),
         isActive: true,
@@ -167,6 +170,9 @@ export const Dashboard: React.FC = () => {
       const newStore = {
         name: newStoreName,
         type: storeToDuplicate.type,
+        companyName: storeToDuplicate.companyName || '',
+        ico: storeToDuplicate.ico || '',
+        companyAddress: storeToDuplicate.companyAddress || '',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         isActive: true,

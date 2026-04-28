@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle } from 'lucide-react';
-import { Sale } from '@/types';
+import { Sale, Store } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { generateReceiptPdfBlob } from '@/lib/pdfGenerator';
 
 interface ReceiptsViewProps {
   storeId: string;
@@ -20,6 +21,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
+  const [store, setStore] = useState<Store | null>(null);
+  const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -37,6 +40,19 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       setLoading(false);
     });
 
+    return unsubscribe;
+  }, [user, storeId]);
+
+  useEffect(() => {
+    if (!user || !storeId) return;
+    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
+    const unsubscribe = onSnapshot(storeRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setStore(null);
+        return;
+      }
+      setStore({ id: snapshot.id, ...snapshot.data() } as Store);
+    });
     return unsubscribe;
   }, [user, storeId]);
 
@@ -125,6 +141,35 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     } finally {
       setDeleting(false);
       setSaleToDelete(null);
+    }
+  };
+
+  const handleOpenReceiptPdf = async (sale: Sale) => {
+    if (generatingPdfForSaleId) return;
+    setGeneratingPdfForSaleId(sale.id);
+    try {
+      const pdfBlob = await generateReceiptPdfBlob(sale, {
+        companyName: store?.companyName,
+        ico: store?.ico,
+        companyAddress: store?.companyAddress,
+      });
+
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const openedWindow = window.open(objectUrl, '_blank', 'noopener,noreferrer');
+      if (!openedWindow) {
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = `doklad-${sale.documentId || sale.id}.pdf`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      console.error('❌ Chyba při generování PDF dokladu:', error);
+      alert('Nepodařilo se vygenerovat PDF doklad. Zkuste to prosím znovu.');
+    } finally {
+      setGeneratingPdfForSaleId(null);
     }
   };
 
@@ -226,6 +271,20 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 </div>
 
                 <div className="flex space-x-2">
+                  <button
+                    onClick={() => handleOpenReceiptPdf(sale)}
+                    disabled={generatingPdfForSaleId === sale.id}
+                    className="flex-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2 px-3 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {generatingPdfForSaleId === sale.id ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400 mr-2"></div>
+                        Generuji...
+                      </>
+                    ) : (
+                      <>📄 Otevřít doklad</>
+                    )}
+                  </button>
                   <button
                     onClick={() => setSelectedSale(sale)}
                     className="flex-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-4 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors flex items-center justify-center"
@@ -344,6 +403,22 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                         )}
                       </span>
                     </div>
+                  </div>
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <button
+                      onClick={() => handleOpenReceiptPdf(selectedSale)}
+                      disabled={generatingPdfForSaleId === selectedSale.id}
+                      className="w-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2.5 px-4 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {generatingPdfForSaleId === selectedSale.id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400 mr-2"></div>
+                          Generuji...
+                        </>
+                      ) : (
+                        <>📄 Otevřít doklad</>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>

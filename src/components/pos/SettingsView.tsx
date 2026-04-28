@@ -13,10 +13,12 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user } = useAuth();
-  const extendedUser = user as any; // Cast na ExtendedUser
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [iban, setIban] = useState<string>('');
+  const [companyName, setCompanyName] = useState<string>('');
+  const [ico, setIco] = useState<string>('');
+  const [companyAddress, setCompanyAddress] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -35,6 +37,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       if (typeof data.iban === 'string') {
         setIban(data.iban);
       }
+      setCompanyName(typeof data.companyName === 'string' ? data.companyName : '');
+      setIco(typeof data.ico === 'string' ? data.ico : '');
+      setCompanyAddress(typeof data.companyAddress === 'string' ? data.companyAddress : '');
     });
     return unsubscribe;
   }, [user, storeId]);
@@ -48,6 +53,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         eurRate,
         redirectToSumUp,
         iban: iban.trim(),
+        companyName: companyName.trim(),
+        ico: ico.trim(),
+        companyAddress: companyAddress.trim(),
         updatedAt: serverTimestamp(),
       });
       setSaved(true);
@@ -62,9 +70,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const formatEurRate = (rate: number) => {
     return `${rate.toFixed(2)} Kč/EUR`;
   };
-
-  // Bezpečné zobrazení displayName
-  const displayName = user?.displayName || 'Uživatel';
 
   return (
     <div className="space-y-6">
@@ -263,7 +268,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           </div>
         </motion.div>
 
-        {/* Store Information */}
+        {/* Company Information */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -276,51 +281,55 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Informace o prodejně
+                Fakturační údaje
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Základní informace a statistiky
+                Údaje pro tisk dokladů
               </p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                ID prodejny:
-              </div>
-              <div className="font-mono text-sm text-gray-900 dark:text-white">
-                {storeId}
-              </div>
+              <label htmlFor="companyName" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Název firmy / Jméno
+              </label>
+              <input
+                id="companyName"
+                type="text"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Např. Jan Novák"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+              />
             </div>
 
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Uživatel:
-              </div>
-              <div className="text-sm text-gray-900 dark:text-white">
-                {user?.email}
-              </div>
+              <label htmlFor="ico" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                IČO
+              </label>
+              <input
+                id="ico"
+                type="text"
+                value={ico}
+                onChange={(e) => setIco(e.target.value)}
+                placeholder="Např. 12345678"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+              />
             </div>
 
             <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Vytvořeno:
-              </div>
-              <div className="text-sm text-gray-900 dark:text-white">
-                {(() => {
-                  const currentStore = extendedUser?.stores?.find((store: any) => store.id === storeId);
-                  if (!currentStore?.createdAt) return 'N/A';
-                  
-                  const createdAt = currentStore.createdAt;
-                  if (createdAt instanceof Date) {
-                    return createdAt.toLocaleDateString('cs-CZ');
-                  } else if ((createdAt as any)?.toDate) {
-                    return (createdAt as any).toDate().toLocaleDateString('cs-CZ');
-                  }
-                  return 'N/A';
-                })()}
-              </div>
+              <label htmlFor="companyAddress" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+                Sídlo / Adresa
+              </label>
+              <textarea
+                id="companyAddress"
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                placeholder="Např. Hlavní 123, 110 00 Praha"
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 resize-y"
+              />
             </div>
           </div>
         </motion.div>

@@ -15,6 +15,9 @@ export interface Store {
   id: string;
   name: string;
   type: 'prodejna' | 'bistro';
+  companyName?: string;
+  ico?: string;
+  companyAddress?: string;
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
