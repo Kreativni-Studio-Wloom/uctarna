@@ -6,9 +6,9 @@ type ReceiptStoreData = {
   companyAddress?: string;
 };
 
-const RECEIPT_WIDTH_MM = 80;
-const CENTER_X = 40;
-const PADDING_MM = 5;
+const RECEIPT_WIDTH_MM = 58;
+const CENTER_X = 29;
+const PADDING_MM = 4;
 const LINE_HEIGHT = 4.2;
 const SECTION_SPACING = 2;
 const DIVIDER_PADDING = 3;
