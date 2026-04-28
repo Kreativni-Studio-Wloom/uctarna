@@ -9,8 +9,6 @@ import {
   ActionCodeSettings,
   EmailAuthProvider,
   reauthenticateWithCredential,
-  sendEmailVerification,
-  updateEmail,
   updatePassword,
   updateProfile,
   verifyBeforeUpdateEmail,
@@ -60,6 +58,9 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
         return 'Zadané heslo není správně.';
       case 'auth/operation-not-allowed':
         return 'Změna e-mailu není aktuálně povolená pro tento účet.';
+      case 'auth/invalid-continue-uri':
+      case 'auth/unauthorized-continue-uri':
+        return 'Redirect URL pro ověřovací e-mail není správně nastavená ve Firebase.';
       default:
         return 'Nepodařilo se změnit e-mail. Zkuste to prosím znovu.';
     }
@@ -165,11 +166,25 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
     setEmailError(null);
     setEmailMessage(null);
     try {
-      // Obnov token před změnou e-mailu - snižuje počet 400 chyb na accounts:update.
+      // Obnov token před změnou e-mailu - snižuje počet 400 chyb.
       await auth.currentUser.getIdToken(true);
-      await updateEmail(auth.currentUser, normalizedEmail);
-      await sendEmailVerification(auth.currentUser, actionCodeSettings);
-      setEmailMessage('Email changed! Please check your inbox for verification.');
+      // Primární a doporučený flow: nejdřív poslat ověřovací odkaz na nový e-mail,
+      // samotná změna proběhne až po kliknutí uživatele na odkaz.
+      try {
+        await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail, actionCodeSettings);
+      } catch (verifyError: any) {
+        // Pokud není redirect URL ve Firebase povolená, zkus fallback bez ActionCodeSettings.
+        if (
+          verifyError?.code === 'auth/invalid-continue-uri' ||
+          verifyError?.code === 'auth/unauthorized-continue-uri'
+        ) {
+          await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail);
+        } else {
+          throw verifyError;
+        }
+      }
+
+      setEmailMessage('Ověřovací e-mail jsme odeslali. Zkontrolujte prosím doručenou poštu i spam.');
       setPendingEmail(null);
       setShowReauthModal(false);
       setReauthPassword('');
@@ -177,25 +192,6 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       if (isRecentLoginError(error)) {
         setPendingEmail(normalizedEmail);
         setShowReauthModal(true);
-      } else if (
-        error?.code === 'auth/operation-not-allowed' ||
-        String(error?.message || '').includes('OPERATION_NOT_ALLOWED')
-      ) {
-        // Některé Firebase konfigurace vyžadují ověřovací flow místo přímého updateEmail.
-        try {
-          await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail, actionCodeSettings);
-          setEmailMessage('Potvrďte změnu e-mailu kliknutím na odkaz, který jsme poslali do schránky.');
-          setPendingEmail(null);
-          setShowReauthModal(false);
-          setReauthPassword('');
-        } catch (verifyError: any) {
-          if (isRecentLoginError(verifyError)) {
-            setPendingEmail(normalizedEmail);
-            setShowReauthModal(true);
-          } else {
-            setEmailError(getEmailErrorMessage(verifyError?.code));
-          }
-        }
       } else {
         setEmailError(getEmailErrorMessage(error?.code));
       }
