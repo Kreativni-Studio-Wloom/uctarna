@@ -125,6 +125,26 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+  const getVisiblePages = (current: number, total: number): Array<number | '...'> => {
+    if (total <= 1) return [1];
+
+    const pages = new Set<number>([1, total, current - 1, current, current + 1]);
+    const sortedPages = Array.from(pages)
+      .filter((page) => page >= 1 && page <= total)
+      .sort((a, b) => a - b);
+
+    const visible: Array<number | '...'> = [];
+    sortedPages.forEach((page, index) => {
+      const previous = sortedPages[index - 1];
+      if (index > 0 && page - previous > 1) {
+        visible.push('...');
+      }
+      visible.push(page);
+    });
+
+    return visible;
+  };
+  const visiblePages = getVisiblePages(currentPage, totalPages);
 
   useEffect(() => {
     if (totalPages === 0 && currentPage !== 1) {
@@ -393,19 +413,34 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               Předchozí
             </button>
 
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`min-w-[2.25rem] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === page
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
+            <div className="hidden sm:flex items-center gap-2">
+              {visiblePages.map((item, index) =>
+                item === '...' ? (
+                  <span
+                    key={`ellipsis-${index}`}
+                    className="min-w-[2.25rem] h-9 px-2 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center"
+                  >
+                    ...
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => setCurrentPage(item)}
+                    className={`min-w-[2.25rem] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === item
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+            </div>
+
+            <div className="sm:hidden px-2 text-sm font-medium text-gray-600 dark:text-gray-300">
+              Strana {currentPage} z {totalPages}
+            </div>
 
             <button
               onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
