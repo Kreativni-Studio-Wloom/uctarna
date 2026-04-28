@@ -524,9 +524,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     <div className="pos-system w-full p-3 md:p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 md:mb-6">
-        <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white">
-          Prodejní systém
-        </h2>
+        <div className="h-10 md:h-10 px-3 md:px-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 inline-flex items-center">
+          <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-900 dark:text-white leading-none">
+            Prodejní systém
+          </h2>
+        </div>
         <div className="flex items-center space-x-2 md:space-x-3">
         <button
             onClick={() => setShowMenu(!showMenu)}
