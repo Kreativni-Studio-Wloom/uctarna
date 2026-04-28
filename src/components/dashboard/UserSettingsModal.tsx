@@ -13,6 +13,7 @@ import {
   updateEmail,
   updatePassword,
   updateProfile,
+  verifyBeforeUpdateEmail,
 } from 'firebase/auth';
 import { X, Save, Lock, User as UserIcon, Mail } from 'lucide-react';
 
@@ -57,9 +58,20 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       case 'auth/wrong-password':
       case 'auth/invalid-credential':
         return 'Zadané heslo není správně.';
+      case 'auth/operation-not-allowed':
+        return 'Změna e-mailu není aktuálně povolená pro tento účet.';
       default:
         return 'Nepodařilo se změnit e-mail. Zkuste to prosím znovu.';
     }
+  };
+
+  const isRecentLoginError = (error: any) => {
+    const code = error?.code || '';
+    const message = String(error?.message || '');
+    return (
+      code === 'auth/requires-recent-login' ||
+      message.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN')
+    );
   };
 
   const saveDisplayName = async () => {
@@ -143,11 +155,18 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       setEmailMessage(null);
       return;
     }
+    if ((auth.currentUser.email || '').toLowerCase() === normalizedEmail) {
+      setEmailError('Zadaný e-mail je stejný jako současný.');
+      setEmailMessage(null);
+      return;
+    }
 
     setEmailSaving(true);
     setEmailError(null);
     setEmailMessage(null);
     try {
+      // Obnov token před změnou e-mailu - snižuje počet 400 chyb na accounts:update.
+      await auth.currentUser.getIdToken(true);
       await updateEmail(auth.currentUser, normalizedEmail);
       await sendEmailVerification(auth.currentUser, actionCodeSettings);
       setEmailMessage('Email changed! Please check your inbox for verification.');
@@ -155,9 +174,28 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       setShowReauthModal(false);
       setReauthPassword('');
     } catch (error: any) {
-      if (error?.code === 'auth/requires-recent-login') {
+      if (isRecentLoginError(error)) {
         setPendingEmail(normalizedEmail);
         setShowReauthModal(true);
+      } else if (
+        error?.code === 'auth/operation-not-allowed' ||
+        String(error?.message || '').includes('OPERATION_NOT_ALLOWED')
+      ) {
+        // Některé Firebase konfigurace vyžadují ověřovací flow místo přímého updateEmail.
+        try {
+          await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail, actionCodeSettings);
+          setEmailMessage('Potvrďte změnu e-mailu kliknutím na odkaz, který jsme poslali do schránky.');
+          setPendingEmail(null);
+          setShowReauthModal(false);
+          setReauthPassword('');
+        } catch (verifyError: any) {
+          if (isRecentLoginError(verifyError)) {
+            setPendingEmail(normalizedEmail);
+            setShowReauthModal(true);
+          } else {
+            setEmailError(getEmailErrorMessage(verifyError?.code));
+          }
+        }
       } else {
         setEmailError(getEmailErrorMessage(error?.code));
       }
