@@ -61,6 +61,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       case 'auth/invalid-continue-uri':
       case 'auth/unauthorized-continue-uri':
         return 'Redirect URL pro ověřovací e-mail není správně nastavená ve Firebase.';
+      case 'auth/network-request-failed':
+        return 'Síť je dočasně nedostupná. Zkuste to prosím za chvíli znovu.';
       default:
         return 'Nepodařilo se změnit e-mail. Zkuste to prosím znovu.';
     }
@@ -74,6 +76,19 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       message.includes('CREDENTIAL_TOO_OLD_LOGIN_AGAIN')
     );
   };
+
+  const isTemporaryOobError = (error: any) => {
+    const code = error?.code || '';
+    const message = String(error?.message || '').toLowerCase();
+    return (
+      code === 'auth/network-request-failed' ||
+      message.includes('503') ||
+      message.includes('service unavailable') ||
+      message.includes('sendoobcode')
+    );
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const saveDisplayName = async () => {
     if (!user || !auth.currentUser) return;
@@ -170,18 +185,38 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       await auth.currentUser.getIdToken(true);
       // Primární a doporučený flow: nejdřív poslat ověřovací odkaz na nový e-mail,
       // samotná změna proběhne až po kliknutí uživatele na odkaz.
-      try {
-        await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail, actionCodeSettings);
-      } catch (verifyError: any) {
-        // Pokud není redirect URL ve Firebase povolená, zkus fallback bez ActionCodeSettings.
-        if (
-          verifyError?.code === 'auth/invalid-continue-uri' ||
-          verifyError?.code === 'auth/unauthorized-continue-uri'
-        ) {
-          await verifyBeforeUpdateEmail(auth.currentUser, normalizedEmail);
-        } else {
-          throw verifyError;
+      const sendVerificationLink = async () => {
+        try {
+          await verifyBeforeUpdateEmail(auth.currentUser!, normalizedEmail, actionCodeSettings);
+        } catch (verifyError: any) {
+          // Pokud není redirect URL ve Firebase povolená, zkus fallback bez ActionCodeSettings.
+          if (
+            verifyError?.code === 'auth/invalid-continue-uri' ||
+            verifyError?.code === 'auth/unauthorized-continue-uri'
+          ) {
+            await verifyBeforeUpdateEmail(auth.currentUser!, normalizedEmail);
+          } else {
+            throw verifyError;
+          }
         }
+      };
+
+      let lastError: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await sendVerificationLink();
+          lastError = null;
+          break;
+        } catch (attemptError: any) {
+          lastError = attemptError;
+          if (!isTemporaryOobError(attemptError) || attempt === 3) {
+            throw attemptError;
+          }
+          await sleep(attempt * 700);
+        }
+      }
+      if (lastError) {
+        throw lastError;
       }
 
       setEmailMessage('Ověřovací e-mail jsme odeslali. Zkontrolujte prosím doručenou poštu i spam.');
@@ -192,6 +227,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
       if (isRecentLoginError(error)) {
         setPendingEmail(normalizedEmail);
         setShowReauthModal(true);
+      } else if (isTemporaryOobError(error)) {
+        setEmailError('Firebase je dočasně nedostupný (503). Zkuste to prosím za chvíli znovu.');
       } else {
         setEmailError(getEmailErrorMessage(error?.code));
       }
