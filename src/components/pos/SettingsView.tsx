@@ -3,9 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard, QrCode } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { Settings, Euro, Save, Check, CreditCard, QrCode, Mail, Lock } from 'lucide-react';
+import { auth, db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  ActionCodeSettings,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  sendEmailVerification,
+  updateEmail,
+} from 'firebase/auth';
 
 interface SettingsViewProps {
   storeId: string;
@@ -21,6 +28,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const [companyAddress, setCompanyAddress] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [showReauthModal, setShowReauthModal] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [reauthLoading, setReauthLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNewEmail(user?.email || '');
+  }, [user?.email]);
 
   // Načtení kurzu pro konkrétní prodejnu
   useEffect(() => {
@@ -69,6 +88,82 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
 
   const formatEurRate = (rate: number) => {
     return `${rate.toFixed(2)} Kč/EUR`;
+  };
+
+  const getEmailErrorMessage = (code?: string) => {
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'Tento e-mail už je používán jiným účtem.';
+      case 'auth/invalid-email':
+        return 'Zadaný e-mail není ve správném formátu.';
+      case 'auth/too-many-requests':
+        return 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.';
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return 'Zadané heslo není správně.';
+      default:
+        return 'Nepodařilo se změnit e-mail. Zkuste to prosím znovu.';
+    }
+  };
+
+  const actionCodeSettings: ActionCodeSettings = {
+    url: 'https://uctarna.fun/login?verified=true',
+    handleCodeInApp: true,
+  };
+
+  const updateUserEmail = async (emailToUpdate: string) => {
+    const normalizedEmail = emailToUpdate.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setEmailError('Zadejte prosím nový e-mail.');
+      setEmailSuccess(null);
+      return;
+    }
+    if (!auth.currentUser) {
+      setEmailError('Uživatel není přihlášen.');
+      setEmailSuccess(null);
+      return;
+    }
+
+    setEmailSaving(true);
+    setEmailError(null);
+    setEmailSuccess(null);
+    try {
+      await updateEmail(auth.currentUser, normalizedEmail);
+      await sendEmailVerification(auth.currentUser, actionCodeSettings);
+      setEmailSuccess('Email changed! Please check your inbox for verification.');
+      setPendingEmail(null);
+      setShowReauthModal(false);
+      setReauthPassword('');
+    } catch (error: any) {
+      if (error?.code === 'auth/requires-recent-login') {
+        setPendingEmail(normalizedEmail);
+        setShowReauthModal(true);
+      } else {
+        setEmailError(getEmailErrorMessage(error?.code));
+      }
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handleReauthenticateAndRetry = async () => {
+    if (!auth.currentUser || !auth.currentUser.email || !pendingEmail) return;
+    if (!reauthPassword) {
+      setEmailError('Pro potvrzení zadejte aktuální heslo.');
+      return;
+    }
+    setReauthLoading(true);
+    setEmailError(null);
+    try {
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, reauthPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      setShowReauthModal(false);
+      await updateUserEmail(pendingEmail);
+    } catch (error: any) {
+      setEmailError(getEmailErrorMessage(error?.code));
+    } finally {
+      setReauthLoading(false);
+    }
   };
 
   return (
@@ -353,7 +448,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Další nastavení
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
             <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
               Téma:
@@ -373,7 +468,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             </div>
           </div>
         </div>
+
+        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+          <div className="flex items-center mb-3">
+            <Mail className="h-5 w-5 text-purple-600 mr-2" />
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Změna e-mailu</h4>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+            Po změně odešleme ověřovací e-mail. Změnu potvrďte kliknutím na odkaz v doručené poště.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="novy@email.cz"
+              className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+            />
+            <button
+              onClick={() => updateUserEmail(newEmail)}
+              disabled={emailSaving || !newEmail.trim()}
+              className="bg-purple-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center min-w-[120px]"
+            >
+              {emailSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Ukládání...
+                </>
+              ) : (
+                'Uložit'
+              )}
+            </button>
+          </div>
+          {emailSuccess && (
+            <p className="mt-3 text-sm text-green-600 dark:text-green-400">{emailSuccess}</p>
+          )}
+          {emailError && (
+            <p className="mt-3 text-sm text-red-600 dark:text-red-400">{emailError}</p>
+          )}
+        </div>
       </motion.div>
+
+      {showReauthModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div className="flex items-center mb-3">
+              <Lock className="h-5 w-5 text-red-600 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Potvrzení identity</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Kvůli bezpečnosti zadejte aktuální heslo a změnu e-mailu zopakujeme.
+            </p>
+            <input
+              type="password"
+              value={reauthPassword}
+              onChange={(e) => setReauthPassword(e.target.value)}
+              placeholder="Aktuální heslo"
+              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+            />
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowReauthModal(false);
+                  setReauthPassword('');
+                  setPendingEmail(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                disabled={reauthLoading}
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={handleReauthenticateAndRetry}
+                disabled={reauthLoading || !reauthPassword}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+              >
+                {reauthLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Ověřuji...
+                  </>
+                ) : (
+                  'Potvrdit'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

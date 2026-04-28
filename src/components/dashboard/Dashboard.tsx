@@ -288,17 +288,6 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowMenu(!showMenu)}
-                ref={menuButtonRef}
-                className="bg-gray-600 text-white w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center"
-              >
-                <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </motion.button>
               <div ref={userMenuContainerRef} className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -318,40 +307,6 @@ export const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {showMenu && (
-        <div
-          ref={menuDropdownRef}
-          className="absolute top-16 sm:top-[4.5rem] right-4 sm:right-6 lg:right-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-56 max-w-xs p-2"
-        >
-          <button
-            onClick={() => {
-              setShowAddStore(true);
-              setShowMenu(false);
-            }}
-            className="w-full text-left px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
-          >
-            <span className="w-8 flex items-center justify-center flex-shrink-0">
-              <Plus className="w-5 h-5" />
-            </span>
-            <span className="truncate">Nová provozovna</span>
-          </button>
-          {stores.length > 0 && (
-            <button
-              onClick={() => {
-                setShowDeleteModal(true);
-                setShowMenu(false);
-              }}
-              className="w-full mt-1 text-left px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
-            >
-              <span className="w-8 flex items-center justify-center flex-shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </span>
-              <span className="truncate">Smazat provozovny</span>
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="mb-8">
@@ -363,6 +318,52 @@ export const Dashboard: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Spravujte své prodejny a prodeje
               </p>
+            </div>
+            <div className="relative self-start sm:self-auto">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowMenu(!showMenu)}
+                ref={menuButtonRef}
+                className="bg-gray-600 text-white w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center"
+              >
+                <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </motion.button>
+              {showMenu && (
+                <div
+                  ref={menuDropdownRef}
+                  className="absolute top-12 sm:top-14 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-56 max-w-xs p-2"
+                >
+                  <button
+                    onClick={() => {
+                      setShowAddStore(true);
+                      setShowMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+                  >
+                    <span className="w-8 flex items-center justify-center flex-shrink-0">
+                      <Plus className="w-5 h-5" />
+                    </span>
+                    <span className="truncate">Nová provozovna</span>
+                  </button>
+                  {stores.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setShowDeleteModal(true);
+                        setShowMenu(false);
+                      }}
+                      className="w-full mt-1 text-left px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+                    >
+                      <span className="w-8 flex items-center justify-center flex-shrink-0">
+                        <Trash2 className="w-5 h-5" />
+                      </span>
+                      <span className="truncate">Smazat provozovny</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
