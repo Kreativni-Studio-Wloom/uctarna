@@ -282,7 +282,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                         Generuji...
                       </>
                     ) : (
-                      <>📄 Otevřít doklad</>
+                      <>Doklad</>
                     )}
                   </button>
                   <button
@@ -416,7 +416,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                           Generuji...
                         </>
                       ) : (
-                        <>📄 Otevřít doklad</>
+                        <>Doklad</>
                       )}
                     </button>
                   </div>
