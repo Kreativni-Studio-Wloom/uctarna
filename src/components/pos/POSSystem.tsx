@@ -877,6 +877,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             key={product.id}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onTouchStart={(e) => e.preventDefault()}
                             onPointerUp={() => {
                               addToCart(product);
                               // nech vyhledávač otevřený; zavře se kliknutím mimo
