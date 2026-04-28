@@ -125,7 +125,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="mt-4 space-y-4">
             <div>
               <label htmlFor="eurRate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Kurz (Kč/EUR)
@@ -151,14 +151,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               </div>
             </div>
 
-            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-sm text-blue-700 dark:text-blue-300 mb-2">
                 Příklad převodu:
               </div>
-              <div className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="text-sm text-blue-600 dark:text-blue-400">
                 100 Kč = {(100 / eurRate).toFixed(2)} EUR
               </div>
-              <div className="text-sm text-gray-700 dark:text-gray-300">
+              <div className="text-sm text-blue-600 dark:text-blue-400">
                 500 Kč = {(500 / eurRate).toFixed(2)} EUR
               </div>
             </div>
