@@ -310,7 +310,7 @@ export const Dashboard: React.FC = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
+          <div className="flex justify-between items-start mb-6 gap-3">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 Moje prodejny
@@ -319,7 +319,7 @@ export const Dashboard: React.FC = () => {
                 Spravujte své prodejny a prodeje
               </p>
             </div>
-            <div className="relative self-start sm:self-auto">
+            <div className="relative">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
