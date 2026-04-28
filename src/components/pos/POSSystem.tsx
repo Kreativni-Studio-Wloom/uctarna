@@ -528,18 +528,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           Prodejní systém
         </h2>
         <div className="flex items-center space-x-2 md:space-x-3">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
             onClick={() => setShowMenu(!showMenu)}
             ref={menuButtonRef}
-            className="bg-gray-600 text-white w-10 h-10 md:w-auto md:h-10 md:px-4 md:py-2 rounded-lg font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center md:gap-2 text-xs md:text-sm lg:text-base"
+            className="w-10 h-10 md:w-auto md:h-10 md:px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center md:gap-2 text-gray-600 dark:text-gray-300 text-xs md:text-sm lg:text-base"
           >
             <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
             <span className="hidden md:inline">Menu</span>
-        </motion.button>
+        </button>
         </div>
       </div>
 

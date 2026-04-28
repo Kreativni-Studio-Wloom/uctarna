@@ -320,17 +320,15 @@ export const Dashboard: React.FC = () => {
               </p>
             </div>
             <div className="relative">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
                 onClick={() => setShowMenu(!showMenu)}
                 ref={menuButtonRef}
-                className="bg-gray-600 text-white w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center text-gray-600 dark:text-gray-300"
               >
                 <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
-              </motion.button>
+              </button>
               {showMenu && (
                 <div
                   ref={menuDropdownRef}
