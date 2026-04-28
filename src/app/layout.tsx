@@ -9,9 +9,12 @@ export const metadata: Metadata = {
   title: 'Účtárna - Profesionální prodejní systém',
   description: 'Moderní online prodejní systém ve stylu ProfiÚčtenka s Firebase a SumUp integrací',
   icons: {
-    icon: '/favicon.png',
-    shortcut: '/favicon.png',
-    apple: '/favicon.png',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    shortcut: ['/favicon.ico'],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
   },
 }
 
