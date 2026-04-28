@@ -199,19 +199,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                   }
                 </div>
               </div>
-              <button
-                onClick={() => setRedirectToSumUp(!redirectToSumUp)}
-                aria-pressed={redirectToSumUp}
-                aria-label="Přepnout přesměrování na SumUp"
-                className={`shrink-0 self-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-700 ${
-                  redirectToSumUp ? 'bg-purple-600' : 'bg-gray-100 dark:bg-gray-800'
-                } rounded-full p-1 w-16 inline-flex items-center transition-colors duration-200 ease-in-out ${
-                  redirectToSumUp ? 'justify-end' : 'justify-start'
-                }`}
-                title={redirectToSumUp ? 'Zapnuto' : 'Vypnuto'}
-              >
-                <span className="w-7 h-7 rounded-full bg-white dark:bg-gray-700 shadow-sm" />
-              </button>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={redirectToSumUp}
+                  onChange={(e) => setRedirectToSumUp(e.target.checked)}
+                  aria-label="Přepnout přesměrování na SumUp"
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+              </label>
             </div>
 
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">

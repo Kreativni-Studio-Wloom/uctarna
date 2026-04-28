@@ -6,7 +6,7 @@ import { collection, query, onSnapshot, updateDoc, deleteDoc, doc } from 'fireba
 import { db } from '@/lib/firebase';
 import { Product } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit, Trash2, Save, X, Package } from 'lucide-react';
+import { Edit, Trash2, Save, X, Package, Search } from 'lucide-react';
 // use pointer events for touch responsiveness
 
 interface ProductEditorProps {
@@ -24,6 +24,13 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const normalizeText = (text: string) =>
+    text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
 
   // Načtení produktů
   useEffect(() => {
@@ -72,6 +79,10 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
     setEditPrice(product.price);
     setEditCost(product.cost);
   };
+
+  const filteredProducts = products.filter((product) =>
+    normalizeText(product.name).includes(normalizeText(searchTerm))
+  );
 
   // Zrušení editace
   const cancelEditing = () => {
@@ -178,130 +189,151 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {products.map((product) => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
-                >
-                  {editingProduct?.id === product.id ? (
-                    // Edit mode
-                    <div className="space-y-3">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Název
-                        </label>
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="Název produktu"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Cena (Kč)
-                        </label>
-                        <input
-                          type="number"
-                          value={editPrice}
-                          onChange={(e) => setEditPrice(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="0"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Náklady (Kč) <span className="text-gray-500 text-xs">(nepovinné)</span>
-                        </label>
-                        <input
-                          type="number"
-                          value={editCost || ''}
-                          onChange={(e) => setEditCost(e.target.value ? Number(e.target.value) : undefined)}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="0"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={saveProduct}
-                          disabled={saving || !editName.trim() || editPrice <= 0}
-                          className="flex-1 bg-green-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-                        >
-                          {saving ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          ) : (
-                            <Save className="h-4 w-4 mr-2" />
-                          )}
-                          Uložit
-                        </button>
-                        <button
-                          onClick={cancelEditing}
-                          className="flex-1 bg-gray-500 text-white py-2 px-3 rounded-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Zrušit
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode
-                    <div className="space-y-3">
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-white text-lg">
-                          {product.name}
-                        </h3>
-                        <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                          {product.price} Kč
-                        </p>
-                        {product.cost !== undefined && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Náklady: {product.cost} Kč
-                          </p>
-                        )}
-                      </div>
-                      
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        <p>Prodáno: {product.soldCount || 0}×</p>
-                        <p>Kategorie: {product.category || 'Nespecifikováno'}</p>
-                        {product.isPopular && (
-                          <p className="text-green-600 dark:text-green-400 font-medium">⭐ Populární</p>
-                        )}
-                      </div>
+            <>
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Hledat položku..."
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  />
+                </div>
+              </div>
 
-                      <div className="flex space-x-2">
-                        <button
-                          onPointerUp={() => startEditing(product)}
-                          className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors flex items-center justify-center touch-target"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Upravit
-                        </button>
-                        <button
-                          onPointerUp={() => deleteProduct(product.id)}
-                          disabled={deleting === product.id}
-                          className="flex-1 bg-red-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center touch-target"
-                        >
-                          {deleting === product.id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          ) : (
-                            <Trash2 className="h-4 w-4 mr-2" />
-                          )}
-                          Smazat
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
+              {filteredProducts.length === 0 ? (
+                <div className="text-center py-10 text-gray-600 dark:text-gray-400">
+                  Žádné položky pro hledaný výraz.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProducts.map((product) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                    >
+                      {editingProduct?.id === product.id ? (
+                        // Edit mode
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Název
+                            </label>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Název produktu"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Cena (Kč)
+                            </label>
+                            <input
+                              type="number"
+                              value={editPrice}
+                              onChange={(e) => setEditPrice(Number(e.target.value))}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="0"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                              Náklady (Kč) <span className="text-gray-500 text-xs">(nepovinné)</span>
+                            </label>
+                            <input
+                              type="number"
+                              value={editCost || ''}
+                              onChange={(e) => setEditCost(e.target.value ? Number(e.target.value) : undefined)}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="0"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={saveProduct}
+                              disabled={saving || !editName.trim() || editPrice <= 0}
+                              className="flex-1 bg-green-600 text-white py-2 px-3 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                            >
+                              {saving ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              ) : (
+                                <Save className="h-4 w-4 mr-2" />
+                              )}
+                              Uložit
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              className="flex-1 bg-gray-500 text-white py-2 px-3 rounded-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors flex items-center justify-center"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Zrušit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        // View mode
+                        <div className="space-y-3">
+                          <div>
+                            <h3 className="font-medium text-gray-900 dark:text-white text-lg">
+                              {product.name}
+                            </h3>
+                            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                              {product.price} Kč
+                            </p>
+                            {product.cost !== undefined && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Náklady: {product.cost} Kč
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <p>Prodáno: {product.soldCount || 0}×</p>
+                            <p>Kategorie: {product.category || 'Nespecifikováno'}</p>
+                            {product.isPopular && (
+                              <p className="text-green-600 dark:text-green-400 font-medium">⭐ Populární</p>
+                            )}
+                          </div>
+
+                          <div className="flex space-x-2">
+                            <button
+                              onPointerUp={() => startEditing(product)}
+                              className="flex-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-3 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center touch-target"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Upravit
+                            </button>
+                            <button
+                              onPointerUp={() => deleteProduct(product.id)}
+                              disabled={deleting === product.id}
+                              className="flex-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 py-2 px-3 rounded-lg font-medium hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center touch-target"
+                            >
+                              {deleting === product.id ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 dark:border-red-400 mr-2"></div>
+                              ) : (
+                                <Trash2 className="h-4 w-4 mr-2" />
+                              )}
+                              Smazat
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
