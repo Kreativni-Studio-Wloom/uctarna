@@ -8,7 +8,7 @@ import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterva
 import { cs } from 'date-fns/locale';
 import { Sale, Product } from '@/types';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, TrendingUp, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
+import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
 import { generateEmailContent } from '@/lib/email';
 
 // Rozšířený User interface s prodejnami
@@ -126,8 +126,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     
     // Výpočet tržeb podle měn
     let totalSalesCZK = 0; // Celková tržba přepočtená na koruny
-    let salesInCZK = 0; // Tržby v korunách (odečtené vrácené koruny)
-    let salesInEUR = 0; // Skutečně vybrané eura (včetně vrácených)
+    let salesInCZK = 0; // Tržby v korunách
+    let salesInEUR = 0; // Skutečně vybrané eura (po vrácení)
     
     filteredSales.forEach(sale => {
       if (sale.currency === 'EUR' && sale.eurRate) {
@@ -135,17 +135,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         const amountInCZK = sale.totalAmount * sale.eurRate;
         totalSalesCZK += amountInCZK;
         
-        // Přidej skutečně vybrané eura (zaplacená částka v eurech)
+        // Přidej skutečně vybrané eura po vrácení
         if (sale.paidAmount && sale.paidCurrency === 'EUR') {
-          salesInEUR += sale.paidAmount;
+          const returnedEur = sale.changeAmountEUR && sale.changeAmountEUR > 0 ? sale.changeAmountEUR : 0;
+          salesInEUR += sale.paidAmount - returnedEur;
         } else {
           // Fallback - pokud nejsou uloženy informace o platbě
           salesInEUR += sale.totalAmount;
-        }
-        
-        // Odečti vrácené koruny (pokud byly vráceny)
-        if (sale.changeAmount && sale.changeAmount > 0) {
-          salesInCZK -= sale.changeAmount; // Odečti vrácené koruny
         }
       } else {
         // Prodej v korunách
@@ -527,12 +523,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               
               <div class="stat-card">
                 <div class="stat-value cash-value">${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</div>
-                <div class="stat-label">Koruny (po vrácení)</div>
+                <div class="stat-label">Koruny</div>
               </div>
               
               <div class="stat-card">
                 <div class="stat-value card-value">${reportData.salesInEUR.toFixed(2)} €</div>
-                <div class="stat-label">Eura (vybrané)</div>
+                <div class="stat-label">Eura</div>
               </div>
               
               <div class="stat-card">
@@ -569,8 +565,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                   ? `Uzávěrka za měsíc ${reportData.startDate}`
                   : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
+              <p><strong>Koruny:</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Eura:</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -921,7 +917,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                Eura (vybrané)
+                Eura
               </p>
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.salesInEUR.toFixed(2)} €
@@ -943,7 +939,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                Koruny (po vrácení)
+                Koruny
               </p>
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
@@ -981,7 +977,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         >
           <div className="flex items-center">
             <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center mr-3">
-              <TrendingUp className="h-5 w-5 text-red-600" />
+              <TrendingDown className="h-5 w-5 text-red-600" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">

@@ -55,19 +55,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const eurAmount = actualTotalAmount / eurRate;
 
   // Výpočet částky k vrácení
-  let changeAmount: number;
+  let changeAmountCZK: number;
+  let changeAmountInEUR: number;
   let paidAmountInCZK: number;
   
   if (payInEUR) {
-    // Při platbě v eurech: zaplacená částka v eurech - hodnota nákupu v eurech, pak přepočítat na koruny
+    // Při platbě v eurech: vrací se vždy v eurech
     const paidAmountInEUR = paidCurrency === 'EUR' ? paidAmount : paidAmount / eurRate;
-    const changeAmountInEUR = paidAmountInEUR - eurAmount; // Zaplacená částka minus hodnota nákupu
-    changeAmount = changeAmountInEUR * eurRate; // Přepočítat na koruny (může být záporné)
+    changeAmountInEUR = paidAmountInEUR - eurAmount; // Zaplacená částka minus hodnota nákupu
+    changeAmountCZK = changeAmountInEUR * eurRate; // pouze informativní přepočet
     paidAmountInCZK = paidAmountInEUR * eurRate; // Pro zobrazení - přepočítat zaplacenou částku na koruny
   } else {
     // Při platbě v korunách: standardní výpočet
     paidAmountInCZK = paidCurrency === 'EUR' ? paidAmount * eurRate : paidAmount;
-    changeAmount = paidAmountInCZK - actualTotalAmount;
+    changeAmountCZK = paidAmountInCZK - actualTotalAmount;
+    changeAmountInEUR = changeAmountCZK / eurRate;
   }
 
   // Aktuální částka pro zobrazení (v eurech pokud je vybrána platba v eurech)
@@ -298,8 +300,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         // Informace o vrácení při platbě v eurech
         paidAmount: paymentMethod === 'cash' ? paidAmount : null,
         paidCurrency: paymentMethod === 'cash' ? (payInEUR ? 'EUR' : paidCurrency) : null,
-        changeAmount: paymentMethod === 'cash' ? changeAmount : null,
-        changeAmountEUR: paymentMethod === 'cash' && payInEUR ? (changeAmount / eurRate) : null,
+        changeAmount: paymentMethod === 'cash' ? (payInEUR ? null : changeAmountCZK) : null,
+        changeAmountEUR: paymentMethod === 'cash' && payInEUR ? changeAmountInEUR : null,
         // Sleva
         discount: discount || null,
         discountAmount: discountAmount || 0,
@@ -467,17 +469,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <div className="flex justify-between items-center text-lg font-bold">
                       <span className="text-green-600 dark:text-green-400">Vrátit:</span>
                       <span className="text-green-600 dark:text-green-400">
-                        {changeAmount > 0 ? (
-                          `${changeAmount.toFixed(2)} Kč`
-                        ) : changeAmount < 0 ? (
-                          `0 Kč`
+                        {payInEUR ? (
+                          changeAmountInEUR > 0 ? `${changeAmountInEUR.toFixed(2)} €` : '0 €'
+                        ) : changeAmountCZK > 0 ? (
+                          `${changeAmountCZK.toFixed(2)} Kč`
+                        ) : changeAmountCZK < 0 ? (
+                          '0 Kč'
                         ) : (
                           '0 Kč'
                         )}
                       </span>
                     </div>
+
+                    {payInEUR && changeAmountInEUR > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        Informačně: {(changeAmountInEUR * eurRate).toFixed(2)} Kč
+                      </div>
+                    )}
                     
-                    {changeAmount < 0 && (
+                    {((payInEUR && changeAmountInEUR < 0) || (!payInEUR && changeAmountCZK < 0)) && (
                       <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
                         <p className="text-sm text-red-600 dark:text-red-400 flex items-center">
                           <span className="mr-2">⚠️</span>
