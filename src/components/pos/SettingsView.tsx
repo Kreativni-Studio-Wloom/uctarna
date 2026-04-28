@@ -165,74 +165,85 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           </div>
         </motion.div>
 
-        {/* SumUp Redirect Setting */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
-        >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-              <CreditCard className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Platba kartou
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Nastavení přesměrování na SumUp při platbě kartou
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        {/* Payments Settings */}
+        <div className="space-y-6">
+          {/* SumUp Redirect Setting */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          >
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
+                <CreditCard className="h-6 w-6 text-purple-600" />
+              </div>
               <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                  Přesměrovat na SumUp
-                </div>
-                <div className="text-xs text-gray-600 dark:text-gray-400">
-                  {redirectToSumUp ? 
-                    'Platba kartou přesměruje na SumUp aplikaci' : 
-                    'Platba kartou se pouze zaznamená do dokladu'
-                  }
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                <input
-                  type="checkbox"
-                  checked={redirectToSumUp}
-                  onChange={(e) => setRedirectToSumUp(e.target.checked)}
-                  aria-label="Přepnout přesměrování na SumUp"
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-              </label>
-            </div>
-
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-              <div className="text-sm text-blue-700 dark:text-blue-300 mb-2">
-                Jak to funguje:
-              </div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
-                {redirectToSumUp ? (
-                  <>
-                    <div>• Kliknutím na "Zaplatit kartou" se otevře SumUp app</div>
-                    <div>• Zákazník dokončí platbu v SumUp aplikaci</div>
-                    <div>• Po úspěšné platbě se vrátí zpět do systému</div>
-                  </>
-                ) : (
-                  <>
-                    <div>• Kliknutím na "Zaplatit kartou" se pouze zaznamená prodej</div>
-                    <div>• Žádné přesměrování na SumUp aplikaci</div>
-                    <div>• Ideální pro offline režim nebo testování</div>
-                  </>
-                )}
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Platba kartou
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Nastavení přesměrování na SumUp při platbě kartou
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Přesměrovat na SumUp
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {redirectToSumUp ? 
+                      'Platba kartou přesměruje na SumUp aplikaci' : 
+                      'Platba kartou se pouze zaznamená do dokladu'
+                    }
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={redirectToSumUp}
+                    onChange={(e) => setRedirectToSumUp(e.target.checked)}
+                    aria-label="Přepnout přesměrování na SumUp"
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+              </div>
+
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="text-sm text-purple-700 dark:text-purple-300 mb-2">
+                  Jak to funguje:
+                </div>
+                <div className="text-xs text-purple-600 dark:text-purple-400 space-y-1">
+                  {redirectToSumUp ? (
+                    <>
+                      <div>• Kliknutím na "Zaplatit kartou" se otevře SumUp app</div>
+                      <div>• Zákazník dokončí platbu v SumUp aplikaci</div>
+                      <div>• Po úspěšné platbě se vrátí zpět do systému</div>
+                    </>
+                  ) : (
+                    <>
+                      <div>• Kliknutím na "Zaplatit kartou" se pouze zaznamená prodej</div>
+                      <div>• Žádné přesměrování na SumUp aplikaci</div>
+                      <div>• Ideální pro offline režim nebo testování</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* QR Payment Setting */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          >
+            <div className="flex items-center mb-4">
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
                 <QrCode className="h-6 w-6 text-blue-600" />
               </div>
@@ -262,8 +273,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
               />
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         {/* Company Information */}
         <motion.div
