@@ -5,8 +5,16 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth, db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword, updateProfile } from 'firebase/auth';
-import { X, Save, Lock, User as UserIcon } from 'lucide-react';
+import {
+  ActionCodeSettings,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  sendEmailVerification,
+  updateEmail,
+  updatePassword,
+  updateProfile,
+} from 'firebase/auth';
+import { X, Save, Lock, User as UserIcon, Mail } from 'lucide-react';
 
 interface UserSettingsModalProps {
   onClose: () => void;
@@ -15,15 +23,44 @@ interface UserSettingsModalProps {
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose }) => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState(user?.displayName || '');
+  const [newEmail, setNewEmail] = useState(user?.email || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [nameMessage, setNameMessage] = useState<string | null>(null);
+  const [emailMessage, setEmailMessage] = useState<string | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showReauthModal, setShowReauthModal] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState('');
+  const [reauthLoading, setReauthLoading] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+
+  const actionCodeSettings: ActionCodeSettings = {
+    url: 'https://uctarna.fun/login?verified=true',
+    handleCodeInApp: true,
+  };
+
+  const getEmailErrorMessage = (code?: string) => {
+    switch (code) {
+      case 'auth/email-already-in-use':
+        return 'Tento e-mail už je používán jiným účtem.';
+      case 'auth/invalid-email':
+        return 'Zadaný e-mail není ve správném formátu.';
+      case 'auth/too-many-requests':
+        return 'Příliš mnoho pokusů. Zkuste to prosím za chvíli.';
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return 'Zadané heslo není správně.';
+      default:
+        return 'Nepodařilo se změnit e-mail. Zkuste to prosím znovu.';
+    }
+  };
 
   const saveDisplayName = async () => {
     if (!user || !auth.currentUser) return;
@@ -94,6 +131,61 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
     }
   };
 
+  const updateUserEmail = async (emailToUpdate: string) => {
+    const normalizedEmail = emailToUpdate.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setEmailError('Zadejte prosím nový e-mail.');
+      setEmailMessage(null);
+      return;
+    }
+    if (!auth.currentUser) {
+      setEmailError('Uživatel není přihlášen.');
+      setEmailMessage(null);
+      return;
+    }
+
+    setEmailSaving(true);
+    setEmailError(null);
+    setEmailMessage(null);
+    try {
+      await updateEmail(auth.currentUser, normalizedEmail);
+      await sendEmailVerification(auth.currentUser, actionCodeSettings);
+      setEmailMessage('Email changed! Please check your inbox for verification.');
+      setPendingEmail(null);
+      setShowReauthModal(false);
+      setReauthPassword('');
+    } catch (error: any) {
+      if (error?.code === 'auth/requires-recent-login') {
+        setPendingEmail(normalizedEmail);
+        setShowReauthModal(true);
+      } else {
+        setEmailError(getEmailErrorMessage(error?.code));
+      }
+    } finally {
+      setEmailSaving(false);
+    }
+  };
+
+  const handleReauthenticateAndRetry = async () => {
+    if (!auth.currentUser || !auth.currentUser.email || !pendingEmail) return;
+    if (!reauthPassword) {
+      setEmailError('Pro potvrzení zadejte aktuální heslo.');
+      return;
+    }
+    setReauthLoading(true);
+    setEmailError(null);
+    try {
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, reauthPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      setShowReauthModal(false);
+      await updateUserEmail(pendingEmail);
+    } catch (error: any) {
+      setEmailError(getEmailErrorMessage(error?.code));
+    } finally {
+      setReauthLoading(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -152,6 +244,36 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
 
           <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
+              <Mail className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" />
+              Změna e-mailu
+            </div>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="novy@email.cz"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+            {emailError && <p className="text-sm text-red-600 dark:text-red-400">{emailError}</p>}
+            {emailMessage && <p className="text-sm text-green-600 dark:text-green-400">{emailMessage}</p>}
+            <button
+              onClick={() => updateUserEmail(newEmail)}
+              disabled={emailSaving || !newEmail.trim()}
+              className="w-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-3 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center disabled:opacity-50"
+            >
+              {emailSaving ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 dark:border-purple-400"></div>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Uložit e-mail
+                </>
+              )}
+            </button>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
               <Lock className="w-4 h-4 mr-2 text-red-600 dark:text-red-400" />
               Změna hesla
             </div>
@@ -195,6 +317,54 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
           </div>
         </div>
       </motion.div>
+
+      {showReauthModal && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 p-5">
+            <div className="flex items-center mb-3">
+              <Lock className="h-5 w-5 text-red-600 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Potvrzení identity</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Kvůli bezpečnosti zadejte aktuální heslo a změnu e-mailu zopakujeme.
+            </p>
+            <input
+              type="password"
+              value={reauthPassword}
+              onChange={(e) => setReauthPassword(e.target.value)}
+              placeholder="Aktuální heslo"
+              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+            />
+            <div className="mt-4 flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setShowReauthModal(false);
+                  setReauthPassword('');
+                  setPendingEmail(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                disabled={reauthLoading}
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={handleReauthenticateAndRetry}
+                disabled={reauthLoading || !reauthPassword}
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+              >
+                {reauthLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Ověřuji...
+                  </>
+                ) : (
+                  'Potvrdit'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
