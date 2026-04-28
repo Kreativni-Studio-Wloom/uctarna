@@ -14,7 +14,7 @@ interface ReceiptsViewProps {
 }
 
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 12;
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
