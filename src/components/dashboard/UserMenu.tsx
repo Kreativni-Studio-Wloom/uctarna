@@ -3,13 +3,14 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, User as UserIcon, Users } from 'lucide-react';
+import { LogOut, User as UserIcon, Users, Settings } from 'lucide-react';
 
 interface UserMenuProps {
   onClose: () => void;
+  onOpenSettings: () => void;
 }
 
-export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
+export const UserMenu: React.FC<UserMenuProps> = ({ onClose, onOpenSettings }) => {
   const { user, signOutUser, switchableAccounts, switchAccount } = useAuth();
 
   const handleSignOut = async () => {
@@ -48,6 +49,16 @@ export const UserMenu: React.FC<UserMenuProps> = ({ onClose }) => {
 
         {/* Menu Items */}
         <div className="py-1">
+          <button
+            onClick={() => {
+              onOpenSettings();
+              onClose();
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center transition-colors"
+          >
+            <Settings className="h-4 w-4 mr-3" />
+            Nastavení uživatele
+          </button>
           {switchableAccounts.filter(a => a.email !== user?.email).length > 0 && (
             <div className="px-4 py-2">
               <div className="flex items-center text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">

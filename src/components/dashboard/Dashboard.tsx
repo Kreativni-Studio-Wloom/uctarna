@@ -6,10 +6,11 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, del
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Store as StoreIcon, LogOut, Settings, User, Trash2 } from 'lucide-react';
+import { Plus, Store as StoreIcon, User, Trash2 } from 'lucide-react';
 import { StoreCard } from './StoreCard';
 import { AddStoreModal } from './AddStoreModal';
 import { UserMenu } from './UserMenu';
+import { UserSettingsModal } from './UserSettingsModal';
 
 export const Dashboard: React.FC = () => {
   const { user, signOutUser } = useAuth();
@@ -17,13 +18,17 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showAddStore, setShowAddStore] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const [selectedStores, setSelectedStores] = useState<string[]>([]);
   const [deleting, setDeleting] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [storeToDuplicate, setStoreToDuplicate] = useState<Store | null>(null);
   const [duplicating, setDuplicating] = useState(false);
   const userMenuContainerRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuDropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!user || !user.uid) return;
@@ -84,6 +89,23 @@ export const Dashboard: React.FC = () => {
       document.removeEventListener('touchstart', onPointerDown);
     };
   }, [showUserMenu]);
+
+  // Zavřít menu po kliknutí mimo
+  useEffect(() => {
+    if (!showMenu) return;
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuDropdownRef.current?.contains(target)) return;
+      setShowMenu(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+    };
+  }, [showMenu]);
 
   const handleAddStore = async (storeName: string, type: 'prodejna' | 'bistro') => {
     if (!user) return;
@@ -266,6 +288,17 @@ export const Dashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-2 sm:space-x-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowMenu(!showMenu)}
+                ref={menuButtonRef}
+                className="bg-gray-600 text-white w-10 h-10 sm:w-11 sm:h-11 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center"
+              >
+                <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </motion.button>
               <div ref={userMenuContainerRef} className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -273,12 +306,51 @@ export const Dashboard: React.FC = () => {
                 >
                   <User className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600 dark:text-gray-300" />
                 </button>
-                {showUserMenu && <UserMenu onClose={() => setShowUserMenu(false)} />}
+                {showUserMenu && (
+                  <UserMenu
+                    onClose={() => setShowUserMenu(false)}
+                    onOpenSettings={() => setShowUserSettings(true)}
+                  />
+                )}
               </div>
             </div>
           </div>
         </div>
       </header>
+
+      {showMenu && (
+        <div
+          ref={menuDropdownRef}
+          className="absolute top-16 sm:top-[4.5rem] right-4 sm:right-6 lg:right-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-56 max-w-xs p-2"
+        >
+          <button
+            onClick={() => {
+              setShowAddStore(true);
+              setShowMenu(false);
+            }}
+            className="w-full text-left px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+          >
+            <span className="w-8 flex items-center justify-center flex-shrink-0">
+              <Plus className="w-5 h-5" />
+            </span>
+            <span className="truncate">Nová provozovna</span>
+          </button>
+          {stores.length > 0 && (
+            <button
+              onClick={() => {
+                setShowDeleteModal(true);
+                setShowMenu(false);
+              }}
+              className="w-full mt-1 text-left px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+            >
+              <span className="w-8 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </span>
+              <span className="truncate">Smazat provozovny</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
@@ -291,31 +363,6 @@ export const Dashboard: React.FC = () => {
               <p className="text-gray-600 dark:text-gray-400 mt-2">
                 Spravujte své prodejny a prodeje
               </p>
-            </div>
-            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setShowAddStore(true)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center justify-center text-sm sm:text-base"
-              >
-                <Plus className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                <span className="hidden sm:inline">Nová prodejna</span>
-                <span className="sm:hidden">Nová</span>
-              </motion.button>
-              
-              {stores.length > 0 && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowDeleteModal(true)}
-                  className="bg-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center justify-center text-sm sm:text-base"
-                >
-                  <Trash2 className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  <span className="hidden sm:inline">Odstranit prodejny</span>
-                  <span className="sm:hidden">Odstranit</span>
-                </motion.button>
-              )}
             </div>
           </div>
 
@@ -369,6 +416,12 @@ export const Dashboard: React.FC = () => {
             onClose={() => setShowAddStore(false)}
             onAdd={handleAddStore}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showUserSettings && (
+          <UserSettingsModal onClose={() => setShowUserSettings(false)} />
         )}
       </AnimatePresence>
 
