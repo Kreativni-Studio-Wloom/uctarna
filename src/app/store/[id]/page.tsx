@@ -146,7 +146,7 @@ export default function StorePage() {
       {/* Navigation */}
       <nav className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-6 md:space-x-8 overflow-x-auto scrollbar-hide pb-2 md:pb-0">
+          <div className="w-full flex justify-between items-stretch">
             {([
               'pos',
               'receipts',
@@ -157,14 +157,14 @@ export default function StorePage() {
               <button
                 key={view}
                 onClick={() => setCurrentView(view)}
-                className={`flex items-center px-2 md:px-3 py-3 md:py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+                className={`flex-1 min-h-[56px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-1 md:px-3 py-2 md:py-4 text-sm font-medium border-b-2 transition-colors ${
                   currentView === view
                     ? 'border-purple-500 text-purple-600 dark:text-purple-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
               >
                 {getViewIcon(view)}
-                <span className="ml-1 md:ml-2">{getViewLabel(view)}</span>
+                <span className="hidden md:block">{getViewLabel(view)}</span>
               </button>
             ))}
           </div>
