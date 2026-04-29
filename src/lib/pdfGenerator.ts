@@ -46,6 +46,8 @@ const formatAmount = (amount: number, currency: Sale['currency']) => {
   return `${amount.toLocaleString('cs-CZ')} Kc`;
 };
 
+const formatCZKAmount = (amount: number) => `${amount.toLocaleString('cs-CZ')} Kc`;
+
 const normalizePaymentMethod = (method: Sale['paymentMethod']) => {
   if (method === 'cash') return 'Hotovost';
   if (method === 'card') return 'Karta';
@@ -121,6 +123,9 @@ export const generateReceiptPdfBlob = async (
 
   estimatedHeight += DIVIDER_PADDING * 2;
   estimatedHeight += LINE_HEIGHT + SECTION_SPACING;
+  if (sale.currency === 'EUR' && sale.eurRate) {
+    estimatedHeight += LINE_HEIGHT * 3;
+  }
   estimatedHeight += LINE_HEIGHT + 1;
   estimatedHeight += LINE_HEIGHT + PADDING_MM;
 
@@ -213,7 +218,7 @@ export const generateReceiptPdfBlob = async (
       doc.text(removeDiacritics(line), PADDING_MM, y);
       if (index === 0) {
         doc.text(String(item.quantity), layout.qtyCenterX, y, { align: 'center' });
-        doc.text(removeDiacritics(formatAmount(rowPrice, sale.currency)), layout.priceRightX, y, { align: 'right' });
+        doc.text(removeDiacritics(formatCZKAmount(rowPrice)), layout.priceRightX, y, { align: 'right' });
       }
       y += LINE_HEIGHT;
     });
@@ -223,6 +228,12 @@ export const generateReceiptPdfBlob = async (
   y += 1;
 
   drawLabelValue('Zpusob uhrady', normalizePaymentMethod(sale.paymentMethod));
+  if (sale.currency === 'EUR' && sale.eurRate) {
+    const amountInCZK = sale.originalAmountCZK ?? sale.totalAmount * sale.eurRate;
+    drawLabelValue('Kurz', `${sale.eurRate.toFixed(2)} Kc/EUR`);
+    drawLabelValue('Castka v Kc', formatCZKAmount(amountInCZK));
+    drawLabelValue('Castka v EUR', `${sale.totalAmount.toFixed(2)} EUR`);
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
