@@ -717,7 +717,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 ) : (
                   isRefund ? 
-                    `Vrátit zákazníkovi ${refundAmount} Kč` : 
+                    (displayCurrency === 'EUR'
+                      ? `Vrátit zákazníkovi ${displayAmount.toFixed(2)} €`
+                      : `Vrátit zákazníkovi ${refundAmount} Kč`) : 
                     displayCurrency === 'EUR' ? 
                       `Zaplatit ${displayAmount.toFixed(2)} €` : 
                       `Zaplatit ${displayAmount.toFixed(2)} Kč`
