@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard, QrCode } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -15,6 +15,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user } = useAuth();
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
+  const [tipsEnabled, setTipsEnabled] = useState(false);
   const [iban, setIban] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [ico, setIco] = useState<string>('');
@@ -34,6 +35,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       if (typeof data.redirectToSumUp === 'boolean') {
         setRedirectToSumUp(data.redirectToSumUp);
       }
+      if (typeof data.tipsEnabled === 'boolean') {
+        setTipsEnabled(data.tipsEnabled);
+      }
       if (typeof data.iban === 'string') {
         setIban(data.iban);
       }
@@ -52,6 +56,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
         eurRate,
         redirectToSumUp,
+        tipsEnabled,
         iban: iban.trim(),
         companyName: companyName.trim(),
         ico: ico.trim(),
@@ -233,6 +238,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                   )}
                 </div>
               </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+          >
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/20 rounded-lg flex items-center justify-center mr-4">
+                <Banknote className="h-6 w-6 text-amber-700 dark:text-amber-300" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Spropitné
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Umožní v pokladně zadat spropitné, které se přičte k úhradě a zobrazí u dokladu.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                  Spropitné v dokladu
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  {tipsEnabled
+                    ? 'V checkoutu se zobrazí pole pro částku spropitného.'
+                    : 'Checkout zůstane bez pole pro spropitné.'}
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={tipsEnabled}
+                  onChange={(e) => setTipsEnabled(e.target.checked)}
+                  aria-label="Zapnout spropitné v pokladně"
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+              </label>
             </div>
           </motion.div>
 

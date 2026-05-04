@@ -46,13 +46,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [manualSumUpCode, setManualSumUpCode] = useState('');
+  const [tipsEnabled, setTipsEnabled] = useState(false);
+  const [tipInput, setTipInput] = useState('');
   const [iban, setIban] = useState<string>('');
   const [qrDocumentId, setQrDocumentId] = useState<string>(''); // 10 chars (existing format)
   const [qrVariableSymbol, setQrVariableSymbol] = useState<string>(''); // numeric only
 
   const [eurRate, setEurRate] = useState<number>(25.0);
-  // Použij finální částku po slevě, pokud je k dispozici, jinak původní částku
-  const actualTotalAmount = finalAmount !== undefined ? finalAmount : totalAmount;
+  const baseAmount = finalAmount !== undefined ? finalAmount : totalAmount;
+  const tipKč =
+    tipsEnabled && baseAmount >= 0
+      ? Math.max(0, parseFloat(tipInput.replace(/\s/g, '').replace(',', '.') || '') || 0)
+      : 0;
+  const actualTotalAmount = baseAmount + tipKč;
+  const isRefund = baseAmount < 0;
   const eurAmount = actualTotalAmount / eurRate;
 
   // Výpočet částky k vrácení
@@ -77,9 +84,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const displayAmount = payInEUR ? eurAmount : actualTotalAmount;
   const displayCurrency = payInEUR ? 'EUR' : 'CZK';
 
-  // Kontrola, zda je to vratka (záporná částka)
-  const isRefund = actualTotalAmount < 0;
-  const refundAmount = Math.abs(actualTotalAmount);
+  const refundAmount = Math.abs(baseAmount);
 
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
@@ -112,9 +117,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       } else {
         setIban('');
       }
+      if (typeof data.tipsEnabled === 'boolean') {
+        setTipsEnabled(data.tipsEnabled);
+      }
     });
     return unsubscribe;
   }, [user, storeId]);
+
+  useEffect(() => {
+    if (!tipsEnabled) setTipInput('');
+  }, [tipsEnabled]);
 
   // Poslech výsledku platby z návratové stránky (BroadcastChannel + storage event)
   useEffect(() => {
@@ -231,6 +243,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: actualTotalAmount,
+          tipAmount: tipKč > 0 ? tipKč : null,
           served: false,
         };
 
@@ -271,6 +284,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: actualTotalAmount,
+          tipAmount: tipKč,
           customerName: storeType === 'bistro' ? (customerName || null) : null
         }));
         
@@ -295,6 +309,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Hotovost nebo platba kartou bez přesměrování na SumUp - vytvoř prodej/vratku v Firestore
       const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
       const trimmedManualSumUpCode = manualSumUpCode.trim();
+      const tipForDoc = tipKč > 0 ? (payInEUR ? tipKč / eurRate : tipKč) : null;
       const sale = {
         items: cart,
         totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
@@ -318,6 +333,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         discount: discount || null,
         discountAmount: discountAmount || 0,
         finalAmount: actualTotalAmount,
+        tipAmount: tipForDoc,
         sumUpData: paymentMethod === 'card' && !redirectToSumUp && trimmedManualSumUpCode
           ? {
               foreignTxId: documentId,
@@ -402,9 +418,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 ))}
               </div>
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 space-y-3">
+                {tipsEnabled && !isRefund && (
+                  <>
+                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                      <span>Částka po slevě:</span>
+                      <span>
+                        {payInEUR
+                          ? `${(baseAmount / eurRate).toFixed(2)} €`
+                          : `${baseAmount.toFixed(2)} Kč`}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Spropitné (Kč)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={tipInput}
+                        onChange={(e) => setTipInput(e.target.value)}
+                        placeholder="0"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between items-center text-lg font-bold text-gray-900 dark:text-white">
-                  <span>Celkem:</span>
+                  <span>{tipsEnabled && !isRefund && tipKč > 0 ? 'K úhradě:' : 'Celkem:'}</span>
                   <span>
                     {displayCurrency === 'EUR' ? 
                       `${displayAmount.toFixed(2)} €` : 
@@ -432,6 +473,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Zaplaceno
                   </h4>
                 </div>
+
+                {tipsEnabled && !isRefund && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                      Spropitné (Kč)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={tipInput}
+                      onChange={(e) => setTipInput(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
                 
                 {/* Input pro částku */}
                 <div className="flex items-center space-x-3 mb-4">
@@ -531,6 +588,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Platba QR kódem
                   </h4>
                 </div>
+
+                {tipsEnabled && !isRefund && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Spropitné (Kč)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={tipInput}
+                      onChange={(e) => setTipInput(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
                   <QRCode value={getSpaydString()} size={220} />
@@ -662,6 +735,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   )}
                 </div>
               )}
+
+              {paymentMethod === 'card' && tipsEnabled && !isRefund && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Spropitné (Kč)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={tipInput}
+                    onChange={(e) => setTipInput(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              )}
               
               {/* SumUp info - pouze při platbě kartou */}
               {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && (
@@ -669,7 +758,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
                     <CreditCard className="h-4 w-4 mr-2" />
                     <span>
-                      Platba kartou proběhne přes SumUp aplikaci. Po kliknutí "Zaplatit" se otevře SumUp app s předvyplněnou částkou {totalAmount} Kč.
+                      Platba kartou proběhne přes SumUp aplikaci. Po kliknutí "Zaplatit" se otevře SumUp app s předvyplněnou částkou {actualTotalAmount.toFixed(2)} Kč.
                     </span>
                   </div>
                 </div>

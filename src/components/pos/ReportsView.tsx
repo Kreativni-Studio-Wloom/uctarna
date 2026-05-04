@@ -7,6 +7,7 @@ import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { Sale, Product } from '@/types';
+import { saleTipInCzk } from '@/lib/saleTip';
 import { motion } from 'framer-motion';
 import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
 import { generateEmailContent } from '@/lib/email';
@@ -203,6 +204,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     // Počet prodejů se slevou
     const salesWithDiscount = filteredSales.filter(sale => sale.discount && sale.discountAmount && sale.discountAmount > 0).length;
 
+    const totalTips = filteredSales.reduce((sum, sale) => sum + saleTipInCzk(sale), 0);
+
     return {
       totalSales: totalSalesCZK, // Celková tržba v korunách
       salesInCZK, // Tržby v korunách (odečtené vrácené koruny)
@@ -215,6 +218,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       totalProfit, // Celkový zisk
       totalDiscounts, // Celkové slevy
       salesWithDiscount, // Počet prodejů se slevou
+      totalTips,
       sales: filteredSales,
     };
   };
@@ -270,6 +274,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         totalProfit: reportData.totalProfit,
         totalDiscounts: reportData.totalDiscounts,
         salesWithDiscount: reportData.salesWithDiscount,
+        totalTips: reportData.totalTips,
         products: products.map(p => ({
           id: p.id,
           name: p.name,
@@ -330,6 +335,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     customerCount: number;
     totalCosts: number;
     totalProfit: number;
+    totalTips: number;
     products: Array<{
       id: string;
       name: string;
@@ -414,6 +420,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     customerCount: number;
     totalCosts: number;
     totalProfit: number;
+    totalTips: number;
     products: Array<{
       id: string;
       name: string;
@@ -486,7 +493,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin: 20px 0; }
+          .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin: 20px 0; }
           .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
           .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
           .stat-label { font-size: 14px; color: #666; }
@@ -532,6 +539,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </div>
               
               <div class="stat-card">
+                <div class="stat-value">${reportData.totalTips.toLocaleString('cs-CZ')} Kč</div>
+                <div class="stat-label">Spropitné</div>
+              </div>
+              
+              <div class="stat-card">
                 <div class="stat-value">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
                 <div class="stat-label">Zisk</div>
               </div>
@@ -567,6 +579,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Koruny:</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura:</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
+              <p><strong>Spropitné (celkem):</strong> ${reportData.totalTips.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
             </div>
           </div>
@@ -992,6 +1005,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             </div>
           </div>
         </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.52 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Banknote className="h-5 w-5 text-amber-700 dark:text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                Spropitné
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.totalTips.toLocaleString('cs-CZ')} Kč
+              </p>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* Recent Sales + Detailed Product Breakdown */}
@@ -1027,6 +1061,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                         `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
                       }
                     </span>
+                    {typeof sale.tipAmount === 'number' && sale.tipAmount > 0 && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                        +spropitné{' '}
+                        {sale.currency === 'EUR'
+                          ? `${sale.tipAmount.toFixed(2)} €`
+                          : `${sale.tipAmount} Kč`}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

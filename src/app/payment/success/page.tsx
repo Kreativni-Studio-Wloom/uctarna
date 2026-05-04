@@ -89,7 +89,8 @@ function PaymentSuccessContent() {
         return;
       }
       
-      const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName } = JSON.parse(paymentData);
+      const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName, tipAmount: storedTip } = JSON.parse(paymentData);
+      const tipAmount = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
       
       console.log('📋 Data z localStorage:', {
         storeId,
@@ -134,7 +135,8 @@ function PaymentSuccessContent() {
         discount: discount || null,
         discountAmount: discountAmount || 0,
         finalAmount: finalAmount || totalAmount,
-        customerName: customerName || null
+        customerName: customerName || null,
+        tipAmount
       });
 
       const response = await fetch('/api/sumup-callback', {
@@ -155,7 +157,8 @@ function PaymentSuccessContent() {
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: finalAmount || totalAmount,
-          customerName: customerName || null
+          customerName: customerName || null,
+          tipAmount
         }),
       });
 
@@ -221,7 +224,8 @@ function PaymentSuccessContent() {
         const paymentDataRaw = localStorage.getItem('uctarna_payment_data');
         if (!paymentDataRaw) return;
         const paymentData = JSON.parse(paymentDataRaw);
-        const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName } = paymentData;
+        const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName, tipAmount: rawTip } = paymentData;
+        const tipAmountFallback = typeof rawTip === 'number' && rawTip > 0 ? rawTip : null;
         if (!storeId || !userId || !Array.isArray(cartItems)) return;
 
         const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
@@ -240,6 +244,7 @@ function PaymentSuccessContent() {
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: finalAmount || totalAmount || 0,
+          tipAmount: tipAmountFallback,
           sumUpData: {
             foreignTxId: foreignTxId,
             sumUpTxCode: txCode,

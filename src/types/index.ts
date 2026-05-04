@@ -22,6 +22,8 @@ export interface Store {
   updatedAt: Date;
   isActive: boolean;
   redirectToSumUp?: boolean; // Nastavení pro přesměrování na SumUp při platbě kartou
+  /** Zapnuté zadávání spropitného v checkoutu (přičte se k úhradě, uloží se na doklad). */
+  tipsEnabled?: boolean;
   iban?: string; // IBAN pro platby QR kódem (SPAYD)
 }
 
@@ -89,6 +91,8 @@ export interface Sale {
   discount?: { type: 'percentage' | 'amount'; value: number } | null;
   discountAmount?: number; // Částka slevy v Kč
   finalAmount?: number; // Finální částka po slevě
+  /** Spropitné v měně dokladu (CZK nebo EUR); celková úhrada je v totalAmount / finalAmount včetně spropitného. */
+  tipAmount?: number;
   // Výdej (kuchyně): označení, že objednávka byla připravena a vydána
   prepared?: boolean;
   preparedAt?: Date;

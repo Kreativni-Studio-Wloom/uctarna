@@ -103,6 +103,9 @@ export async function POST(request: NextRequest) {
     const discountAmount = body.discountAmount || body['discount_amount'];
     const finalAmount = body.finalAmount || body['final_amount'] || amount;
     const customerName = body.customerName || body['customer_name'];
+    const tipAmountRaw = body.tipAmount ?? body['tip_amount'];
+    const tipAmount =
+      typeof tipAmountRaw === 'number' && tipAmountRaw > 0 ? tipAmountRaw : null;
 
     // Rozšířené logování pro debugging
     console.log('📊 Extrahované parametry:', {
@@ -207,6 +210,7 @@ export async function POST(request: NextRequest) {
         discount: discount || null,
         discountAmount: discountAmount || 0,
         finalAmount: finalAmount || amount || 0,
+        tipAmount,
         sumUpData: {
           foreignTxId,
           sumUpTxCode: txCode,

@@ -300,6 +300,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       </span>
                     )}
                   </div>
+                  {typeof sale.tipAmount === 'number' && sale.tipAmount > 0 && (
+                    <div className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      vč. spropitného{' '}
+                      {sale.currency === 'EUR'
+                        ? `${sale.tipAmount.toFixed(2)} €`
+                        : `${sale.tipAmount} Kč`}
+                    </div>
+                  )}
                   <div className="text-sm text-gray-500 dark:text-gray-400">
                     {sale.items.length} položek
                   </div>
@@ -482,7 +490,17 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       })}
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                    {typeof selectedSale.tipAmount === 'number' && selectedSale.tipAmount > 0 && (
+                      <div className="flex justify-between items-center text-sm text-amber-700 dark:text-amber-300">
+                        <span>Spropitné:</span>
+                        <span>
+                          {selectedSale.currency === 'EUR'
+                            ? `${selectedSale.tipAmount.toFixed(2)} €`
+                            : `${selectedSale.tipAmount} Kč`}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-lg font-bold text-gray-900 dark:text-white">
                       <span>Celkem:</span>
                       <span>

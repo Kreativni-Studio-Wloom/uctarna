@@ -17,6 +17,8 @@ export interface ReportData {
   totalProfit: number;
   totalDiscounts?: number;
   salesWithDiscount?: number;
+  /** Součet spropitného za období v Kč (EUR přepočteno kurzem dokladu). */
+  totalTips?: number;
   products: Array<{
     id: string;
     name: string;
@@ -188,8 +190,8 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                   <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.salesWithDiscount || 0} prodejů</div>
                 </td>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
-                  <div style="font-size:24px; font-weight:bold; color:#28a745; margin-bottom:5px;">${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</div>
-                  <div style="font-size:14px; color:#666;">Zisk</div>
+                  <div style="font-size:24px; font-weight:bold; color:#d97706; margin-bottom:5px;">${(reportData.totalTips ?? 0).toLocaleString('cs-CZ')} Kč</div>
+                  <div style="font-size:14px; color:#666;">Spropitné</div>
                 </td>
               </tr>
             </table>
@@ -220,6 +222,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
               <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
               <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
               <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)</p>
+              <p><strong>Spropitné:</strong> ${(reportData.totalTips ?? 0).toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>

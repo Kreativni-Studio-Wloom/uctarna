@@ -235,10 +235,13 @@ export const generateReceiptPdfBlob = async (
     drawLabelValue('Castka v EUR', `${sale.totalAmount.toFixed(2)} EUR`);
   }
 
+  const tip = sale.tipAmount ?? 0;
+  const totalWithoutTip = Math.max(0, sale.totalAmount - tip);
+
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12.5);
   doc.text('CELKEM', PADDING_MM, y + 1);
-  doc.text(removeDiacritics(formatAmount(sale.totalAmount, sale.currency)), pageWidth - PADDING_MM, y + 1, { align: 'right' });
+  doc.text(removeDiacritics(formatAmount(totalWithoutTip, sale.currency)), pageWidth - PADDING_MM, y + 1, { align: 'right' });
   y += LINE_HEIGHT + 1;
 
   y += 2;
