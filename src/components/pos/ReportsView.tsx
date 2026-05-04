@@ -1061,14 +1061,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                         `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
                       }
                     </span>
-                    {typeof sale.tipAmount === 'number' && sale.tipAmount > 0 && (
-                      <span className="text-xs text-amber-600 dark:text-amber-400">
-                        +spropitné{' '}
-                        {sale.currency === 'EUR'
-                          ? `${sale.tipAmount.toFixed(2)} €`
-                          : `${sale.tipAmount} Kč`}
-                      </span>
-                    )}
                   </div>
                 </div>
               ))}

@@ -1,0 +1,17 @@
+---
+description: Po dokončení úprav kódu vždy commit a push na GitHub
+alwaysApply: true
+---
+
+# Git: automatický commit a push
+
+Když úkol zahrnuje změny v repozitáři a práce je hotová (nebo významná část je hotová), **nečekej na další příkaz uživatele**:
+
+1. `git status` – ověř změny.
+2. Pokud nejsou žádné změny, nic necommituj.
+3. `git add` pro dotčené soubory, **konkrétní commit message** česky (co a proč v jedné větě nebo krátkém odstavci).
+4. `git push` na `origin` pro aktuální větev.
+
+Nepiš uživateli jen „můžeš commitnout“ – změny Proveď ty.
+
+**Výjimky:** uživatel výslovně řekne, aby se necommitovalo / nepřepínalo větve; nebo při merge konfliktech – popiš problém místo slepého push.

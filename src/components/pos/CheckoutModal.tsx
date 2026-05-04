@@ -54,11 +54,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   const baseAmount = finalAmount !== undefined ? finalAmount : totalAmount;
-  const tipKč =
+  const tipParsed =
     tipsEnabled && baseAmount >= 0
       ? Math.max(0, parseFloat(tipInput.replace(/\s/g, '').replace(',', '.') || '') || 0)
       : 0;
-  const actualTotalAmount = baseAmount + tipKč;
+  /** Příspěvek spropitného k celkové částce v Kč (u plateb v EUR je vstup v €). */
+  const tipAmountKč = payInEUR ? tipParsed * eurRate : tipParsed;
+  const actualTotalAmount = baseAmount + tipAmountKč;
   const isRefund = baseAmount < 0;
   const eurAmount = actualTotalAmount / eurRate;
 
@@ -127,6 +129,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (!tipsEnabled) setTipInput('');
   }, [tipsEnabled]);
+
+  useEffect(() => {
+    setTipInput('');
+  }, [payInEUR]);
 
   // Poslech výsledku platby z návratové stránky (BroadcastChannel + storage event)
   useEffect(() => {
@@ -243,7 +249,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: actualTotalAmount,
-          tipAmount: tipKč > 0 ? tipKč : null,
+          tipAmount: tipParsed > 0 ? tipParsed : null,
           served: false,
         };
 
@@ -284,7 +290,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discount: discount || null,
           discountAmount: discountAmount || 0,
           finalAmount: actualTotalAmount,
-          tipAmount: tipKč,
+          tipAmount: tipAmountKč > 0 ? tipAmountKč : 0,
           customerName: storeType === 'bistro' ? (customerName || null) : null
         }));
         
@@ -309,7 +315,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Hotovost nebo platba kartou bez přesměrování na SumUp - vytvoř prodej/vratku v Firestore
       const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
       const trimmedManualSumUpCode = manualSumUpCode.trim();
-      const tipForDoc = tipKč > 0 ? (payInEUR ? tipKč / eurRate : tipKč) : null;
+      const tipForDoc = tipParsed > 0 ? tipParsed : null;
       const sale = {
         items: cart,
         totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
@@ -431,7 +437,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Spropitné (Kč)
+                        {payInEUR ? 'Spropitné (€)' : 'Spropitné (Kč)'}
                       </label>
                       <input
                         type="text"
@@ -445,7 +451,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </>
                 )}
                 <div className="flex justify-between items-center text-lg font-bold text-gray-900 dark:text-white">
-                  <span>{tipsEnabled && !isRefund && tipKč > 0 ? 'K úhradě:' : 'Celkem:'}</span>
+                  <span>{tipsEnabled && !isRefund && tipParsed > 0 ? 'K úhradě:' : 'Celkem:'}</span>
                   <span>
                     {displayCurrency === 'EUR' ? 
                       `${displayAmount.toFixed(2)} €` : 
@@ -473,22 +479,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Zaplaceno
                   </h4>
                 </div>
-
-                {tipsEnabled && !isRefund && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
-                      Spropitné (Kč)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={tipInput}
-                      onChange={(e) => setTipInput(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                )}
                 
                 {/* Input pro částku */}
                 <div className="flex items-center space-x-3 mb-4">
@@ -588,22 +578,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Platba QR kódem
                   </h4>
                 </div>
-
-                {tipsEnabled && !isRefund && (
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Spropitné (Kč)
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={tipInput}
-                      onChange={(e) => setTipInput(e.target.value)}
-                      placeholder="0"
-                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                )}
 
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
                   <QRCode value={getSpaydString()} size={220} />
@@ -733,22 +707,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-
-              {paymentMethod === 'card' && tipsEnabled && !isRefund && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Spropitné (Kč)
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={tipInput}
-                    onChange={(e) => setTipInput(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
                 </div>
               )}
               
