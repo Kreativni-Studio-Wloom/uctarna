@@ -45,6 +45,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerName, setCustomerName] = useState<string>('');
   const [storeType, setStoreType] = useState<'prodejna' | 'bistro' | null>(null);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
+  const [manualSumUpCode, setManualSumUpCode] = useState('');
   const [iban, setIban] = useState<string>('');
   const [qrDocumentId, setQrDocumentId] = useState<string>(''); // 10 chars (existing format)
   const [qrVariableSymbol, setQrVariableSymbol] = useState<string>(''); // numeric only
@@ -189,6 +190,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return `SPD*1.0*ACC:${acc}*AM:${amount}*CC:CZK*X-VS:${vs}*MSG:${msg}`;
   };
 
+  const openSumUpManualRedirect = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const baseUrl = sumUpService.createPaymentUrl({
+        amount: actualTotalAmount,
+        currency: 'CZK',
+      });
+      const url = new URL(baseUrl);
+      // V manuálním režimu chceme otevřít SumUp bez callback URL.
+      url.searchParams.delete('callbacksuccess');
+      url.searchParams.delete('callbackfail');
+      window.location.assign(url.toString());
+    } catch (error) {
+      console.error('❌ Chyba při manuálním otevření SumUp app:', error);
+    }
+  };
+
   const handlePayment = async () => {
     if (!user) return;
 
@@ -283,6 +301,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       // Hotovost nebo platba kartou bez přesměrování na SumUp - vytvoř prodej/vratku v Firestore
       const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
+      const trimmedManualSumUpCode = manualSumUpCode.trim();
       const sale = {
         items: cart,
         totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
@@ -306,6 +325,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         discount: discount || null,
         discountAmount: discountAmount || 0,
         finalAmount: actualTotalAmount,
+        sumUpData: paymentMethod === 'card' && !redirectToSumUp && trimmedManualSumUpCode
+          ? {
+              foreignTxId: documentId,
+              sumUpTxCode: trimmedManualSumUpCode,
+              status: 'success' as const,
+              callbackReceived: false,
+            }
+          : null,
         served: false,
       };
 
@@ -669,13 +696,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               
               {/* SumUp vypnuté - pouze při platbě kartou */}
               {paymentMethod === 'card' && sumUpAvailable && !redirectToSumUp && (
-                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
-                  <div className="flex items-center text-sm text-green-700 dark:text-green-300">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    <span>
-                      Platba kartou se zaznamená pouze do dokladu. SumUp aplikace se neotevře.
-                    </span>
+                <div className="mt-3 space-y-4">
+                  <button
+                    type="button"
+                    onClick={openSumUpManualRedirect}
+                    className="w-full px-4 py-3 rounded-lg font-medium border border-blue-300 text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-gray-800 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/20 transition-all duration-200"
+                  >
+                    Přesměrovat do SumUp
+                  </button>
+                  <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                    <div className="flex items-center text-sm text-green-700 dark:text-green-300">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      <span>
+                        Platba kartou se zaznamená pouze do dokladu. SumUp aplikace se neotevře.
+                      </span>
+                    </div>
                   </div>
+                  <input
+                    type="text"
+                    value={manualSumUpCode}
+                    onChange={(e) => setManualSumUpCode(e.target.value)}
+                    placeholder="Kód transakce (nepovinné)"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
                 </div>
               )}
               
