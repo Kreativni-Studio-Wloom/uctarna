@@ -193,15 +193,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const openSumUpManualRedirect = () => {
     if (typeof window === 'undefined') return;
     try {
-      const baseUrl = sumUpService.createPaymentUrl({
-        amount: actualTotalAmount,
-        currency: 'CZK',
-      });
-      const url = new URL(baseUrl);
-      // V manuálním režimu chceme otevřít SumUp bez callback URL.
-      url.searchParams.delete('callbacksuccess');
-      url.searchParams.delete('callbackfail');
-      window.location.assign(url.toString());
+      // V manuálním režimu jen otevřeme SumUp app bez předání transakčních dat.
+      window.location.assign('sumupmerchant://');
     } catch (error) {
       console.error('❌ Chyba při manuálním otevření SumUp app:', error);
     }
