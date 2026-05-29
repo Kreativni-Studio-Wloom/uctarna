@@ -10,7 +10,7 @@ import { Sale, Product } from '@/types';
 import { saleTipInCzk } from '@/lib/saleTip';
 import { motion } from 'framer-motion';
 import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
-import { generateEmailContent, ReportData, ProductSummaryRow } from '@/lib/email';
+import { generateEmailContent, EmailReportData, buildEmailReportData } from '@/lib/email';
 
 // Rozšířený User interface s prodejnami
 interface ExtendedUser {
