@@ -3,11 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Sale, Store } from '@/types';
+import { Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, orderBy, limit, startAfter, onSnapshot, doc, deleteDoc, updateDoc, increment, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc, deleteDoc, updateDoc, increment, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { generateReceiptPdfBlob } from '@/lib/pdfGenerator';
+import { useStore } from '@/contexts/StoreContext';
 
 interface ReceiptsViewProps {
   storeId: string;
@@ -26,6 +27,7 @@ const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const ITEMS_PER_PAGE = 12;
   const { user } = useAuth();
+  const storeDoc = useStore();
   const [pageSales, setPageSales] = useState<Sale[]>([]);
   const [allSales, setAllSales] = useState<Sale[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -37,7 +39,6 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
-  const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
 
@@ -100,7 +101,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     return unsubscribe;
   }, [user, storeId, currentPage, isSearchMode]);
 
-  // Režim vyhledávání: načíst celou historii až když uživatel skutečně hledá.
+  // Režim vyhledávání: jednorázově načíst historii (getDocs), ne realtime listener na celou kolekci.
   useEffect(() => {
     if (!user || !storeId || !isSearchMode) {
       setAllSales([]);
@@ -108,35 +109,33 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       return;
     }
 
+    let cancelled = false;
     setSearchLoading(true);
     const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
     const q = query(salesRef, orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setAllSales(
-        snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        })) as Sale[]
-      );
-      setSearchLoading(false);
-    });
+    getDocs(q)
+      .then((snapshot) => {
+        if (cancelled) return;
+        setAllSales(
+          snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as Sale[]
+        );
+      })
+      .catch((error) => {
+        console.error('❌ Chyba při načítání dokladů pro vyhledávání:', error);
+        if (!cancelled) setAllSales([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSearchLoading(false);
+      });
 
-    return unsubscribe;
-  }, [user, storeId, isSearchMode]);
-
-  useEffect(() => {
-    if (!user || !storeId) return;
-    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
-    const unsubscribe = onSnapshot(storeRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        setStore(null);
-        return;
-      }
-      setStore({ id: snapshot.id, ...snapshot.data() } as Store);
-    });
-    return unsubscribe;
-  }, [user, storeId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, storeId, isSearchMode, debouncedSearch]);
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -261,9 +260,9 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     setGeneratingPdfForSaleId(sale.id);
     try {
       const pdfBlob = await generateReceiptPdfBlob(sale, {
-        companyName: store?.companyName,
-        ico: store?.ico,
-        companyAddress: store?.companyAddress,
+        companyName: storeDoc?.companyName,
+        ico: storeDoc?.ico,
+        companyAddress: storeDoc?.companyAddress,
       });
 
       const objectUrl = URL.createObjectURL(pdfBlob);

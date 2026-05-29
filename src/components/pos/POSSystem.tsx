@@ -1,19 +1,35 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { useStore } from '@/contexts/StoreContext';
+import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus, Pin } from 'lucide-react';
-// removed touch hook usage inside maps; using pointer events instead
 import { AddProductModal } from './AddProductModal';
-import { CheckoutModal } from './CheckoutModal';
 import { DiscountModal } from './DiscountModal';
-import { ProductEditor } from './ProductEditor';
-import { ExtrasManagerModal } from './ExtrasManagerModal';
-import { SelectExtrasModal } from './SelectExtrasModal';
+
+const CheckoutModal = dynamic(
+  () => import('./CheckoutModal').then((m) => ({ default: m.CheckoutModal })),
+  { ssr: false }
+);
+const ProductEditor = dynamic(
+  () => import('./ProductEditor').then((m) => ({ default: m.ProductEditor })),
+  { ssr: false }
+);
+const ExtrasManagerModal = dynamic(
+  () => import('./ExtrasManagerModal').then((m) => ({ default: m.ExtrasManagerModal })),
+  { ssr: false }
+);
+const SelectExtrasModal = dynamic(
+  () => import('./SelectExtrasModal').then((m) => ({ default: m.SelectExtrasModal })),
+  { ssr: false }
+);
+
+const CART_SAVE_DEBOUNCE_MS = 400;
 
 interface POSSystemProps {
   storeId: string;
@@ -23,6 +39,7 @@ interface POSSystemProps {
 export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const PENDING_PURCHASES_LIMIT = 20;
   const { user } = useAuth();
+  const storeDoc = useStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,7 +56,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
   const [showExtrasManager, setShowExtrasManager] = useState(false);
   const [showPinnedManager, setShowPinnedManager] = useState(false);
-  const [pinnedProductIds, setPinnedProductIds] = useState<string[]>([]);
+  const pinnedProductIds = storeDoc?.pinnedProductIds ?? [];
   const [pinnedSearchTerm, setPinnedSearchTerm] = useState('');
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
@@ -81,18 +98,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       hasLoadedCartRef.current = true;
     });
 
-    return unsubscribe;
-  }, [user, storeId]);
-
-  // Načtení připnutých položek prodejny
-  useEffect(() => {
-    if (!user || !storeId) return;
-    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
-    const unsubscribe = onSnapshot(storeRef, (snapshot) => {
-      const data: any = snapshot.data() || {};
-      const pinned = Array.isArray(data.pinnedProductIds) ? data.pinnedProductIds : [];
-      setPinnedProductIds(pinned);
-    });
     return unsubscribe;
   }, [user, storeId]);
 
@@ -170,26 +175,32 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     }
   };
 
-  // Ukládání košíku do Firestore při změně obsahu
+  // Ukládání košíku do Firestore s debounce – méně zápisů při rychlém přidávání položek.
   useEffect(() => {
     if (!user || !storeId) return;
-    if (!hasLoadedCartRef.current) return; // počkej na první načtení ze snapshotu
+    if (!hasLoadedCartRef.current) return;
     if (suppressNextSaveRef.current) {
       suppressNextSaveRef.current = false;
       return;
     }
+
     const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
-    const save = async () => {
+    const timer = window.setTimeout(async () => {
       try {
-        await setDoc(cartDocRef, {
-          items: cart,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
+        await setDoc(
+          cartDocRef,
+          {
+            items: cart,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
       } catch (error) {
         console.error('❌ Chyba při ukládání košíku do Firestore:', error);
       }
-    };
-    save();
+    }, CART_SAVE_DEBOUNCE_MS);
+
+    return () => window.clearTimeout(timer);
   }, [cart, user, storeId]);
 
   // --- konec perzistence košíku ---
@@ -298,28 +309,34 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     return unsubscribe;
   }, [user, storeId]);
 
-  const filteredProducts = products
-    .filter(product =>
-      normalizeText(product.name).includes(normalizeText(searchTerm))
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  const filteredProducts = useMemo(
+    () =>
+      products
+        .filter((product) => normalizeText(product.name).includes(normalizeText(searchTerm)))
+        .sort((a, b) => a.name.localeCompare(b.name, 'cs')),
+    [products, searchTerm]
+  );
 
-  // Top 20 nejprodávanějších produktů na základě soldCount
-  const topSellingProducts = products
-    .sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0))
-    .slice(0, 20);
+  const topSellingProducts = useMemo(
+    () => [...products].sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0)).slice(0, 20),
+    [products]
+  );
 
-  const pinnedProducts = products
-    .filter((p) => pinnedProductIds.includes(p.id))
-    .sort((a, b) => pinnedProductIds.indexOf(a.id) - pinnedProductIds.indexOf(b.id));
+  const pinnedProducts = useMemo(
+    () =>
+      products
+        .filter((p) => pinnedProductIds.includes(p.id))
+        .sort((a, b) => pinnedProductIds.indexOf(a.id) - pinnedProductIds.indexOf(b.id)),
+    [products, pinnedProductIds]
+  );
 
-  const filteredPinnedManagerProducts = products
-    .filter((product) =>
-      normalizeText(product.name).includes(normalizeText(pinnedSearchTerm))
-    )
-    .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-
-  const popularProducts = products.filter(product => product.isPopular);
+  const filteredPinnedManagerProducts = useMemo(
+    () =>
+      products
+        .filter((product) => normalizeText(product.name).includes(normalizeText(pinnedSearchTerm)))
+        .sort((a, b) => a.name.localeCompare(b.name, 'cs')),
+    [products, pinnedSearchTerm]
+  );
 
   const generateItemId = (): string => {
     return 'itm_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
@@ -445,7 +462,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       ? pinnedProductIds.filter((id) => id !== productId)
       : [...pinnedProductIds, productId];
 
-    setPinnedProductIds(next);
     try {
       await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
         pinnedProductIds: next,
@@ -453,7 +469,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       });
     } catch (error) {
       console.error('❌ Chyba při ukládání připnutých položek:', error);
-      setPinnedProductIds(pinnedProductIds);
     }
   };
 

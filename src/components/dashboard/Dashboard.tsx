@@ -30,6 +30,8 @@ export const Dashboard: React.FC = () => {
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
 
+  const backfilledStoreTypesRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!user || !user.uid) return;
 
@@ -38,28 +40,28 @@ export const Dashboard: React.FC = () => {
       where('isActive', '==', true)
     );
 
-    const unsubscribe = onSnapshot(storesQuery, async (snapshot) => {
+    const unsubscribe = onSnapshot(storesQuery, (snapshot) => {
       const storesData: Store[] = [];
-      const updates: Promise<any>[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      const updates: Promise<unknown>[] = [];
+      snapshot.forEach((storeDoc) => {
+        const data = storeDoc.data();
         const storeWithDefaults = {
-          id: doc.id, 
+          id: storeDoc.id,
           ...data,
           type: data.type || 'prodejna',
           createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
         } as Store;
         storesData.push(storeWithDefaults);
-        // Backfill typu prodejny pro existující záznamy
-        if (!data.type) {
-          updates.push(updateDoc(doc.ref, { type: 'prodejna' }));
+        if (!data.type && !backfilledStoreTypesRef.current.has(storeDoc.id)) {
+          backfilledStoreTypesRef.current.add(storeDoc.id);
+          updates.push(updateDoc(storeDoc.ref, { type: 'prodejna' }));
         }
       });
       setStores(storesData);
       setLoading(false);
       if (updates.length > 0) {
-        try { await Promise.allSettled(updates); } catch {}
+        void Promise.allSettled(updates);
       }
     }, (error: any) => {
       console.error('Error loading stores:', error);

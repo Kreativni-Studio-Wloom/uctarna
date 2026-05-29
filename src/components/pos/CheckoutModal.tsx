@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, DollarSign, Euro, Calculator, QrCode } from 'lucide-react';
 import { CartItem } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { addDoc, collection, serverTimestamp, doc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
+import { useStore } from '@/contexts/StoreContext';
+import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 import QRCode from 'react-qr-code';
@@ -34,6 +35,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   finalAmount
 }) => {
   const { user } = useAuth();
+  const storeDoc = useStore();
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'qr'>('cash');
   const [loading, setLoading] = useState(false);
   const [showEurConversion, setShowEurConversion] = useState(false);
@@ -95,36 +97,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const hasIban = Boolean(iban && iban.trim().length > 0);
   const canUseQr = !isRefund && displayCurrency === 'CZK' && paymentMethod !== 'card' ? hasIban : hasIban && !isRefund; // guard; UI also checks
 
-  // Načtení kurzu pro store z Firestore a detekce SumUp
+  // Nastavení prodejny sdílená z StoreContext (bez duplicitního Firestore listeneru).
   useEffect(() => {
-    if (!user || !storeId) return;
     if (typeof window !== 'undefined') {
       SumUpService.detectSumUpApp().then(setSumUpAvailable);
       setSumUpAffiliateKeyConfigured(sumUpService.hasAffiliateKeyConfigured());
     }
-    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
-    const unsubscribe = onSnapshot(storeRef, (snap) => {
-      const data: any = snap.data() || {};
-      if (typeof data.eurRate === 'number') {
-        setEurRate(data.eurRate);
-      }
-      if (data.type === 'prodejna' || data.type === 'bistro') {
-        setStoreType(data.type);
-      }
-      if (typeof data.redirectToSumUp === 'boolean') {
-        setRedirectToSumUp(data.redirectToSumUp);
-      }
-      if (typeof data.iban === 'string') {
-        setIban(data.iban);
-      } else {
-        setIban('');
-      }
-      if (typeof data.tipsEnabled === 'boolean') {
-        setTipsEnabled(data.tipsEnabled);
-      }
-    });
-    return unsubscribe;
-  }, [user, storeId]);
+  }, []);
+
+  useEffect(() => {
+    if (!storeDoc) return;
+    if (typeof storeDoc.eurRate === 'number') {
+      setEurRate(storeDoc.eurRate);
+    }
+    if (storeDoc.type === 'prodejna' || storeDoc.type === 'bistro') {
+      setStoreType(storeDoc.type);
+    }
+    if (typeof storeDoc.redirectToSumUp === 'boolean') {
+      setRedirectToSumUp(storeDoc.redirectToSumUp);
+    }
+    if (typeof storeDoc.iban === 'string') {
+      setIban(storeDoc.iban);
+    } else {
+      setIban('');
+    }
+    if (typeof storeDoc.tipsEnabled === 'boolean') {
+      setTipsEnabled(storeDoc.tipsEnabled);
+    }
+  }, [storeDoc]);
 
   useEffect(() => {
     if (!tipsEnabled) setTipInput('');

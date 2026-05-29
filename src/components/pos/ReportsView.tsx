@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
@@ -11,6 +11,7 @@ import { saleTipInCzk } from '@/lib/saleTip';
 import { motion } from 'framer-motion';
 import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
 import { generateEmailContent, EmailReportData, buildEmailReportData } from '@/lib/email';
+import { useStore } from '@/contexts/StoreContext';
 
 // Rozšířený User interface s prodejnami
 interface ExtendedUser {
@@ -37,6 +38,7 @@ interface ReportsViewProps {
 
 export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const { user, firebaseUser } = useAuth();
+  const storeDoc = useStore();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,12 +247,61 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     };
   };
 
+  const reportData = useMemo(
+    () => getReportData(),
+    [sales, products, selectedPeriod, selectedDate, customStartDate, customEndDate, extendedUser]
+  );
+  const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
+  const soldProductsSummary = useMemo(
+    () =>
+      Array.from(
+        reportData.sales.reduce((acc, sale) => {
+          sale.items?.forEach((item) => {
+            const key = item.productId || item.productName;
+            const product = productMap.get(item.productId);
+            const unitCost = product?.cost || 0;
+            const revenue = item.price * item.quantity;
+            const costs = unitCost * item.quantity;
+            const profit = revenue - costs;
+
+            const existing = acc.get(key);
+            if (existing) {
+              existing.quantity += item.quantity;
+              existing.revenue += revenue;
+              existing.costs += costs;
+              existing.profit += profit;
+              return;
+            }
+
+            acc.set(key, {
+              name: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.price,
+              revenue,
+              costs,
+              profit,
+            });
+          });
+
+          return acc;
+        }, new Map<string, {
+          name: string;
+          quantity: number;
+          unitPrice: number;
+          revenue: number;
+          costs: number;
+          profit: number;
+        }>())
+      ).sort((a, b) => b[1].revenue - a[1].revenue),
+    [reportData.sales, productMap]
+  );
+
   const buildEmailPayload = (): EmailReportData => {
     const reportData = getReportData();
 
     return buildEmailReportData(
       {
-        storeName: extendedUser?.stores?.find((s) => s.id === storeId)?.name || 'Neznámá prodejna',
+        storeName: storeDoc?.name || extendedUser?.stores?.find((s) => s.id === storeId)?.name || 'Neznámá prodejna',
         period:
           selectedPeriod === 'day'
             ? 'Denní'
@@ -266,7 +317,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
                 ? format(customStartDate, 'd.M.yyyy', { locale: cs })
-                : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
+                : storeDoc?.createdAt
+                  ? format(storeDoc.createdAt instanceof Date ? storeDoc.createdAt : new Date(storeDoc.createdAt), 'd.M.yyyy', { locale: cs })
+                  : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
                   ? format(extendedUser.stores.find((s) => s.id === storeId)!.createdAt, 'd.M.yyyy', { locale: cs })
                   : 'Od založení',
         endDate:
@@ -430,49 +483,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       </div>
     );
   }
-
-  const reportData = getReportData();
-  const productMap = new Map(products.map((product) => [product.id, product]));
-  const soldProductsSummary = Array.from(
-    reportData.sales.reduce((acc, sale) => {
-      sale.items?.forEach((item) => {
-        const key = item.productId || item.productName;
-        const product = productMap.get(item.productId);
-        const unitCost = product?.cost || 0;
-        const revenue = item.price * item.quantity;
-        const costs = unitCost * item.quantity;
-        const profit = revenue - costs;
-
-        const existing = acc.get(key);
-        if (existing) {
-          existing.quantity += item.quantity;
-          existing.revenue += revenue;
-          existing.costs += costs;
-          existing.profit += profit;
-          return;
-        }
-
-        acc.set(key, {
-          name: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          revenue,
-          costs,
-          profit,
-        });
-      });
-
-      return acc;
-    }, new Map<string, {
-      name: string;
-      quantity: number;
-      unitPrice: number;
-      revenue: number;
-      costs: number;
-      profit: number;
-    }>())
-  )
-    .sort((a, b) => b[1].revenue - a[1].revenue);
 
   return (
     <div className="space-y-6">

@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStore } from '@/contexts/StoreContext';
 import { motion } from 'framer-motion';
 import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 interface SettingsViewProps {
   storeId: string;
@@ -13,6 +14,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user } = useAuth();
+  const storeDoc = useStore();
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [tipsEnabled, setTipsEnabled] = useState(false);
@@ -23,30 +25,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Načtení kurzu pro konkrétní prodejnu
+  // Synchronizace z jediného store listeneru na úrovni stránky prodejny.
   useEffect(() => {
-    if (!user || !storeId) return;
-    const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
-    const unsubscribe = onSnapshot(storeRef, (snap) => {
-      const data: any = snap.data() || {};
-      if (typeof data.eurRate === 'number') {
-        setEurRate(data.eurRate);
-      }
-      if (typeof data.redirectToSumUp === 'boolean') {
-        setRedirectToSumUp(data.redirectToSumUp);
-      }
-      if (typeof data.tipsEnabled === 'boolean') {
-        setTipsEnabled(data.tipsEnabled);
-      }
-      if (typeof data.iban === 'string') {
-        setIban(data.iban);
-      }
-      setCompanyName(typeof data.companyName === 'string' ? data.companyName : '');
-      setIco(typeof data.ico === 'string' ? data.ico : '');
-      setCompanyAddress(typeof data.companyAddress === 'string' ? data.companyAddress : '');
-    });
-    return unsubscribe;
-  }, [user, storeId]);
+    if (!storeDoc) return;
+    if (typeof storeDoc.eurRate === 'number') {
+      setEurRate(storeDoc.eurRate);
+    }
+    if (typeof storeDoc.redirectToSumUp === 'boolean') {
+      setRedirectToSumUp(storeDoc.redirectToSumUp);
+    }
+    if (typeof storeDoc.tipsEnabled === 'boolean') {
+      setTipsEnabled(storeDoc.tipsEnabled);
+    }
+    if (typeof storeDoc.iban === 'string') {
+      setIban(storeDoc.iban);
+    }
+    setCompanyName(typeof storeDoc.companyName === 'string' ? storeDoc.companyName : '');
+    setIco(typeof storeDoc.ico === 'string' ? storeDoc.ico : '');
+    setCompanyAddress(typeof storeDoc.companyAddress === 'string' ? storeDoc.companyAddress : '');
+  }, [storeDoc]);
 
   const handleSave = async () => {
     if (!user) return;

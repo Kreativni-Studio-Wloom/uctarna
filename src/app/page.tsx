@@ -1,10 +1,21 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { Dashboard } from '@/components/dashboard/Dashboard';
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+
+const Dashboard = dynamic(
+  () => import('@/components/dashboard/Dashboard').then((m) => ({ default: m.Dashboard })),
+  {
+    loading: () => (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-10 w-10 text-purple-600 animate-spin" />
+      </div>
+    ),
+  }
+);
 
 export default function Home() {
   const { user, loading } = useAuth();

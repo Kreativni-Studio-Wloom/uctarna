@@ -1,11 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserSettings, Store } from '@/types';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const ACCOUNT_SESSIONS_STORAGE_KEY = 'uctarna_account_sessions_v1';
 
@@ -139,19 +138,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Funkce pro obnovení prodejen
-  const refreshUserStores = async () => {
+  const refreshUserStores = useCallback(async () => {
     if (!firebaseUser || !firebaseUser.uid) return;
-    
+
     try {
       const stores = await loadUserStores(firebaseUser.uid);
-      if (user) {
-        setUser({ ...user, stores });
-      }
+      setUser((prev) => (prev ? { ...prev, stores } : prev));
     } catch (error) {
       console.error('Error refreshing user stores:', error);
     }
-  };
+  }, [firebaseUser]);
+
+  const signOutUser = useCallback(async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  }, []);
+
+  const updateUserSettings = useCallback(async (settings: Partial<UserSettings>) => {
+    if (!user) return;
+
+    try {
+      const updatedUser = { ...user, settings: { ...user.settings, ...settings } };
+      await setDoc(doc(db, 'users', user.uid), updatedUser);
+      setUser(updatedUser);
+    } catch (error) {
+      console.error('Error updating user settings:', error);
+    }
+  }, [user]);
+
+  const value = useMemo<AuthContextType>(() => ({
+    user,
+    firebaseUser,
+    loading,
+    signOutUser,
+    rememberAccountSession,
+    switchAccount,
+    switchableAccounts,
+    updateUserSettings,
+    refreshUserStores,
+  }), [
+    user,
+    firebaseUser,
+    loading,
+    signOutUser,
+    switchableAccounts,
+    updateUserSettings,
+    refreshUserStores,
+  ]);
 
   useEffect(() => {
     const sessions = loadStoredSessions();
@@ -176,17 +213,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (userDoc.exists()) {
             const userData = userDoc.data() as User;
-            // Nečekej na pomalejší načtení prodejen, aby se appka otevřela hned.
             setUser({ ...userData, stores: [] });
             setLoading(false);
-            // Prodejny dotáhni až na pozadí.
-            loadUserStores(firebaseUser.uid)
-              .then((stores) => {
-                setUser((prev) => (prev ? { ...prev, stores } : prev));
-              })
-              .catch((storesError) => {
-                console.error('Error loading user stores:', storesError);
-              });
             const sessions = loadStoredSessions();
             const idx = sessions.findIndex((entry) => entry.email === (firebaseUser.email || '').toLowerCase());
             if (idx >= 0) {
@@ -245,58 +273,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             stores: [],
           };
           setUser(fallbackUser);
-
-          // Pokus o tiché dočtení prodejen na pozadí
-          try {
-            const stores = await loadUserStores(firebaseUser.uid);
-            setUser((prev) => (prev ? { ...prev, stores } : prev));
-          } catch (storesError) {
-            console.error('Error loading stores after fallback:', storesError);
-          }
+          setLoading(false);
         }
       } else {
         setUser(null);
         setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return unsubscribe;
   }, []);
-
-  const signOutUser = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const updateUserSettings = async (settings: Partial<UserSettings>) => {
-    if (!user) return;
-    
-    try {
-      const updatedUser = { ...user, settings: { ...user.settings, ...settings } };
-      await setDoc(doc(db, 'users', user.uid), updatedUser);
-      setUser(updatedUser);
-    } catch (error) {
-      console.error('Error updating user settings:', error);
-    }
-  };
-
-  const value: AuthContextType = {
-    user,
-    firebaseUser,
-    loading,
-    signOutUser,
-    rememberAccountSession,
-    switchAccount,
-    switchableAccounts,
-    updateUserSettings,
-    refreshUserStores,
-  };
 
   return (
     <AuthContext.Provider value={value}>

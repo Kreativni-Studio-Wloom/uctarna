@@ -22,6 +22,10 @@ export interface Store {
   updatedAt: Date;
   isActive: boolean;
   redirectToSumUp?: boolean; // Nastavení pro přesměrování na SumUp při platbě kartou
+  /** Kurz EUR pro tuto prodejnu (přepisuje uživatelské nastavení). */
+  eurRate?: number;
+  /** ID produktů připnutých v POS mřížce. */
+  pinnedProductIds?: string[];
   /** Zapnuté zadávání spropitného v checkoutu (přičte se k úhradě, uloží se na doklad). */
   tipsEnabled?: boolean;
   iban?: string; // IBAN pro platby QR kódem (SPAYD)

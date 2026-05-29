@@ -3,6 +3,10 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   // Odstraněno output: 'export' - aplikace je dynamická s Firebase
   // trailingSlash: true, // Také odstraněno pro lepší kompatibilitu
+
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'date-fns', 'framer-motion'],
+  },
   
   // Optimalizace obrázků
   images: {
