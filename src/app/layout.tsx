@@ -2,12 +2,14 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Účtárna - Profesionální prodejní systém',
   description: 'Moderní online prodejní systém s Firebase a SumUp integrací',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },
@@ -41,6 +43,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200`}>
         <AuthProvider>
+          <ServiceWorkerRegister />
           {children}
         </AuthProvider>
       </body>

@@ -19,7 +19,7 @@
     "@headlessui/react": "^1.7.17",
     "@hookform/resolvers": "^3.3.2",
     "date-fns": "^2.30.0",
-    "firebase": "^10.7.0",
+    "firebase": "^10.14.1",
     "framer-motion": "^10.16.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
