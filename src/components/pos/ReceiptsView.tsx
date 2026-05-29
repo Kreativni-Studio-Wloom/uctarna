@@ -311,7 +311,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <input
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Hledat podle ID nebo čísla dokladu (prohledá všechny doklady)…"
+          placeholder="Hledat podle ID nebo čísla dokladu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
       </div>
