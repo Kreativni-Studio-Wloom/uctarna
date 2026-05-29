@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { User as FirebaseUser, onAuthStateChanged, signOut, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, onSnapshot, getDocs, getDocsFromCache } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserSettings, Store } from '@/types';
 
@@ -33,7 +33,6 @@ interface AuthContextType {
   refreshUserStores: () => Promise<void>;
 }
 
-// Rozšířený User interface s prodejnami
 interface ExtendedUser extends User {
   stores?: Store[];
 }
@@ -48,11 +47,40 @@ export const useAuth = () => {
   return context;
 };
 
+function buildFallbackUser(firebaseUser: FirebaseUser): ExtendedUser {
+  return {
+    uid: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    displayName: firebaseUser.displayName || null,
+    createdAt: new Date(),
+    settings: {
+      eurRate: 25.0,
+      theme: 'auto',
+    },
+    stores: [],
+  };
+}
+
+function mapStoreDocs(snapshot: { forEach: (fn: (doc: { id: string; data: () => Record<string, unknown> }) => void) => void }): Store[] {
+  const stores: Store[] = [];
+  snapshot.forEach((storeDoc) => {
+    const data = storeDoc.data();
+    stores.push({
+      id: storeDoc.id,
+      ...data,
+      createdAt: (data.createdAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+      updatedAt: (data.updatedAt as { toDate?: () => Date })?.toDate?.() || new Date(),
+    } as Store);
+  });
+  return stores;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [switchableAccounts, setSwitchableAccounts] = useState<SwitchableAccount[]>([]);
+  const creatingUserRef = useRef(false);
 
   const loadStoredSessions = (): StoredAccountSession[] => {
     if (typeof window === 'undefined') return [];
@@ -75,6 +103,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .map(({ email, displayName, lastUsedAt }) => ({ email, displayName, lastUsedAt }))
         .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
     );
+  };
+
+  const touchStoredSession = (email: string, displayName: string | null) => {
+    const sessions = loadStoredSessions();
+    const idx = sessions.findIndex((entry) => entry.email === email.toLowerCase());
+    if (idx < 0) return;
+    sessions[idx] = {
+      ...sessions[idx],
+      displayName,
+      lastUsedAt: Date.now(),
+    };
+    saveStoredSessions(sessions);
   };
 
   const rememberAccountSession = (email: string, password: string) => {
@@ -104,42 +144,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await signInWithEmailAndPassword(auth, target.email, target.password);
   };
 
-  // Funkce pro načtení prodejen uživatele
   const loadUserStores = async (userId: string): Promise<Store[]> => {
     if (!userId) return [];
-    
+
+    const storesQuery = query(
+      collection(db, 'users', userId, 'stores'),
+      where('isActive', '==', true)
+    );
+
     try {
-      const storesQuery = query(
-        collection(db, 'users', userId, 'stores'),
-        where('isActive', '==', true)
-      );
-      const storesSnapshot = await getDocs(storesQuery);
-      const stores: Store[] = [];
-      
-      storesSnapshot.forEach((doc) => {
-        const data = doc.data();
-        stores.push({ 
-          id: doc.id, 
-          ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(),
-          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(),
-        } as Store);
-      });
-      
-      return stores;
-    } catch (error: any) {
-      console.error('Error loading user stores:', error);
-      // Pokud je chyba oprávnění, vrátíme prázdný seznam
-      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
-        console.log('Chyba oprávnění při načítání prodejen - uživatel pravděpodobně není správně přihlášen');
-        return [];
+      const cachedSnapshot = await getDocsFromCache(storesQuery);
+      if (!cachedSnapshot.empty) {
+        return mapStoreDocs(cachedSnapshot);
       }
+    } catch {
+      // Cache miss — pokračuj na síť na pozadí.
+    }
+
+    try {
+      const snapshot = await getDocs(storesQuery);
+      return mapStoreDocs(snapshot);
+    } catch (error: unknown) {
+      console.error('Error loading user stores:', error);
       return [];
     }
   };
 
   const refreshUserStores = useCallback(async () => {
-    if (!firebaseUser || !firebaseUser.uid) return;
+    if (!firebaseUser?.uid) return;
 
     try {
       const stores = await loadUserStores(firebaseUser.uid);
@@ -200,88 +232,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setFirebaseUser(firebaseUser);
-      
-      if (firebaseUser && firebaseUser.uid) {
-        try {
-          // Nevyžaduj nucené obnovení tokenu při každém startu (zbytečně zpomaluje první načtení).
-          await firebaseUser.getIdToken();
+    let unsubscribeUserDoc: (() => void) | undefined;
 
-          // Zkus načíst uživatele z Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
+    const ensureUserDocument = async (firebaseUser: FirebaseUser) => {
+      if (creatingUserRef.current) return;
+      creatingUserRef.current = true;
+      try {
+        const newUser = buildFallbackUser(firebaseUser);
+        await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+        setUser(newUser);
+        touchStoredSession((firebaseUser.email || '').toLowerCase(), newUser.displayName || null);
+      } catch (error) {
+        console.error('Error creating user document:', error);
+      } finally {
+        creatingUserRef.current = false;
+      }
+    };
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (nextFirebaseUser) => {
+      setFirebaseUser(nextFirebaseUser);
+      unsubscribeUserDoc?.();
+      unsubscribeUserDoc = undefined;
+
+      if (!nextFirebaseUser?.uid) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const fallbackUser = buildFallbackUser(nextFirebaseUser);
+      setUser(fallbackUser);
+      setLoading(false);
+
+      void nextFirebaseUser.getIdToken().catch(() => {});
+
+      const userRef = doc(db, 'users', nextFirebaseUser.uid);
+      unsubscribeUserDoc = onSnapshot(
+        userRef,
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const userData = snapshot.data() as User;
             setUser({ ...userData, stores: [] });
-            setLoading(false);
-            const sessions = loadStoredSessions();
-            const idx = sessions.findIndex((entry) => entry.email === (firebaseUser.email || '').toLowerCase());
-            if (idx >= 0) {
-              sessions[idx] = {
-                ...sessions[idx],
-                displayName: userData.displayName || null,
-                lastUsedAt: Date.now(),
-              };
-              saveStoredSessions(sessions);
-            }
-          } else {
-            // Vytvoř nového uživatele - opraveno pro undefined displayName
-            const newUser: ExtendedUser = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || null, // Změněno z undefined na null
-              createdAt: new Date(),
-              settings: {
-                eurRate: 25.0, // Výchozí kurz
-                theme: 'auto',
-              },
-              stores: [], // Prázdný seznam prodejen pro nového uživatele
-            };
-            
-            await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-            setUser(newUser);
-            setLoading(false);
-            const sessions = loadStoredSessions();
-            const idx = sessions.findIndex((entry) => entry.email === (firebaseUser.email || '').toLowerCase());
-            if (idx >= 0) {
-              sessions[idx] = {
-                ...sessions[idx],
-                displayName: newUser.displayName || null,
-                lastUsedAt: Date.now(),
-              };
-              saveStoredSessions(sessions);
-            }
-          }
-        } catch (error: any) {
-          console.error('Error loading user:', error);
-          // Pokud je chyba oprávnění nebo dočasné selhání načtení profilu, neshazuj session.
-          // Fallback na Firebase user zajistí okamžitý přechod z loginu.
-          if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
-            console.log('Chyba oprávnění - uživatel pravděpodobně není správně přihlášen');
+            touchStoredSession((nextFirebaseUser.email || '').toLowerCase(), userData.displayName || null);
+            return;
           }
 
-          const fallbackUser: ExtendedUser = {
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || null,
-            createdAt: new Date(),
-            settings: {
-              eurRate: 25.0,
-              theme: 'auto',
-            },
-            stores: [],
-          };
+          if (snapshot.metadata.fromCache) {
+            return;
+          }
+
+          void ensureUserDocument(nextFirebaseUser);
+        },
+        (error) => {
+          console.error('Error loading user profile:', error);
           setUser(fallbackUser);
           setLoading(false);
         }
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
+      );
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      unsubscribeUserDoc?.();
+    };
   }, []);
 
   return (

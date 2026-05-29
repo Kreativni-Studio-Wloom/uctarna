@@ -63,14 +63,10 @@ export const Dashboard: React.FC = () => {
       if (updates.length > 0) {
         void Promise.allSettled(updates);
       }
-    }, (error: any) => {
+    }, (error: unknown) => {
       console.error('Error loading stores:', error);
-      // Pokud je chyba oprávnění, zobrazíme prázdný seznam
-      if (error.code === 'permission-denied' || error.message?.includes('permissions')) {
-        console.log('Chyba oprávnění při načítání prodejen - uživatel pravděpodobně není správně přihlášen');
-        setStores([]);
-        setLoading(false);
-      }
+      setStores([]);
+      setLoading(false);
     });
 
     return unsubscribe;

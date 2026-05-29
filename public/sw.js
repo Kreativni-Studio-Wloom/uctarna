@@ -1,31 +1,7 @@
-const CACHE_SHELL = 'uctarna-shell-v3';
-const CACHE_STATIC = 'uctarna-static-v3';
+const CACHE_SHELL = 'uctarna-shell-v4';
+const CACHE_STATIC = 'uctarna-static-v4';
 
 const SHELL_URLS = ['/', '/manifest.json', '/favicon.ico', '/favicon.svg', '/apple-touch-icon.png'];
-
-/** Hosty, které service worker nikdy nesmí interceptovat (CORS / ITP). */
-const BYPASS_HOSTS = new Set([
-  'firestore.googleapis.com',
-  'identitytoolkit.googleapis.com',
-  'securetoken.googleapis.com',
-  'firebase.googleapis.com',
-  'firebaseinstallations.googleapis.com',
-  'www.googleapis.com',
-]);
-
-function mustBypassServiceWorker(url) {
-  const { hostname, origin } = url;
-
-  if (BYPASS_HOSTS.has(hostname)) return true;
-  if (hostname.endsWith('.googleapis.com')) return true;
-  if (hostname.endsWith('.firebaseapp.com')) return true;
-  if (hostname.endsWith('.firebasestorage.app')) return true;
-
-  // Veškerý cross-origin provoz necháme prohlížeči — SW nesmí sahat na Firebase ani jiné API.
-  if (origin !== self.location.origin) return true;
-
-  return false;
-}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -79,11 +55,18 @@ async function networkFirstNavigation(request) {
 }
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Firebase / Google API — nikdy neinterceptovat (CORS / ITP v Safari).
+  if (url.hostname.includes('googleapis.com') || url.hostname.includes('firebase')) {
+    return;
+  }
+
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   const request = event.request;
-  const url = new URL(request.url);
-
-  if (mustBypassServiceWorker(url)) return;
-
   if (request.method !== 'GET') return;
 
   if (url.pathname.startsWith('/_next/static/')) {
