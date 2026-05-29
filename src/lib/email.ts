@@ -1,7 +1,14 @@
 // Tento modul poskytuje pouze generování obsahu e-mailu pro uzávěrky.
 
-// Interface pro report data
-export interface ReportData {
+export interface ProductSummaryRow {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  totalProfit: number;
+}
+
+export interface EmailReportData {
   storeName: string;
   period: string;
   startDate: string;
@@ -17,84 +24,121 @@ export interface ReportData {
   totalProfit: number;
   totalDiscounts?: number;
   salesWithDiscount?: number;
-  /** Součet spropitného za období v Kč (EUR přepočteno kurzem dokladu). */
   totalTips?: number;
-  products: Array<{
-    id: string;
-    name: string;
-    price: number;
-    cost?: number;
-  }>;
-  sales: Array<{
-    createdAt: Date | string;
-    items?: Array<{
-      productId: string;
-      productName: string;
-      quantity: number;
-      price: number;
-    }>;
-    paymentMethod: string;
-    totalAmount: number;
-  }>;
+  numCashSales: number;
+  numCardSales: number;
+  numQrSales: number;
+  productSummary: ProductSummaryRow[];
 }
 
-// Funkce pro generování email obsahu
-export function generateEmailContent(reportData: ReportData, actionName?: string) {
-  // Vytvoření mapy produktů pro rychlé vyhledávání nákladů
-  const productMap = new Map(reportData.products.map(p => [p.id, p]));
-  
-  // Agregace všech prodaných položek s výpočtem zisku
-  const productSummary = new Map<string, { 
-    quantity: number; 
-    totalPrice: number; 
-    price: number; 
-    totalCost: number; 
-    totalProfit: number; 
-  }>();
-  
-  reportData.sales.forEach((sale) => {
+type SaleItemForEmail = {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+};
+
+type SaleForEmail = {
+  items?: SaleItemForEmail[];
+  paymentMethod: string;
+};
+
+type ProductCostLookup = {
+  id: string;
+  cost?: number;
+};
+
+export function buildEmailReportData(
+  meta: Pick<EmailReportData, 'storeName' | 'period' | 'startDate' | 'endDate'>,
+  totals: Pick<
+    EmailReportData,
+    | 'totalSales'
+    | 'salesInCZK'
+    | 'salesInEUR'
+    | 'cashSales'
+    | 'cardSales'
+    | 'qrSales'
+    | 'customerCount'
+    | 'totalCosts'
+    | 'totalProfit'
+    | 'totalDiscounts'
+    | 'salesWithDiscount'
+    | 'totalTips'
+  >,
+  sales: SaleForEmail[],
+  products: ProductCostLookup[]
+): EmailReportData {
+  const productMap = new Map(products.map((product) => [product.id, product]));
+  const summaryMap = new Map<string, ProductSummaryRow>();
+
+  sales.forEach((sale) => {
     sale.items?.forEach((item) => {
-      const key = item.productName;
-      const product = productMap.get(item.productId);
-      const itemCost = product?.cost || 0;
-      const itemProfit = (item.price - itemCost) * item.quantity;
-      
-      const existing = productSummary.get(key);
-      
+      const itemCost = productMap.get(item.productId)?.cost || 0;
+      const totalPrice = item.quantity * item.price;
+      const totalProfit = (item.price - itemCost) * item.quantity;
+      const existing = summaryMap.get(item.productName);
+
       if (existing) {
         existing.quantity += item.quantity;
-        existing.totalPrice += item.quantity * item.price;
-        existing.totalCost += itemCost * item.quantity;
-        existing.totalProfit += itemProfit;
-      } else {
-        productSummary.set(key, {
-          quantity: item.quantity,
-          totalPrice: item.quantity * item.price,
-          price: item.price,
-          totalCost: itemCost * item.quantity,
-          totalProfit: itemProfit
-        });
+        existing.totalPrice += totalPrice;
+        existing.totalProfit += totalProfit;
+        return;
       }
+
+      summaryMap.set(item.productName, {
+        name: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        totalPrice,
+        totalProfit,
+      });
     });
   });
 
-  // Agregace prodejů dle způsobu platby
-  const numCardSales = reportData.sales.filter(s => s.paymentMethod === 'card').length;
-  const numCashSales = reportData.sales.filter(s => s.paymentMethod === 'cash').length;
-  const numQrSales = reportData.sales.filter(s => s.paymentMethod === 'qr').length;
+  return {
+    ...meta,
+    ...totals,
+    numCashSales: sales.filter((sale) => sale.paymentMethod === 'cash').length,
+    numCardSales: sales.filter((sale) => sale.paymentMethod === 'card').length,
+    numQrSales: sales.filter((sale) => sale.paymentMethod === 'qr').length,
+    productSummary: Array.from(summaryMap.values()).sort((a, b) => b.totalPrice - a.totalPrice),
+  };
+}
 
-  // Vytvoření řádků pro souhrn položek
-  const productSummaryRows = Array.from(productSummary.entries())
-    .sort((a, b) => b[1].totalPrice - a[1].totalPrice) // Seřadit podle celkové hodnoty (sestupně)
-    .map(([productName, summary]) => `
+function formatPeriodLabel(reportData: EmailReportData) {
+  if (reportData.period === 'Denní') {
+    return `Denní uzávěrka z ${reportData.startDate}`;
+  }
+  if (reportData.period === 'Měsíční') {
+    return `Uzávěrka za měsíc ${reportData.startDate}`;
+  }
+  if (reportData.period === 'Vlastní období') {
+    return `Uzávěrka od ${reportData.startDate} do ${reportData.endDate}`;
+  }
+  return `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`;
+}
+
+export function generateEmailContent(reportData: EmailReportData, actionName?: string) {
+  const periodLabel = formatPeriodLabel(reportData);
+  const uniqueProductCount = reportData.productSummary.length;
+
+  const productSummaryRows = reportData.productSummary
+    .map((summary) => `
       <tr>
-        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.quantity}x ${productName}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${summary.price.toLocaleString('cs-CZ')} Kč</td>
+        <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.quantity}x ${summary.name}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #dee2e6;">${summary.unitPrice.toLocaleString('cs-CZ')} Kč</td>
         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #28a745;">${summary.totalPrice.toLocaleString('cs-CZ')} Kč</td>
         <td style="padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;">${summary.totalProfit.toLocaleString('cs-CZ')} Kč</td>
       </tr>
-    `).join('');
-  
+    `)
+    .join('');
+
+  const productSummaryText = reportData.productSummary
+    .map((summary) =>
+      `${summary.quantity}x ${summary.name} - ${summary.totalPrice.toLocaleString('cs-CZ')} Kč (zisk: ${summary.totalProfit.toLocaleString('cs-CZ')} Kč)`
+    )
+    .join('\n');
+
   return {
     html: `
       <!DOCTYPE html>
@@ -110,14 +154,6 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
           .header h1 { margin: 0; font-size: 24px; }
           .header p { margin: 10px 0 0 0; opacity: 0.9; }
           .content { padding: 20px; }
-          .stats-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 15px; margin: 20px 0; }
-          .stat-card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #e9ecef; }
-          .stat-value { font-size: 24px; font-weight: bold; color: #28a745; margin-bottom: 5px; }
-          .stat-label { font-size: 14px; color: #666; }
-          .cash-value { color: #ffc107; }
-          .card-value { color: #6f42c1; }
-          .customer-value { color: #007bff; }
-          .muted { font-size: 12px; color: #666; margin-top: 5px; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; }
           th { background: #f8f9fa; padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; color: #495057; font-weight: bold; }
           td { padding: 12px; border-bottom: 1px solid #dee2e6; }
@@ -129,11 +165,7 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
         <div class="container">
           <div class="header">
             <h1>${reportData.storeName}${actionName ? ` - ${actionName}` : ''}</h1>
-            <p>${reportData.period === 'Denní' 
-              ? `Denní uzávěrka z ${reportData.startDate}`
-              : reportData.period === 'Měsíční' 
-                ? `Uzávěrka za měsíc ${reportData.startDate}`
-                : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
+            <p>${periodLabel}</p>
           </div>
           
           <div class="content">
@@ -168,19 +200,19 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#6f42c1; margin-bottom:5px;">${reportData.cardSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">Karty</div>
-                  <div style="font-size:12px; color:#666; margin-top:5px;">${numCardSales} prodejů</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numCardSales} prodejů</div>
                 </td>
               </tr>
               <tr>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#ffc107; margin-bottom:5px;">${reportData.cashSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">Hotovost</div>
-                  <div style="font-size:12px; color:#666; margin-top:5px;">${numCashSales} prodejů</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numCashSales} prodejů</div>
                 </td>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#0d6efd; margin-bottom:5px;">${reportData.qrSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">QR kód</div>
-                  <div style="font-size:12px; color:#666; margin-top:5px;">${numQrSales} prodejů</div>
+                  <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numQrSales} prodejů</div>
                 </td>
               </tr>
               <tr>
@@ -212,20 +244,16 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
             </table>
             <div class="summary">
               <h4>📊 Souhrn tržeb</h4>
-              <p><strong>Období:</strong> ${reportData.period === 'Denní' 
-                ? `Denní uzávěrka z ${reportData.startDate}`
-                : reportData.period === 'Měsíční' 
-                  ? `Uzávěrka za měsíc ${reportData.startDate}`
-                  : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}</p>
+              <p><strong>Období:</strong> ${periodLabel}</p>
               <p><strong>Celková tržba:</strong> ${reportData.totalSales.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Zisk:</strong> ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)</p>
-              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)</p>
-              <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)</p>
+              <p><strong>Hotovost:</strong> ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${reportData.numCashSales} prodejů)</p>
+              <p><strong>Karty:</strong> ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${reportData.numCardSales} prodejů)</p>
+              <p><strong>QR kód:</strong> ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${reportData.numQrSales} prodejů)</p>
               <p><strong>Spropitné:</strong> ${(reportData.totalTips ?? 0).toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
-              <p><strong>Počet různých produktů:</strong> ${productSummary.size}</p>
+              <p><strong>Počet různých produktů:</strong> ${uniqueProductCount}</p>
             </div>
           </div>
           
@@ -240,34 +268,26 @@ export function generateEmailContent(reportData: ReportData, actionName?: string
     text: `
 ${reportData.period} uzávěrka - ${reportData.storeName}${actionName ? ` - ${actionName}` : ''}
 
-Období: ${reportData.period === 'Denní' 
-  ? `Denní uzávěrka z ${reportData.startDate}`
-  : reportData.period === 'Měsíční' 
-    ? `Uzávěrka za měsíc ${reportData.startDate}`
-    : `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`}
+Období: ${periodLabel}
 
 📊 STATISTIKY:
 - Celková tržba: ${reportData.totalSales.toLocaleString('cs-CZ')} Kč
-- Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${numCashSales} prodejů)
-- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${numCardSales} prodejů)
-- QR kód: ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${numQrSales} prodejů)
+- Hotovost: ${reportData.cashSales.toLocaleString('cs-CZ')} Kč (${reportData.numCashSales} prodejů)
+- Karty: ${reportData.cardSales.toLocaleString('cs-CZ')} Kč (${reportData.numCardSales} prodejů)
+- QR kód: ${reportData.qrSales.toLocaleString('cs-CZ')} Kč (${reportData.numQrSales} prodejů)
 - Zisk: ${reportData.totalProfit.toLocaleString('cs-CZ')} Kč
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
 - Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
 - Zákazníci: ${reportData.customerCount}
 - Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
-- Počet různých produktů: ${productSummary.size}
+- Počet různých produktů: ${uniqueProductCount}
 
 📋 SOUHRN PRODANÝCH POLOŽEK:
-${Array.from(productSummary.entries())
-  .sort((a, b) => b[1].totalPrice - a[1].totalPrice)
-  .map(([productName, summary]) => 
-    `${summary.quantity}x ${productName} - ${summary.totalPrice.toLocaleString('cs-CZ')} Kč (zisk: ${summary.totalProfit.toLocaleString('cs-CZ')} Kč)`
-  ).join('\n')}
+${productSummaryText}
 
 ---
 Uzávěrka vygenerována automaticky dne ${new Date().toLocaleDateString('cs-CZ')}
 Účtárna - Profesionální prodejní systém
-    `
+    `,
   };
 }

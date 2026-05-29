@@ -1,20 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import type Transporter from 'nodemailer/lib/mailer';
 
-// SMTP konfigurace pro Účtárna
-const transporter = nodemailer.createTransport({
-  host: 'smtp.seznam.cz',
-  port: 465,
-  secure: true, // SSL/TLS
-  auth: {
-    user: 'info@uctarna.fun',
-    pass: 'xeQvep-coccec-watza7'
-  },
-  tls: {
-    rejectUnauthorized: false
+export const runtime = 'nodejs';
+
+let transporter: Transporter | null = null;
+
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.seznam.cz',
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: true,
+      pool: true,
+      maxConnections: 1,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
+      auth: {
+        user: process.env.SMTP_USER || 'info@uctarna.fun',
+        pass: process.env.SMTP_PASS || 'xeQvep-coccec-watza7',
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
   }
-});
 
+  return transporter;
+}
+
+// Endpoint pouze předá hotový HTML/text e-mail přes SMTP – bez Firestore dotazů.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -27,50 +43,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('📧 Preparing to send email to:', to);
-    console.log('📧 Subject:', subject);
+    const userInfo = await getTransporter().sendMail({
+      from: process.env.SMTP_FROM || 'info@uctarna.fun',
+      to,
+      subject,
+      html,
+      text,
+    });
 
-    // Email data pro uživatele
-    const userMailOptions = {
-      from: 'info@uctarna.fun',
-      to: to,
-      subject: subject,
-      html: html,
-      text: text
-    };
-
-    try {
-      // Odešli email uživateli
-      console.log('📧 Sending email to user:', to);
-      const userInfo = await transporter.sendMail(userMailOptions);
-      console.log('✅ User email sent successfully:', userInfo.messageId);
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Email byl úspěšně odeslán přes SMTP server',
-        messageId: userInfo.messageId,
-        details: {
-          from: userMailOptions.from,
-          to: userMailOptions.to,
-          subject: userMailOptions.subject,
-          timestamp: new Date().toISOString(),
-          smtpServer: 'smtp.seznam.cz'
-        }
-      });
-      
-    } catch (smtpError: any) {
-      console.error('❌ Error sending email via SMTP:', smtpError);
-      
-      return NextResponse.json(
-        { error: `Chyba při odesílání emailu přes SMTP: ${smtpError.message}` },
-        { status: 500 }
-      );
-    }
-
+    return NextResponse.json({
+      success: true,
+      message: 'Email byl úspěšně odeslán přes SMTP server',
+      messageId: userInfo.messageId,
+    });
   } catch (error) {
     console.error('❌ Error in send-email API:', error);
+
+    const message = error instanceof Error ? error.message : 'Neznámá chyba';
     return NextResponse.json(
-      { error: 'Chyba při zpracování požadavku' },
+      { error: `Chyba při odesílání emailu přes SMTP: ${message}` },
       { status: 500 }
     );
   }
