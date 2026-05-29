@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Sale, Store } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, deleteDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
-import { startOfDay, endOfDay, format, isToday } from 'date-fns';
+import { collection, query, orderBy, limit, startAfter, onSnapshot, doc, deleteDoc, updateDoc, increment, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { generateReceiptPdfBlob } from '@/lib/pdfGenerator';
 
@@ -16,7 +15,6 @@ interface ReceiptsViewProps {
 
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const ITEMS_PER_PAGE = 12;
-  const RECENT_PAGE_SIZE = 50;
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,15 +23,11 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
-  // Výchozí pohled: pouze doklady vybraného dne (dnes). Starší data se načítají na vyžádání.
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  // Režim "starší doklady": načítá posledních N dokladů napříč dny s limitem (Načíst více).
-  const [recentMode, setRecentMode] = useState(false);
-  const [recentLimit, setRecentLimit] = useState(RECENT_PAGE_SIZE);
-  // Příznak, že server vrátil přesně tolik dokladů, kolik byl limit (může existovat víc).
-  const [hasMoreRecent, setHasMoreRecent] = useState(false);
+  // Kurzor = poslední doklad předchozí stránky (pro startAfter u další stránky).
+  const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -41,28 +35,44 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     setLoading(true);
     const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
 
-    const q = recentMode
-      ? query(salesRef, orderBy('createdAt', 'desc'), limit(recentLimit))
-      : query(
-          salesRef,
-          where('createdAt', '>=', Timestamp.fromDate(startOfDay(selectedDate))),
-          where('createdAt', '<=', Timestamp.fromDate(endOfDay(selectedDate))),
-          orderBy('createdAt', 'desc')
-        );
+    const prevCursor = currentPage > 1 ? pageCursorsRef.current[currentPage - 2] : null;
+    if (currentPage > 1 && !prevCursor) {
+      setLoading(false);
+      return;
+    }
+
+    const q =
+      currentPage === 1
+        ? query(salesRef, orderBy('createdAt', 'desc'), limit(ITEMS_PER_PAGE + 1))
+        : query(
+            salesRef,
+            orderBy('createdAt', 'desc'),
+            startAfter(prevCursor!),
+            limit(ITEMS_PER_PAGE + 1)
+          );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const salesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Sale[];
+      const docs = snapshot.docs;
+      const hasMore = docs.length > ITEMS_PER_PAGE;
+      const pageDocs = hasMore ? docs.slice(0, ITEMS_PER_PAGE) : docs;
 
-      setSales(salesData);
-      setHasMoreRecent(recentMode && snapshot.size >= recentLimit);
+      setSales(
+        pageDocs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        })) as Sale[]
+      );
+      setHasNextPage(hasMore);
+
+      if (pageDocs.length > 0) {
+        pageCursorsRef.current[currentPage - 1] = pageDocs[pageDocs.length - 1];
+      }
+
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [user, storeId, recentMode, recentLimit, selectedDate]);
+  }, [user, storeId, currentPage]);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -138,67 +148,23 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     return docId.includes(q) || vs.includes(q) || id.includes(q);
   });
 
-  const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
-  const paginatedSales = filteredSales.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-  const getVisiblePages = (current: number, total: number): Array<number | '...'> => {
-    if (total <= 1) return [1];
-
-    const pages = new Set<number>([1, total, current - 1, current, current + 1]);
-    const sortedPages = Array.from(pages)
-      .filter((page) => page >= 1 && page <= total)
-      .sort((a, b) => a - b);
-
-    const visible: Array<number | '...'> = [];
-    sortedPages.forEach((page, index) => {
-      const previous = sortedPages[index - 1];
-      if (index > 0 && page - previous > 1) {
-        visible.push('...');
-      }
-      visible.push(page);
-    });
-
-    return visible;
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+    pageCursorsRef.current = [];
   };
-  const visiblePages = getVisiblePages(currentPage, totalPages);
 
-  useEffect(() => {
-    if (totalPages === 0 && currentPage !== 1) {
-      setCurrentPage(1);
-      return;
+  const handlePrevPage = () => {
+    setCurrentPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage((prev) => prev + 1);
     }
-    if (totalPages > 0 && currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const handleSelectDate = (value: string) => {
-    if (!value) return;
-    const [year, month, day] = value.split('-').map(Number);
-    setSelectedDate(new Date(year, (month || 1) - 1, day || 1));
-    setRecentMode(false);
-    setRecentLimit(RECENT_PAGE_SIZE);
-    setCurrentPage(1);
   };
 
-  const handleEnableRecentMode = () => {
-    setRecentMode(true);
-    setRecentLimit(RECENT_PAGE_SIZE);
-    setCurrentPage(1);
-  };
-
-  const handleBackToToday = () => {
-    setRecentMode(false);
-    setRecentLimit(RECENT_PAGE_SIZE);
-    setSelectedDate(new Date());
-    setCurrentPage(1);
-  };
-
-  const handleLoadMoreRecent = () => {
-    setRecentLimit((prev) => prev + RECENT_PAGE_SIZE);
-  };
+  const showPagination = currentPage > 1 || hasNextPage;
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
@@ -271,61 +237,15 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           Doklady
         </h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          {recentMode
-            ? `Posledních ${filteredSales.length} dokladů`
-            : `${filteredSales.length} dokladů`}
-        </div>
-      </div>
-
-      {/* Volba období - výchozí jsou pouze dnešní doklady */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Den:</label>
-            <input
-              type="date"
-              value={format(selectedDate, 'yyyy-MM-dd')}
-              max={format(new Date(), 'yyyy-MM-dd')}
-              onChange={(e) => handleSelectDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-            />
-          </div>
-          {!recentMode && !isToday(selectedDate) && (
-            <button
-              onClick={handleBackToToday}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              Dnes
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {recentMode ? (
-            <button
-              onClick={handleBackToToday}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              Zpět na dnešek
-            </button>
-          ) : (
-            <button
-              onClick={handleEnableRecentMode}
-              className="px-3 py-2 rounded-lg text-sm font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-            >
-              Načíst starší doklady
-            </button>
-          )}
+          Strana {currentPage}
+          {filteredSales.length > 0 && ` · ${filteredSales.length} dokladů`}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         <input
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setCurrentPage(1);
-          }}
+          onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Hledat podle ID nebo čísla dokladu…"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
@@ -335,26 +255,18 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <div className="text-center py-12">
           <Receipt className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {sales.length === 0
-              ? recentMode
-                ? 'Žádné doklady'
-                : isToday(selectedDate)
-                  ? 'Dnes zatím nejsou žádné doklady'
-                  : 'V tento den nejsou žádné doklady'
-              : 'Nenalezeny žádné doklady'}
+            {sales.length === 0 ? 'Zatím nejsou žádné doklady' : 'Nenalezeny žádné doklady'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
             {sales.length === 0
-              ? recentMode
-                ? 'Po prvním prodeji se zde zobrazí doklady'
-                : 'Vyberte jiný den nebo načtěte starší doklady'
-              : 'Zkuste upravit hledaný výraz'}
+              ? 'Po prvním prodeji se zde zobrazí doklady'
+              : 'Zkuste upravit hledaný výraz na této stránce'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {paginatedSales.map((sale, index) => (
+            {filteredSales.map((sale, index) => (
               <motion.div
                 key={sale.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -453,67 +365,31 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         </div>
       )}
 
-      {totalPages > 1 && (
+      {showPagination && (
         <div className="flex items-center justify-center mt-6">
           <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-2 shadow-sm">
             <button
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
+              onClick={handlePrevPage}
+              disabled={currentPage === 1 || loading}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
               Předchozí
             </button>
 
-            <div className="hidden sm:flex items-center gap-2">
-              {visiblePages.map((item, index) =>
-                item === '...' ? (
-                  <span
-                    key={`ellipsis-${index}`}
-                    className="min-w-[2.25rem] h-9 px-2 text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center"
-                  >
-                    ...
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    onClick={() => setCurrentPage(item)}
-                    className={`min-w-[2.25rem] h-9 px-3 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === item
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-            </div>
-
-            <div className="sm:hidden px-2 text-sm font-medium text-gray-600 dark:text-gray-300">
-              Strana {currentPage} z {totalPages}
+            <div className="px-3 text-sm font-medium text-gray-600 dark:text-gray-300">
+              Strana {currentPage}
             </div>
 
             <button
-              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
+              onClick={handleNextPage}
+              disabled={!hasNextPage || loading}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
             >
               Další
               <ChevronRight className="h-4 w-4 ml-1" />
             </button>
           </div>
-        </div>
-      )}
-
-      {recentMode && hasMoreRecent && !search && (
-        <div className="flex justify-center mt-4">
-          <button
-            onClick={handleLoadMoreRecent}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
-          >
-            Načíst dalších {RECENT_PAGE_SIZE}
-          </button>
         </div>
       )}
 
