@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Sale, Store } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, deleteDoc, updateDoc, increment, Timestamp } from 'firebase/firestore';
+import { startOfDay, endOfDay, format, isToday } from 'date-fns';
 import { db } from '@/lib/firebase';
 import { generateReceiptPdfBlob } from '@/lib/pdfGenerator';
 
@@ -15,6 +16,7 @@ interface ReceiptsViewProps {
 
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const ITEMS_PER_PAGE = 12;
+  const RECENT_PAGE_SIZE = 50;
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,25 +27,42 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
+  // Výchozí pohled: pouze doklady vybraného dne (dnes). Starší data se načítají na vyžádání.
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // Režim "starší doklady": načítá posledních N dokladů napříč dny s limitem (Načíst více).
+  const [recentMode, setRecentMode] = useState(false);
+  const [recentLimit, setRecentLimit] = useState(RECENT_PAGE_SIZE);
+  // Příznak, že server vrátil přesně tolik dokladů, kolik byl limit (může existovat víc).
+  const [hasMoreRecent, setHasMoreRecent] = useState(false);
 
   useEffect(() => {
     if (!user || !storeId) return;
 
+    setLoading(true);
     const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
-    const q = query(salesRef, orderBy('createdAt', 'desc'));
+
+    const q = recentMode
+      ? query(salesRef, orderBy('createdAt', 'desc'), limit(recentLimit))
+      : query(
+          salesRef,
+          where('createdAt', '>=', Timestamp.fromDate(startOfDay(selectedDate))),
+          where('createdAt', '<=', Timestamp.fromDate(endOfDay(selectedDate))),
+          orderBy('createdAt', 'desc')
+        );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const salesData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Sale[];
-      
+
       setSales(salesData);
+      setHasMoreRecent(recentMode && snapshot.size >= recentLimit);
       setLoading(false);
     });
 
     return unsubscribe;
-  }, [user, storeId]);
+  }, [user, storeId, recentMode, recentLimit, selectedDate]);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -155,6 +174,32 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   }, [currentPage, totalPages]);
 
+  const handleSelectDate = (value: string) => {
+    if (!value) return;
+    const [year, month, day] = value.split('-').map(Number);
+    setSelectedDate(new Date(year, (month || 1) - 1, day || 1));
+    setRecentMode(false);
+    setRecentLimit(RECENT_PAGE_SIZE);
+    setCurrentPage(1);
+  };
+
+  const handleEnableRecentMode = () => {
+    setRecentMode(true);
+    setRecentLimit(RECENT_PAGE_SIZE);
+    setCurrentPage(1);
+  };
+
+  const handleBackToToday = () => {
+    setRecentMode(false);
+    setRecentLimit(RECENT_PAGE_SIZE);
+    setSelectedDate(new Date());
+    setCurrentPage(1);
+  };
+
+  const handleLoadMoreRecent = () => {
+    setRecentLimit((prev) => prev + RECENT_PAGE_SIZE);
+  };
+
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
 
@@ -226,7 +271,51 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           Doklady
         </h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          Celkem: {filteredSales.length} dokladů
+          {recentMode
+            ? `Posledních ${filteredSales.length} dokladů`
+            : `${filteredSales.length} dokladů`}
+        </div>
+      </div>
+
+      {/* Volba období - výchozí jsou pouze dnešní doklady */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Den:</label>
+            <input
+              type="date"
+              value={format(selectedDate, 'yyyy-MM-dd')}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              onChange={(e) => handleSelectDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+            />
+          </div>
+          {!recentMode && !isToday(selectedDate) && (
+            <button
+              onClick={handleBackToToday}
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Dnes
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {recentMode ? (
+            <button
+              onClick={handleBackToToday}
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Zpět na dnešek
+            </button>
+          ) : (
+            <button
+              onClick={handleEnableRecentMode}
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+            >
+              Načíst starší doklady
+            </button>
+          )}
         </div>
       </div>
 
@@ -246,10 +335,20 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <div className="text-center py-12">
           <Receipt className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {sales.length === 0 ? 'Zatím nejsou žádné doklady' : 'Nenalezeny žádné doklady'}
+            {sales.length === 0
+              ? recentMode
+                ? 'Žádné doklady'
+                : isToday(selectedDate)
+                  ? 'Dnes zatím nejsou žádné doklady'
+                  : 'V tento den nejsou žádné doklady'
+              : 'Nenalezeny žádné doklady'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            {sales.length === 0 ? 'Po prvním prodeji se zde zobrazí doklady' : 'Zkuste upravit hledaný výraz'}
+            {sales.length === 0
+              ? recentMode
+                ? 'Po prvním prodeji se zde zobrazí doklady'
+                : 'Vyberte jiný den nebo načtěte starší doklady'
+              : 'Zkuste upravit hledaný výraz'}
           </p>
         </div>
       ) : (
@@ -404,6 +503,17 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               <ChevronRight className="h-4 w-4 ml-1" />
             </button>
           </div>
+        </div>
+      )}
+
+      {recentMode && hasMoreRecent && !search && (
+        <div className="flex justify-center mt-4">
+          <button
+            onClick={handleLoadMoreRecent}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+          >
+            Načíst dalších {RECENT_PAGE_SIZE}
+          </button>
         </div>
       )}
 

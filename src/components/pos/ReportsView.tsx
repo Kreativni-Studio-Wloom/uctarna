@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
+import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from 'firebase/firestore';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import { Sale, Product } from '@/types';
 import { saleTipInCzk } from '@/lib/saleTip';
@@ -35,6 +35,8 @@ interface ReportsViewProps {
   storeId: string;
 }
 
+const TOTAL_PAGE_SIZE = 50;
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const { user, firebaseUser } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
@@ -42,6 +44,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const [loading, setLoading] = useState(true);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'month' | 'total' | 'custom'>('day');
+  const [totalHistoryRequested, setTotalHistoryRequested] = useState(false);
+  const [totalLimit, setTotalLimit] = useState(TOTAL_PAGE_SIZE);
+  const [hasMoreTotal, setHasMoreTotal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState(new Date());
   const [customEndDate, setCustomEndDate] = useState(new Date());
@@ -56,27 +61,74 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   useEffect(() => {
     if (!user || !user.uid || !storeId) return;
 
-    const salesQuery = query(
-      collection(db, 'users', user.uid, 'stores', storeId, 'sales'),
-      orderBy('createdAt', 'desc')
-    );
+    const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
+
+    // Serverové datové hranice podle vybraného období - aby se nestahovala celá historie.
+    let rangeStart: Date | null = null;
+    let rangeEnd: Date | null = null;
+    if (selectedPeriod === 'day') {
+      rangeStart = startOfDay(selectedDate);
+      rangeEnd = endOfDay(selectedDate);
+    } else if (selectedPeriod === 'month') {
+      rangeStart = startOfMonth(selectedDate);
+      rangeEnd = endOfMonth(selectedDate);
+    } else if (selectedPeriod === 'custom') {
+      rangeStart = startOfDay(customStartDate);
+      rangeEnd = endOfDay(customEndDate);
+    }
 
     const productsQuery = query(
       collection(db, 'users', user.uid, 'stores', storeId, 'products')
     );
 
-    const unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
-      const salesData: Sale[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        salesData.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-        } as Sale);
+    let unsubscribeSales: (() => void) | undefined;
+
+    if (selectedPeriod === 'custom' && customStartDate > customEndDate) {
+      setSales([]);
+    } else if (selectedPeriod === 'total') {
+      if (!totalHistoryRequested) {
+        setSales([]);
+        setHasMoreTotal(false);
+      } else {
+        const salesQuery = query(
+          salesRef,
+          orderBy('createdAt', 'desc'),
+          limit(totalLimit)
+        );
+        unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
+          const salesData: Sale[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            salesData.push({
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate() || new Date(),
+            } as Sale);
+          });
+          setSales(salesData);
+          setHasMoreTotal(snapshot.size >= totalLimit);
+        });
+      }
+    } else if (rangeStart && rangeEnd) {
+      const salesQuery = query(
+        salesRef,
+        where('createdAt', '>=', Timestamp.fromDate(rangeStart)),
+        where('createdAt', '<=', Timestamp.fromDate(rangeEnd)),
+        orderBy('createdAt', 'desc')
+      );
+      unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
+        const salesData: Sale[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          salesData.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+          } as Sale);
+        });
+        setSales(salesData);
       });
-      setSales(salesData);
-    });
+    }
 
     const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
       const productsData: Product[] = [];
@@ -94,32 +146,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     });
 
     return () => {
-      unsubscribeSales();
+      unsubscribeSales?.();
       unsubscribeProducts();
     };
-  }, [user, storeId]);
+  }, [user, storeId, selectedPeriod, selectedDate, customStartDate, customEndDate, totalHistoryRequested, totalLimit]);
 
-  const getFilteredSales = () => {
-    if (selectedPeriod === 'day') {
-      const start = startOfDay(selectedDate);
-      const end = endOfDay(selectedDate);
-      return sales.filter(sale => isWithinInterval(sale.createdAt, { start, end }));
-    } else if (selectedPeriod === 'month') {
-      const start = startOfMonth(selectedDate);
-      const end = endOfMonth(selectedDate);
-      return sales.filter(sale => isWithinInterval(sale.createdAt, { start, end }));
-    } else if (selectedPeriod === 'custom') {
-      // Validace intervalu - začátek nesmí být později než konec
-      if (customStartDate > customEndDate) {
-        return []; // Vrátit prázdný seznam místo pádu
-      }
-      const start = startOfDay(customStartDate);
-      const end = endOfDay(customEndDate);
-      return sales.filter(sale => isWithinInterval(sale.createdAt, { start, end }));
-    } else {
-      return sales; // 'total' period
+  const handlePeriodChange = (period: 'day' | 'month' | 'total' | 'custom') => {
+    if (period !== 'total') {
+      setTotalHistoryRequested(false);
+      setTotalLimit(TOTAL_PAGE_SIZE);
+      setHasMoreTotal(false);
     }
+    setSelectedPeriod(period);
   };
+
+  const handleLoadTotalHistory = () => {
+    setTotalHistoryRequested(true);
+    setTotalLimit(TOTAL_PAGE_SIZE);
+  };
+
+  const handleLoadMoreTotal = () => {
+    setTotalLimit((prev) => prev + TOTAL_PAGE_SIZE);
+  };
+
+  // Prodeje už filtruje Firestore dotaz; klient jen vrátí načtená data.
+  const getFilteredSales = () => sales;
 
   const getReportData = () => {
     const filteredSales = getFilteredSales();
@@ -701,7 +752,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-4">
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setSelectedPeriod('day')}
+              onClick={() => handlePeriodChange('day')}
               className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                 selectedPeriod === 'day'
                   ? 'bg-purple-600 text-white'
@@ -711,7 +762,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               Den
             </button>
             <button
-              onClick={() => setSelectedPeriod('month')}
+              onClick={() => handlePeriodChange('month')}
               className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                 selectedPeriod === 'month'
                   ? 'bg-purple-600 text-white'
@@ -721,7 +772,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               Měsíc
             </button>
             <button
-              onClick={() => setSelectedPeriod('custom')}
+              onClick={() => handlePeriodChange('custom')}
               className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                 selectedPeriod === 'custom'
                   ? 'bg-purple-600 text-white'
@@ -731,7 +782,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               Období
             </button>
             <button
-              onClick={() => setSelectedPeriod('total')}
+              onClick={() => handlePeriodChange('total')}
               className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
                 selectedPeriod === 'total'
                   ? 'bg-purple-600 text-white'
@@ -792,6 +843,29 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                 Neplatný interval: Datum začátku musí být před datem konce
               </span>
             </div>
+          </div>
+        )}
+        {selectedPeriod === 'total' && !totalHistoryRequested && (
+          <div className="mt-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+            <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+              Celkový přehled načte historii prodejů po dávkách. Pro rychlejší načtení použijte Den, Měsíc nebo vlastní období.
+            </p>
+            <button
+              onClick={handleLoadTotalHistory}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+            >
+              Načíst historii prodejů
+            </button>
+          </div>
+        )}
+        {selectedPeriod === 'total' && totalHistoryRequested && hasMoreTotal && (
+          <div className="mt-3 flex justify-center">
+            <button
+              onClick={handleLoadMoreTotal}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+            >
+              Načíst dalších {TOTAL_PAGE_SIZE} prodejů
+            </button>
           </div>
         )}
       </div>

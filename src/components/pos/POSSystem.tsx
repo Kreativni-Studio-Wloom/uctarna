@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,7 @@ interface POSSystemProps {
 }
 
 export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
+  const PENDING_PURCHASES_LIMIT = 20;
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -225,20 +226,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   useEffect(() => {
     if (!user || !user.uid || !storeId) return;
 
-    console.log('🔍 Loading products for store:', storeId, 'user:', user.uid);
-
     const productsQuery = query(
       collection(db, 'users', user.uid, 'stores', storeId, 'products')
     );
 
     const unsubscribe = onSnapshot(productsQuery, (snapshot) => {
       const productsData: Product[] = [];
-      console.log('📊 Snapshot size:', snapshot.size);
-      
+
       snapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('📦 Product data:', doc.id, data);
-        
+
         const product: Product = {
           id: doc.id,
           name: data.name || 'Neznámý produkt',
@@ -252,8 +249,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         
         productsData.push(product);
       });
-      
-      console.log('✅ Loaded products:', productsData.length, productsData);
+
       setProducts(productsData);
       setLoading(false);
       setError(null);
@@ -271,7 +267,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     if (!user || !user.uid || !storeId) return;
 
     const pendingQuery = query(
-      collection(db, 'users', user.uid, 'stores', storeId, 'pendingPurchases')
+      collection(db, 'users', user.uid, 'stores', storeId, 'pendingPurchases'),
+      orderBy('createdAt', 'desc'),
+      limit(PENDING_PURCHASES_LIMIT)
     );
 
     const unsubscribe = onSnapshot(pendingQuery, (snapshot) => {
@@ -279,7 +277,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        const pendingPurchase: PendingPurchase = {
+        pendingData.push({
           id: doc.id,
           items: data.items || [],
           totalAmount: data.totalAmount || 0,
@@ -289,13 +287,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           storeId: data.storeId,
           userId: data.userId,
           note: data.note,
-        };
-        pendingData.push(pendingPurchase);
+        });
       });
-      
-      // Seřadit podle data vytvoření (nejnovější první)
-      const sortedPending = pendingData.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      setPendingPurchases(sortedPending);
+
+      setPendingPurchases(pendingData);
     }, (error) => {
       console.error('❌ Error loading pending purchases:', error);
     });
