@@ -274,84 +274,56 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     };
   };
 
-  const buildEmailReportPayload = (): ReportData => {
+  const buildEmailPayload = (): EmailReportData => {
     const reportData = getReportData();
-    const productMap = new Map(products.map((p) => [p.id, p]));
-    const summaryMap = new Map<string, ProductSummaryRow>();
 
-    reportData.sales.forEach((sale) => {
-      sale.items?.forEach((item) => {
-        const key = item.productName;
-        const product = productMap.get(item.productId);
-        const itemCost = product?.cost || 0;
-        const itemProfit = (item.price - itemCost) * item.quantity;
-        const existing = summaryMap.get(key);
-
-        if (existing) {
-          existing.quantity += item.quantity;
-          existing.totalPrice += item.quantity * item.price;
-          existing.totalProfit += itemProfit;
-        } else {
-          summaryMap.set(key, {
-            productName: key,
-            quantity: item.quantity,
-            totalPrice: item.quantity * item.price,
-            price: item.price,
-            totalProfit: itemProfit,
-          });
-        }
-      });
-    });
-
-    const productSummary = Array.from(summaryMap.values()).sort(
-      (a, b) => b.totalPrice - a.totalPrice
+    return buildEmailReportData(
+      {
+        storeName: extendedUser?.stores?.find((s) => s.id === storeId)?.name || 'Neznámá prodejna',
+        period:
+          selectedPeriod === 'day'
+            ? 'Denní'
+            : selectedPeriod === 'month'
+              ? 'Měsíční'
+              : selectedPeriod === 'custom'
+                ? 'Vlastní období'
+                : 'Celková',
+        startDate:
+          selectedPeriod === 'day'
+            ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+            : selectedPeriod === 'month'
+              ? format(selectedDate, 'MMMM yyyy', { locale: cs })
+              : selectedPeriod === 'custom'
+                ? format(customStartDate, 'd.M.yyyy', { locale: cs })
+                : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
+                  ? format(extendedUser.stores.find((s) => s.id === storeId)!.createdAt, 'd.M.yyyy', { locale: cs })
+                  : 'Od založení',
+        endDate:
+          selectedPeriod === 'day'
+            ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+            : selectedPeriod === 'month'
+              ? format(selectedDate, 'MMMM yyyy', { locale: cs })
+              : selectedPeriod === 'custom'
+                ? format(customEndDate, 'd.M.yyyy', { locale: cs })
+                : format(new Date(), 'd.M.yyyy', { locale: cs }),
+      },
+      {
+        totalSales: reportData.totalSales,
+        salesInCZK: reportData.salesInCZK,
+        salesInEUR: reportData.salesInEUR,
+        cashSales: reportData.cashSales,
+        cardSales: reportData.cardSales,
+        qrSales: reportData.qrSales,
+        customerCount: reportData.customerCount,
+        totalCosts: reportData.totalCosts,
+        totalProfit: reportData.totalProfit,
+        totalDiscounts: reportData.totalDiscounts,
+        salesWithDiscount: reportData.salesWithDiscount,
+        totalTips: reportData.totalTips,
+      },
+      reportData.sales,
+      products.map((product) => ({ id: product.id, cost: product.cost }))
     );
-
-    return {
-      storeName: extendedUser?.stores?.find((s) => s.id === storeId)?.name || 'Neznámá prodejna',
-      period:
-        selectedPeriod === 'day'
-          ? 'Denní'
-          : selectedPeriod === 'month'
-            ? 'Měsíční'
-            : selectedPeriod === 'custom'
-              ? 'Vlastní období'
-              : 'Celková',
-      startDate:
-        selectedPeriod === 'day'
-          ? format(selectedDate, 'd.M.yyyy', { locale: cs })
-          : selectedPeriod === 'month'
-            ? format(selectedDate, 'MMMM yyyy', { locale: cs })
-            : selectedPeriod === 'custom'
-              ? format(customStartDate, 'd.M.yyyy', { locale: cs })
-              : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
-                ? format(extendedUser.stores.find((s) => s.id === storeId)!.createdAt, 'd.M.yyyy', { locale: cs })
-                : 'Od založení',
-      endDate:
-        selectedPeriod === 'day'
-          ? format(selectedDate, 'd.M.yyyy', { locale: cs })
-          : selectedPeriod === 'month'
-            ? format(selectedDate, 'MMMM yyyy', { locale: cs })
-            : selectedPeriod === 'custom'
-              ? format(customEndDate, 'd.M.yyyy', { locale: cs })
-              : format(new Date(), 'd.M.yyyy', { locale: cs }),
-      totalSales: reportData.totalSales,
-      salesInCZK: reportData.salesInCZK,
-      salesInEUR: reportData.salesInEUR,
-      cashSales: reportData.cashSales,
-      cardSales: reportData.cardSales,
-      qrSales: reportData.qrSales,
-      customerCount: reportData.customerCount,
-      totalCosts: reportData.totalCosts,
-      totalProfit: reportData.totalProfit,
-      totalDiscounts: reportData.totalDiscounts,
-      salesWithDiscount: reportData.salesWithDiscount,
-      totalTips: reportData.totalTips,
-      productSummary,
-      numCashSales: reportData.sales.filter((s) => s.paymentMethod === 'cash').length,
-      numCardSales: reportData.sales.filter((s) => s.paymentMethod === 'card').length,
-      numQrSales: reportData.sales.filter((s) => s.paymentMethod === 'qr').length,
-    };
   };
 
   const generatePDFReport = async (customActionName?: string) => {
@@ -373,7 +345,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         return;
       }
 
-      const emailPayload = buildEmailReportPayload();
+      const emailPayload = buildEmailPayload();
       await sendReportEmail(emailPayload, user.email || '', customActionName);
 
       // Zobraz potvrzovací modal s odpočtem a automatickým zavřením
@@ -405,7 +377,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   };
 
   const sendReportEmail = async (
-    reportData: ReportData,
+    reportData: EmailReportData,
     userEmail: string,
     customActionName?: string
   ) => {
