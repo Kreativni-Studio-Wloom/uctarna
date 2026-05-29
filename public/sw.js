@@ -1,15 +1,31 @@
-const CACHE_SHELL = 'uctarna-shell-v2';
-const CACHE_STATIC = 'uctarna-static-v2';
+const CACHE_SHELL = 'uctarna-shell-v3';
+const CACHE_STATIC = 'uctarna-static-v3';
 
 const SHELL_URLS = ['/', '/manifest.json', '/favicon.ico', '/favicon.svg', '/apple-touch-icon.png'];
 
-const FIREBASE_HOSTS = [
+/** Hosty, které service worker nikdy nesmí interceptovat (CORS / ITP). */
+const BYPASS_HOSTS = new Set([
   'firestore.googleapis.com',
-  'firebase.googleapis.com',
   'identitytoolkit.googleapis.com',
   'securetoken.googleapis.com',
+  'firebase.googleapis.com',
+  'firebaseinstallations.googleapis.com',
   'www.googleapis.com',
-];
+]);
+
+function mustBypassServiceWorker(url) {
+  const { hostname, origin } = url;
+
+  if (BYPASS_HOSTS.has(hostname)) return true;
+  if (hostname.endsWith('.googleapis.com')) return true;
+  if (hostname.endsWith('.firebaseapp.com')) return true;
+  if (hostname.endsWith('.firebasestorage.app')) return true;
+
+  // Veškerý cross-origin provoz necháme prohlížeči — SW nesmí sahat na Firebase ani jiné API.
+  if (origin !== self.location.origin) return true;
+
+  return false;
+}
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -34,13 +50,6 @@ self.addEventListener('activate', (event) => {
       .then(() => self.clients.claim())
   );
 });
-
-function shouldBypassServiceWorker(url) {
-  if (url.origin !== self.location.origin) {
-    return FIREBASE_HOSTS.some((host) => url.hostname === host || url.hostname.endsWith('.googleapis.com'));
-  }
-  return false;
-}
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
@@ -71,10 +80,11 @@ async function networkFirstNavigation(request) {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== 'GET') return;
-
   const url = new URL(request.url);
-  if (shouldBypassServiceWorker(url)) return;
+
+  if (mustBypassServiceWorker(url)) return;
+
+  if (request.method !== 'GET') return;
 
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request, CACHE_STATIC));
