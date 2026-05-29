@@ -13,31 +13,57 @@ interface ReceiptsViewProps {
   storeId: string;
 }
 
+const SEARCH_DEBOUNCE_MS = 400;
+
+const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
+  const q = queryText.toLowerCase();
+  const docId = (sale.documentId || '').toString().toLowerCase();
+  const vs = ((sale as any).variableSymbol || '').toString().toLowerCase();
+  const id = (sale.id || '').toString().toLowerCase();
+  return docId.includes(q) || vs.includes(q) || id.includes(q);
+};
+
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const ITEMS_PER_PAGE = 12;
   const { user } = useAuth();
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pageSales, setPageSales] = useState<Sale[]>([]);
+  const [allSales, setAllSales] = useState<Sale[]>([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
-  // Kurzor = poslední doklad předchozí stránky (pro startAfter u další stránky).
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
 
-  useEffect(() => {
-    if (!user || !storeId) return;
+  const isSearchMode = debouncedSearch.length > 0;
 
-    setLoading(true);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch]);
+
+  // Běžný režim: načítat vždy jen jednu stránku (12 dokladů).
+  useEffect(() => {
+    if (!user || !storeId || isSearchMode) return;
+
+    setPageLoading(true);
     const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
 
     const prevCursor = currentPage > 1 ? pageCursorsRef.current[currentPage - 2] : null;
     if (currentPage > 1 && !prevCursor) {
-      setLoading(false);
+      setPageLoading(false);
       return;
     }
 
@@ -56,7 +82,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       const hasMore = docs.length > ITEMS_PER_PAGE;
       const pageDocs = hasMore ? docs.slice(0, ITEMS_PER_PAGE) : docs;
 
-      setSales(
+      setPageSales(
         pageDocs.map((docSnap) => ({
           id: docSnap.id,
           ...docSnap.data(),
@@ -68,11 +94,36 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         pageCursorsRef.current[currentPage - 1] = pageDocs[pageDocs.length - 1];
       }
 
-      setLoading(false);
+      setPageLoading(false);
     });
 
     return unsubscribe;
-  }, [user, storeId, currentPage]);
+  }, [user, storeId, currentPage, isSearchMode]);
+
+  // Režim vyhledávání: načíst celou historii až když uživatel skutečně hledá.
+  useEffect(() => {
+    if (!user || !storeId || !isSearchMode) {
+      setAllSales([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
+    const q = query(salesRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAllSales(
+        snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        })) as Sale[]
+      );
+      setSearchLoading(false);
+    });
+
+    return unsubscribe;
+  }, [user, storeId, isSearchMode]);
 
   useEffect(() => {
     if (!user || !storeId) return;
@@ -139,19 +190,29 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
-  const filteredSales = sales.filter((sale) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    const docId = (sale.documentId || '').toString().toLowerCase();
-    const vs = ((sale as any).variableSymbol || '').toString().toLowerCase();
-    const id = (sale.id || '').toString().toLowerCase();
-    return docId.includes(q) || vs.includes(q) || id.includes(q);
-  });
+  const searchResults = isSearchMode
+    ? allSales.filter((sale) => matchesSaleSearch(sale, debouncedSearch))
+    : [];
+
+  const searchTotalPages = Math.max(1, Math.ceil(searchResults.length / ITEMS_PER_PAGE));
+  const displaySales = isSearchMode
+    ? searchResults.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
+      )
+    : pageSales;
+
+  const canGoNext = isSearchMode
+    ? currentPage < searchTotalPages
+    : hasNextPage;
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
-    setCurrentPage(1);
-    pageCursorsRef.current = [];
+    if (!value.trim()) {
+      setDebouncedSearch('');
+      setCurrentPage(1);
+      pageCursorsRef.current = [];
+    }
   };
 
   const handlePrevPage = () => {
@@ -159,12 +220,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   };
 
   const handleNextPage = () => {
-    if (hasNextPage) {
+    if (canGoNext) {
       setCurrentPage((prev) => prev + 1);
     }
   };
 
-  const showPagination = currentPage > 1 || hasNextPage;
+  const showPagination = isSearchMode
+    ? searchResults.length > ITEMS_PER_PAGE
+    : currentPage > 1 || hasNextPage;
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
@@ -222,7 +285,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
-  if (loading) {
+  if (pageLoading && !isSearchMode && pageSales.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -237,8 +300,11 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           Doklady
         </h2>
         <div className="text-sm text-gray-500 dark:text-gray-400">
-          Strana {currentPage}
-          {filteredSales.length > 0 && ` · ${filteredSales.length} dokladů`}
+          {isSearchMode
+            ? searchLoading
+              ? 'Načítám doklady pro vyhledávání…'
+              : `${searchResults.length} nalezených dokladů`
+            : `Strana ${currentPage}${displaySales.length > 0 ? ` · ${displaySales.length} dokladů` : ''}`}
         </div>
       </div>
 
@@ -246,27 +312,36 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <input
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Hledat podle ID nebo čísla dokladu…"
+          placeholder="Hledat podle ID nebo čísla dokladu (prohledá všechny doklady)…"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
       </div>
 
-      {filteredSales.length === 0 ? (
+      {searchLoading && isSearchMode ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mr-3"></div>
+          <span className="text-gray-600 dark:text-gray-400">Prohledávám všechny doklady…</span>
+        </div>
+      ) : displaySales.length === 0 ? (
         <div className="text-center py-12">
           <Receipt className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            {sales.length === 0 ? 'Zatím nejsou žádné doklady' : 'Nenalezeny žádné doklady'}
+            {isSearchMode
+              ? 'Nenalezeny žádné doklady'
+              : pageSales.length === 0
+                ? 'Zatím nejsou žádné doklady'
+                : 'Nenalezeny žádné doklady'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            {sales.length === 0
-              ? 'Po prvním prodeji se zde zobrazí doklady'
-              : 'Zkuste upravit hledaný výraz na této stránce'}
+            {isSearchMode
+              ? 'Zkuste upravit hledaný výraz'
+              : 'Po prvním prodeji se zde zobrazí doklady'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <AnimatePresence>
-            {filteredSales.map((sale, index) => (
+            {displaySales.map((sale, index) => (
               <motion.div
                 key={sale.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -370,7 +445,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-2 shadow-sm">
             <button
               onClick={handlePrevPage}
-              disabled={currentPage === 1 || loading}
+              disabled={currentPage === 1 || pageLoading || searchLoading}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
@@ -378,12 +453,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
             </button>
 
             <div className="px-3 text-sm font-medium text-gray-600 dark:text-gray-300">
-              Strana {currentPage}
+              {isSearchMode
+                ? `Strana ${currentPage} z ${searchTotalPages}`
+                : `Strana ${currentPage}`}
             </div>
 
             <button
               onClick={handleNextPage}
-              disabled={!hasNextPage || loading}
+              disabled={!canGoNext || pageLoading || searchLoading}
               className="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors flex items-center"
             >
               Další
