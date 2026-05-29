@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 
 export const runtime = 'nodejs';
 
-let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
+let transporter: Transporter | null = null;
 
 function getTransporter() {
   if (!transporter) {
