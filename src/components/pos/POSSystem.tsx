@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
@@ -111,6 +111,27 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // Firestore perzistence košíku (per uživatel a prodejna)
   const suppressNextSaveRef = useRef(false);
   const hasLoadedCartRef = useRef(false);
+  const cartPersistGenerationRef = useRef(0);
+  const cartSaveTimerRef = useRef<number | null>(null);
+
+  const clearCartState = useCallback(async () => {
+    cartPersistGenerationRef.current += 1;
+    if (cartSaveTimerRef.current !== null) {
+      window.clearTimeout(cartSaveTimerRef.current);
+      cartSaveTimerRef.current = null;
+    }
+    suppressNextSaveRef.current = true;
+    setCart([]);
+
+    if (!user?.uid || !storeId) return;
+
+    const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
+    try {
+      await deleteDoc(cartDocRef);
+    } catch (error) {
+      console.error('❌ Chyba při mazání košíku ve Firestore:', error);
+    }
+  }, [user, storeId]);
 
   // Odběr košíku z Firestore
   useEffect(() => {
@@ -136,21 +157,51 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     return unsubscribe;
   }, [user, storeId]);
 
-  // Posluchač pro zprávy o úspěšné platbě kartou
+  // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
-    const handlePaymentSuccess = (event: MessageEvent) => {
-      if (event.data?.type === 'PAYMENT_SUCCESS') {
-        // Vyčistit košík, zavřít modal a resetovat slevu
-        setCart([]);
-        setShowCheckout(false);
-        setDiscount(null);
-        console.log('✅ Úspěšná platba kartou - košík vyčištěn');
+    const handlePaymentSuccess = () => {
+      void clearCartState();
+      setShowCheckout(false);
+      setDiscount(null);
+      console.log('✅ Úspěšná platba – košík vyčištěn');
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
+    };
+
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('uctarna_payments');
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
+      };
+    } catch {
+      /* BroadcastChannel nemusí být k dispozici */
+    }
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'uctarna_payment_result' || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        if (data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
+      } catch {
+        /* ignore */
       }
     };
 
-    window.addEventListener('message', handlePaymentSuccess);
-    return () => window.removeEventListener('message', handlePaymentSuccess);
-  }, []);
+    window.addEventListener('message', onMessage);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      window.removeEventListener('storage', onStorage);
+      try {
+        bc?.close();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [clearCartState]);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
@@ -175,8 +226,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
       await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'pendingPurchases'), pendingPurchase);
       
-      // Vyčistit košík a slevu
-      setCart([]);
+      await clearCartState();
       setDiscount(null);
       setShowMenu(false);
       
@@ -219,13 +269,28 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       return;
     }
 
-    const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
-    const timer = window.setTimeout(async () => {
+    if (cartSaveTimerRef.current !== null) {
+      window.clearTimeout(cartSaveTimerRef.current);
+      cartSaveTimerRef.current = null;
+    }
+
+    const itemsToSave = cart;
+    const generationAtSchedule = cartPersistGenerationRef.current;
+
+    cartSaveTimerRef.current = window.setTimeout(async () => {
+      cartSaveTimerRef.current = null;
+      if (generationAtSchedule !== cartPersistGenerationRef.current) return;
+
+      const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
       try {
+        if (itemsToSave.length === 0) {
+          await deleteDoc(cartDocRef);
+          return;
+        }
         await setDoc(
           cartDocRef,
           {
-            items: cart,
+            items: itemsToSave,
             updatedAt: serverTimestamp(),
           },
           { merge: true }
@@ -235,7 +300,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       }
     }, CART_SAVE_DEBOUNCE_MS);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (cartSaveTimerRef.current !== null) {
+        window.clearTimeout(cartSaveTimerRef.current);
+        cartSaveTimerRef.current = null;
+      }
+    };
   }, [cart, user, storeId]);
 
   // --- konec perzistence košíku ---
@@ -1166,7 +1236,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             discountAmount={discountAmount}
             finalAmount={finalAmount}
             onSuccess={() => {
-              setCart([]);
+              void clearCartState();
               setShowCheckout(false);
               setDiscount(null); // Reset slevy po úspěšném prodeji
             }}
