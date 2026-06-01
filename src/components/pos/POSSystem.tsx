@@ -69,7 +69,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
-  const highlightTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightProductIdRef = useRef<string | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
