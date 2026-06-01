@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
@@ -72,6 +72,31 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
+  const cartColumnRef = useRef<HTMLDivElement | null>(null);
+  const cartColumnHeightRef = useRef<number | null>(null);
+
+  /** Na mobilu dorovná scroll, když košík nahoře změní výšku — produkty zůstanou na místě */
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!window.matchMedia('(max-width: 1023px)').matches) return;
+
+    const column = cartColumnRef.current;
+    if (!column) return;
+
+    const newHeight = column.offsetHeight;
+    const prevHeight = cartColumnHeightRef.current;
+    cartColumnHeightRef.current = newHeight;
+    if (prevHeight === null) return;
+
+    const delta = newHeight - prevHeight;
+    if (delta === 0) return;
+
+    const scrollRoot =
+      document.getElementById('__next') ?? document.documentElement;
+    if (scrollRoot.scrollTop <= 0) return;
+
+    scrollRoot.scrollTop += delta;
+  }, [cart, discount, isReturnMode]);
 
   // Funkce pro normalizaci diakritiky
   const normalizeText = (text: string): string => {
@@ -654,8 +679,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
-        {/* Košík: na mobilu dole (order-2), aby přidání položky neposouvalo produkty */}
-        <div className="order-2 lg:order-2 space-y-3 md:space-y-4 [overflow-anchor:none]">
+        {/* Right Column - Cart (na mobilu nahoře, na desktopu vpravo) */}
+        <div
+          ref={cartColumnRef}
+          className="lg:order-2 space-y-3 md:space-y-4 [overflow-anchor:none]"
+        >
           {/* Cart Header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm md:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">
@@ -838,8 +866,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           </motion.button>
         </div>
 
-        {/* Produkty: na mobilu nahoře (order-1), na desktopu vlevo */}
-        <div className="order-1 lg:col-span-2 lg:order-1 space-y-3 md:space-y-4 lg:space-y-6">
+        {/* Left Column - Products (na mobilu dole, na desktopu vlevo) */}
+        <div className="lg:col-span-2 lg:order-1 space-y-3 md:space-y-4 lg:space-y-6">
           {/* Search */}
           <div className="relative" ref={searchContainerRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
