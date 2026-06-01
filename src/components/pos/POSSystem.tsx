@@ -113,9 +113,37 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const hasLoadedCartRef = useRef(false);
   const cartPersistGenerationRef = useRef(0);
   const cartSaveTimerRef = useRef<number | null>(null);
+  const skipCartSnapshotRef = useRef(false);
+
+  const persistCartToFirestore = useCallback(
+    async (items: CartItem[], generationAtCall?: number) => {
+      if (!user?.uid || !storeId) return;
+      if (
+        generationAtCall !== undefined &&
+        generationAtCall !== cartPersistGenerationRef.current
+      ) {
+        return;
+      }
+
+      const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
+      if (items.length === 0) {
+        await deleteDoc(cartDocRef);
+        return;
+      }
+      await setDoc(
+        cartDocRef,
+        {
+          items,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    },
+    [user, storeId]
+  );
 
   const clearCartState = useCallback(async () => {
-    cartPersistGenerationRef.current += 1;
+    const generationAtClear = ++cartPersistGenerationRef.current;
     if (cartSaveTimerRef.current !== null) {
       window.clearTimeout(cartSaveTimerRef.current);
       cartSaveTimerRef.current = null;
@@ -125,13 +153,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
     if (!user?.uid || !storeId) return;
 
-    const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
     try {
-      await deleteDoc(cartDocRef);
+      await persistCartToFirestore([], generationAtClear);
     } catch (error) {
       console.error('❌ Chyba při mazání košíku ve Firestore:', error);
     }
-  }, [user, storeId]);
+  }, [user, storeId, persistCartToFirestore]);
 
   // Odběr košíku z Firestore
   useEffect(() => {
@@ -139,6 +166,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
     const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
     const unsubscribe = onSnapshot(cartDocRef, (snapshot) => {
+      if (skipCartSnapshotRef.current) return;
+
       if (snapshot.exists()) {
         const data: any = snapshot.data();
         const items: CartItem[] = Array.isArray(data.items) ? data.items : [];
@@ -238,12 +267,34 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   // Funkce pro obnovení odloženého nákupu
   const restorePendingPurchase = async (pendingPurchase: PendingPurchase) => {
-    setCart(pendingPurchase.items);
+    const items = Array.isArray(pendingPurchase.items) ? pendingPurchase.items : [];
+    if (items.length === 0) {
+      console.warn('⚠️ Odložený nákup nemá položky, obnovení přeskočeno');
+      return;
+    }
+
+    cartPersistGenerationRef.current += 1;
+    if (cartSaveTimerRef.current !== null) {
+      window.clearTimeout(cartSaveTimerRef.current);
+      cartSaveTimerRef.current = null;
+    }
+
+    skipCartSnapshotRef.current = true;
+    setCart(items);
     setDiscount(pendingPurchase.discount || null);
-    
-    // Automaticky smazat z uložených nákupů
-    await deletePendingPurchase(pendingPurchase.id);
-    
+
+    try {
+      await persistCartToFirestore(items);
+      await deletePendingPurchase(pendingPurchase.id);
+      // Druhý zápis – starý deleteDoc z clearCartState mohl proběhnout až po prvním setDoc
+      await persistCartToFirestore(items);
+      suppressNextSaveRef.current = true;
+    } catch (error) {
+      console.error('❌ Chyba při obnovení odloženého nákupu:', error);
+    } finally {
+      skipCartSnapshotRef.current = false;
+    }
+
     console.log('✅ Nákup obnoven a smazán z uložených:', pendingPurchase);
   };
 
@@ -281,20 +332,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       cartSaveTimerRef.current = null;
       if (generationAtSchedule !== cartPersistGenerationRef.current) return;
 
-      const cartDocRef = doc(db, 'users', user.uid, 'stores', storeId, 'state', 'cart');
       try {
-        if (itemsToSave.length === 0) {
-          await deleteDoc(cartDocRef);
-          return;
-        }
-        await setDoc(
-          cartDocRef,
-          {
-            items: itemsToSave,
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
+        await persistCartToFirestore(itemsToSave, generationAtSchedule);
       } catch (error) {
         console.error('❌ Chyba při ukládání košíku do Firestore:', error);
       }
@@ -306,7 +345,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         cartSaveTimerRef.current = null;
       }
     };
-  }, [cart, user, storeId]);
+  }, [cart, user, storeId, persistCartToFirestore]);
 
   // --- konec perzistence košíku ---
 
