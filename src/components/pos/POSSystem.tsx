@@ -31,6 +31,14 @@ const SelectExtrasModal = dynamic(
 
 const CART_SAVE_DEBOUNCE_MS = 400;
 
+/** Stabilní obrys bez ring-offset — na mobilu neposouvá layout při highlightu */
+const productPickButtonClass = (isHighlighted: boolean) =>
+  `ring-2 ring-inset touch-target transition-colors duration-200 ${
+    isHighlighted
+      ? 'ring-purple-500 bg-purple-50 dark:bg-purple-900/10'
+      : 'ring-transparent'
+  }`;
+
 interface POSSystemProps {
   storeId: string;
   storeName: string;
@@ -646,8 +654,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4 lg:gap-6">
-        {/* Right Column - Cart (na mobilu nahoře, na desktopu vpravo) */}
-        <div className="lg:order-2 space-y-3 md:space-y-4">
+        {/* Košík: na mobilu dole (order-2), aby přidání položky neposouvalo produkty */}
+        <div className="order-2 lg:order-2 space-y-3 md:space-y-4 [overflow-anchor:none]">
           {/* Cart Header */}
           <div className="flex items-center justify-between">
             <h3 className="text-sm md:text-base lg:text-lg font-semibold text-gray-900 dark:text-white">
@@ -830,8 +838,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           </motion.button>
         </div>
 
-        {/* Left Column - Products (na mobilu dole, na desktopu vlevo) */}
-        <div className="lg:col-span-2 lg:order-1 space-y-3 md:space-y-4 lg:space-y-6">
+        {/* Produkty: na mobilu nahoře (order-1), na desktopu vlevo */}
+        <div className="order-1 lg:col-span-2 lg:order-1 space-y-3 md:space-y-4 lg:space-y-6">
           {/* Search */}
           <div className="relative" ref={searchContainerRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -883,15 +891,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         return (
                           <motion.button
                             key={product.id}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onTouchStart={(e) => e.preventDefault()}
+                            type="button"
                             onPointerUp={() => {
                               addToCart(product);
                               // nech vyhledávač otevřený; zavře se kliknutím mimo
                             }}
-                            className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all duration-200 text-left group touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
+                            className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
@@ -1009,10 +1014,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   return (
                     <motion.button
                       key={product.id}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      type="button"
                       onPointerUp={() => addToCart(product)}
-                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                         {product.name}
@@ -1039,10 +1043,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   return (
                     <motion.button
                       key={product.id}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      type="button"
                       onPointerUp={() => addToCart(product)}
-                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left touch-target ${isHighlighted ? 'ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''}`}
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                         {product.name}

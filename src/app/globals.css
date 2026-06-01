@@ -63,6 +63,7 @@ body {
     overflow-y: visible; /* Povolení scrollování */
     height: auto;
     min-height: 100vh;
+    overflow-anchor: none; /* Košík dole neruší scroll při přidání položky */
   }
   
   /* Povolení scrollování pro obsah prodejny */
