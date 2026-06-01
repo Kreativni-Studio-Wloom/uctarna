@@ -30,6 +30,9 @@ const SelectExtrasModal = dynamic(
 );
 
 const CART_SAVE_DEBOUNCE_MS = 400;
+/** Mezera mezi přidáními stejného produktu – po delší pauze začíná badge znovu od 1× */
+const CART_ADD_BURST_GAP_MS = 900;
+const CART_ADD_HIGHLIGHT_MS = 500;
 
 /** Stabilní obrys bez ring-offset — na mobilu neposouvá layout při highlightu */
 const productPickButtonClass = (isHighlighted: boolean) =>
@@ -46,6 +49,7 @@ const ProductAddedBadge: React.FC<{ count: number; positionClassName?: string }>
   positionClassName = 'top-1.5 right-1.5',
 }) => (
   <motion.span
+    key={count}
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.15, ease: 'easeOut' }}
@@ -88,6 +92,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
+  const addBurstRef = useRef<Map<string, { count: number; lastAt: number }>>(new Map());
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -510,9 +515,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   const markProductAddedForHighlight = (prevCart: CartItem[], nextCart: CartItem[], productId: string) => {
     const delta = getMainLineQuantity(nextCart, productId) - getMainLineQuantity(prevCart, productId);
-    if (delta !== 0) {
-      pendingHighlightRef.current = { productId, count: Math.abs(delta) };
-    }
+    if (delta === 0) return;
+
+    const addedNow = Math.abs(delta);
+    const now = Date.now();
+    const prevBurst = addBurstRef.current.get(productId);
+    const burstCount =
+      prevBurst && now - prevBurst.lastAt <= CART_ADD_BURST_GAP_MS
+        ? prevBurst.count + addedNow
+        : addedNow;
+
+    addBurstRef.current.set(productId, { count: burstCount, lastAt: now });
+    pendingHighlightRef.current = { productId, count: burstCount };
   };
 
   const flashProductAdded = (productId: string, count: number) => {
@@ -523,7 +537,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     highlightTimerRef.current = window.setTimeout(() => {
       setAddedHighlight((current) => (current?.productId === productId ? null : current));
       highlightTimerRef.current = null;
-    }, 400);
+      addBurstRef.current.delete(productId);
+    }, CART_ADD_HIGHLIGHT_MS);
   };
 
   useLayoutEffect(() => {
