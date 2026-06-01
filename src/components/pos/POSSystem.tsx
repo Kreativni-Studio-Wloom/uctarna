@@ -69,6 +69,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingHighlightProductIdRef = useRef<string | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -375,57 +377,103 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     return 'itm_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
   };
 
+  const getMainLineQuantity = (items: CartItem[], productId: string): number =>
+    items
+      .filter((item) => item.productId === productId && !item.parentItemId)
+      .reduce((sum, item) => sum + item.quantity, 0);
+
+  const markProductAddedForHighlight = (prevCart: CartItem[], nextCart: CartItem[], productId: string) => {
+    if (getMainLineQuantity(prevCart, productId) !== getMainLineQuantity(nextCart, productId)) {
+      pendingHighlightProductIdRef.current = productId;
+    }
+  };
+
+  const flashProductAdded = (productId: string) => {
+    setAddedHighlightId(productId);
+    if (highlightTimerRef.current !== null) {
+      window.clearTimeout(highlightTimerRef.current);
+    }
+    highlightTimerRef.current = window.setTimeout(() => {
+      setAddedHighlightId((current) => (current === productId ? null : current));
+      highlightTimerRef.current = null;
+    }, 400);
+  };
+
+  useLayoutEffect(() => {
+    const productId = pendingHighlightProductIdRef.current;
+    if (!productId) return;
+    pendingHighlightProductIdRef.current = null;
+    if (getMainLineQuantity(cart, productId) === 0) return;
+    flashProductAdded(productId);
+  }, [cart]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current !== null) {
+        window.clearTimeout(highlightTimerRef.current);
+      }
+    };
+  }, []);
+
   // Funkce pro přidání produktu (normální nebo vratka)
   const addToCart = (product: Product) => {
     if (isReturnMode) {
-      // Vratka - produkt se přidá s negativním množstvím
-      setCart(prevCart => {
-        const existingItem = prevCart.find(item => item.productId === product.id);
+      setCart((prevCart) => {
+        const existingItem = prevCart.find((item) => item.productId === product.id);
+        let nextCart: CartItem[];
         if (existingItem) {
-          return prevCart.map(item =>
+          nextCart = prevCart.map((item) =>
             item.productId === product.id
               ? { ...item, quantity: item.quantity - 1 }
               : item
           );
         } else {
-          return [...prevCart, {
-            itemId: generateItemId(),
-            productId: product.id,
-            productName: product.name,
-            price: product.price,
-            quantity: -1,
-            parentItemId: null,
-          }];
+          nextCart = [
+            ...prevCart,
+            {
+              itemId: generateItemId(),
+              productId: product.id,
+              productName: product.name,
+              price: product.price,
+              quantity: -1,
+              parentItemId: null,
+            },
+          ];
         }
+        markProductAddedForHighlight(prevCart, nextCart, product.id);
+        return nextCart;
       });
-      setIsReturnMode(false); // Deaktivuje režim vratky
-    } else {
-      // Normální přidání produktu
-    setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.productId === product.id && !item.parentItemId);
+      setIsReturnMode(false);
+      return;
+    }
+
+    setCart((prevCart) => {
+      const existingItem = prevCart.find(
+        (item) => item.productId === product.id && !item.parentItemId
+      );
+      let nextCart: CartItem[];
       if (existingItem) {
-        return prevCart.map(item =>
-          item.productId === product.id
+        nextCart = prevCart.map((item) =>
+          item.productId === product.id && !item.parentItemId
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       } else {
-        return [...prevCart, {
-          itemId: generateItemId(),
-          productId: product.id,
-          productName: product.name,
-          price: product.price,
-          quantity: 1,
-          parentItemId: null,
-        }];
+        nextCart = [
+          ...prevCart,
+          {
+            itemId: generateItemId(),
+            productId: product.id,
+            productName: product.name,
+            price: product.price,
+            quantity: 1,
+            parentItemId: null,
+          },
+        ];
       }
+      markProductAddedForHighlight(prevCart, nextCart, product.id);
+      return nextCart;
     });
-    }
-    // Trigger mini highlight animation on clicked product
-    setAddedHighlightId(product.id);
-    window.setTimeout(() => {
-      setAddedHighlightId((current) => (current === product.id ? null : current));
-    }, 400);
   };
 
   const removeItemByItemId = (itemId: string) => {
@@ -920,10 +968,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           <motion.button
                             key={product.id}
                             type="button"
-                            onPointerUp={() => {
-                              addToCart(product);
-                              // nech vyhledávač otevřený; zavře se kliknutím mimo
-                            }}
+                            onClick={() => addToCart(product)}
                             className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
                         >
                           <div className="flex items-center justify-between">
@@ -1043,7 +1088,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                     <motion.button
                       key={product.id}
                       type="button"
-                      onPointerUp={() => addToCart(product)}
+                      onClick={() => addToCart(product)}
                       className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
@@ -1072,7 +1117,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                     <motion.button
                       key={product.id}
                       type="button"
-                      onPointerUp={() => addToCart(product)}
+                      onClick={() => addToCart(product)}
                       className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
