@@ -33,11 +33,28 @@ const CART_SAVE_DEBOUNCE_MS = 400;
 
 /** Stabilní obrys bez ring-offset — na mobilu neposouvá layout při highlightu */
 const productPickButtonClass = (isHighlighted: boolean) =>
-  `ring-2 ring-inset touch-target transition-colors duration-200 ${
+  `relative overflow-visible ring-2 ring-inset touch-target transition-colors duration-200 ${
     isHighlighted
       ? 'ring-purple-500 bg-purple-50 dark:bg-purple-900/10'
       : 'ring-transparent'
   }`;
+
+type AddedProductHighlight = { productId: string; count: number };
+
+const ProductAddedBadge: React.FC<{ count: number; positionClassName?: string }> = ({
+  count,
+  positionClassName = 'top-1.5 right-1.5',
+}) => (
+  <motion.span
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.15, ease: 'easeOut' }}
+    className={`pointer-events-none absolute z-10 rounded-md bg-purple-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-tight text-white shadow-sm ring-1 ring-purple-400/30 dark:bg-purple-500 dark:ring-purple-300/20 ${positionClassName}`}
+    aria-hidden
+  >
+    {count}×
+  </motion.span>
+);
 
 interface POSSystemProps {
   storeId: string;
@@ -68,9 +85,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [pinnedSearchTerm, setPinnedSearchTerm] = useState('');
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
-  const [addedHighlightId, setAddedHighlightId] = useState<string | null>(null);
+  const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
-  const pendingHighlightProductIdRef = useRef<string | null>(null);
+  const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -492,28 +509,29 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       .reduce((sum, item) => sum + item.quantity, 0);
 
   const markProductAddedForHighlight = (prevCart: CartItem[], nextCart: CartItem[], productId: string) => {
-    if (getMainLineQuantity(prevCart, productId) !== getMainLineQuantity(nextCart, productId)) {
-      pendingHighlightProductIdRef.current = productId;
+    const delta = getMainLineQuantity(nextCart, productId) - getMainLineQuantity(prevCart, productId);
+    if (delta !== 0) {
+      pendingHighlightRef.current = { productId, count: Math.abs(delta) };
     }
   };
 
-  const flashProductAdded = (productId: string) => {
-    setAddedHighlightId(productId);
+  const flashProductAdded = (productId: string, count: number) => {
+    setAddedHighlight({ productId, count });
     if (highlightTimerRef.current !== null) {
       window.clearTimeout(highlightTimerRef.current);
     }
     highlightTimerRef.current = window.setTimeout(() => {
-      setAddedHighlightId((current) => (current === productId ? null : current));
+      setAddedHighlight((current) => (current?.productId === productId ? null : current));
       highlightTimerRef.current = null;
     }, 400);
   };
 
   useLayoutEffect(() => {
-    const productId = pendingHighlightProductIdRef.current;
-    if (!productId) return;
-    pendingHighlightProductIdRef.current = null;
-    if (getMainLineQuantity(cart, productId) === 0) return;
-    flashProductAdded(productId);
+    const pending = pendingHighlightRef.current;
+    if (!pending) return;
+    pendingHighlightRef.current = null;
+    if (getMainLineQuantity(cart, pending.productId) === 0) return;
+    flashProductAdded(pending.productId, pending.count);
   }, [cart]);
 
   useEffect(() => {
@@ -1072,7 +1090,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   ) : (
                     <div className="grid grid-cols-1 gap-2">
                       {filteredProducts.map((product) => {
-                        const isHighlighted = addedHighlightId === product.id;
+                        const isHighlighted = addedHighlight?.productId === product.id;
                         return (
                           <motion.button
                             key={product.id}
@@ -1080,6 +1098,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             onClick={() => addToCart(product)}
                             className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
                         >
+                          {isHighlighted && addedHighlight && (
+                            <ProductAddedBadge count={addedHighlight.count} positionClassName="top-1.5 left-1.5" />
+                          )}
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-gray-900 dark:text-white text-sm truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
@@ -1192,7 +1213,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {pinnedProducts.map((product) => {
-                  const isHighlighted = addedHighlightId === product.id;
+                  const isHighlighted = addedHighlight?.productId === product.id;
                   return (
                     <motion.button
                       key={product.id}
@@ -1200,6 +1221,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       onClick={() => addToCart(product)}
                       className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
+                      {isHighlighted && addedHighlight && (
+                        <ProductAddedBadge count={addedHighlight.count} />
+                      )}
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                         {product.name}
                       </h4>
@@ -1221,7 +1245,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {topSellingProducts.map((product) => {
-                  const isHighlighted = addedHighlightId === product.id;
+                  const isHighlighted = addedHighlight?.productId === product.id;
                   return (
                     <motion.button
                       key={product.id}
@@ -1229,6 +1253,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       onClick={() => addToCart(product)}
                       className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
+                      {isHighlighted && addedHighlight && (
+                        <ProductAddedBadge count={addedHighlight.count} />
+                      )}
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                         {product.name}
                       </h4>
