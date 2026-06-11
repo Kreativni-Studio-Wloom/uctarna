@@ -2,232 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Uctarna Premium — design tokens ─── */
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --background: #ffffff;
+  --foreground: #171717;
+}
 
-  --color-surface: #FAFAFA;
-  --color-surface-elevated: #FFFFFF;
-  --color-surface-glass: rgba(255, 255, 255, 0.72);
-  --color-surface-muted: #F4F4F5;
-
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #64748B;
-  --color-text-tertiary: #94A3B8;
-
-  --color-accent: #6366F1;
-  --color-accent-muted: #EEF2FF;
-  --color-accent-foreground: #FFFFFF;
-
-  --color-success: #10B981;
-  --color-success-muted: #D1FAE5;
-  --color-danger: #EF4444;
-  --color-danger-muted: #FEE2E2;
-
-  --color-border: rgba(15, 23, 42, 0.08);
-  --color-border-subtle: rgba(15, 23, 42, 0.04);
-
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.06);
-  --shadow-elevated: 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-glass: 0 4px 24px rgba(0, 0, 0, 0.06), 0 1px 0 rgba(255, 255, 255, 0.5) inset;
-
-  --backdrop-overlay: rgba(0, 0, 0, 0.2);
-
-  /* Zpětná kompatibilita */
-  --background: var(--color-surface-elevated);
-  --foreground: var(--color-text-primary);
-
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-surface: #0C0C0E;
-    --color-surface-elevated: #161618;
-    --color-surface-glass: rgba(22, 22, 24, 0.85);
-    --color-surface-muted: #1C1C1F;
-
-    --color-text-primary: #F8FAFC;
-    --color-text-secondary: #94A3B8;
-    --color-text-tertiary: #64748B;
-
-    --color-accent: #818CF8;
-    --color-accent-muted: #1E1B4B;
-    --color-accent-foreground: #FFFFFF;
-
-    --color-success: #34D399;
-    --color-success-muted: #064E3B;
-    --color-danger: #F87171;
-    --color-danger-muted: #450A0A;
-
-    --color-border: rgba(248, 250, 252, 0.08);
-    --color-border-subtle: rgba(248, 250, 252, 0.04);
-
-    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.24);
-    --shadow-elevated: 0 2px 4px rgba(0, 0, 0, 0.24), 0 8px 32px rgba(0, 0, 0, 0.32);
-    --shadow-glass: 0 4px 24px rgba(0, 0, 0, 0.32), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
-
-    --backdrop-overlay: rgba(0, 0, 0, 0.5);
-
-    --background: var(--color-surface);
-    --foreground: var(--color-text-primary);
+    --background: #0a0a0a;
+    --foreground: #ededed;
   }
 }
 
-@layer base {
-  html {
-    height: 100%;
-    width: 100%;
-    -webkit-text-size-adjust: 100%;
-    -ms-text-size-adjust: 100%;
-  }
-
-  body {
-    height: 100%;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    color: var(--color-text-primary);
-    background-color: var(--color-surface);
-    letter-spacing: -0.011em;
-  }
-
-  h1, h2, h3, h4 {
-    letter-spacing: -0.02em;
-  }
+/* Mobile optimization */
+html {
+  height: 100%;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
 }
 
-@layer components {
-  /* Sklo — header, bottom bar, floating panely */
-  .glass-panel {
-    @apply bg-surface-glass backdrop-blur-glass border border-border shadow-glass;
-  }
-
-  .glass-panel-strong {
-    @apply bg-surface-glass backdrop-blur-xl border border-border shadow-elevated;
-  }
-
-  /* Karty */
-  .card-elevated {
-    @apply bg-surface-elevated rounded-2xl border border-border shadow-soft;
-  }
-
-  .card-interactive {
-    @apply card-elevated transition-shadow duration-200;
-  }
-
-  @media (hover: hover) {
-    .card-interactive:hover {
-      @apply shadow-elevated;
-    }
-  }
-
-  /* Tlačítka */
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5
-      text-sm font-semibold text-brand-foreground shadow-soft
-      transition-colors duration-150
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/40 focus-visible:ring-offset-2
-      disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-surface-muted px-4 py-2.5
-      text-sm font-semibold text-ink-primary border border-border
-      transition-colors duration-150
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/30 focus-visible:ring-offset-2
-      disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-      text-sm font-medium text-ink-secondary
-      transition-colors duration-150
-      hover:bg-surface-muted hover:text-ink-primary
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/30
-      disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-danger px-4 py-2.5
-      text-sm font-semibold text-white shadow-soft
-      transition-colors duration-150
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40 focus-visible:ring-offset-2
-      disabled:pointer-events-none disabled:opacity-50;
-  }
-
-  /* Inputy */
-  .input-field {
-    @apply w-full rounded-xl border border-border bg-surface-elevated px-4 py-3
-      text-base text-ink-primary placeholder:text-ink-tertiary
-      transition-colors duration-150
-      focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20;
-  }
-
-  /* Ceny — tabular nums */
-  .price-display {
-    @apply font-semibold tabular-nums tracking-tight text-ink-primary;
-  }
-
-  /* Bottom sheet handle (iOS) */
-  .sheet-handle {
-    @apply mx-auto mb-3 h-1 w-10 rounded-full bg-border;
-  }
-
-  /* Skeleton shimmer */
-  .skeleton {
-    @apply relative overflow-hidden rounded-xl bg-surface-muted;
-  }
-
-  .skeleton::after {
-    content: '';
-    @apply absolute inset-0 animate-shimmer;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.35) 50%,
-      transparent 100%
-    );
-    background-size: 200% 100%;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .skeleton::after {
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.06) 50%,
-        transparent 100%
-      );
-      background-size: 200% 100%;
-    }
-  }
-}
-
-@layer utilities {
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  .safe-bottom {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  }
-
-  .safe-top {
-    padding-top: max(0px, env(safe-area-inset-top));
-  }
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--foreground);
+  background-color: var(--background);
 }
 
 #__next {
@@ -240,18 +53,20 @@
 /* Povolení scrollování na mobilních zařízeních */
 @media (max-width: 768px) {
   #__next {
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    overflow-y: auto; /* Vertikální scrollování */
+    overflow-x: hidden; /* Horizontální scrollování zakázáno */
+    -webkit-overflow-scrolling: touch; /* Smooth scrollování na iOS */
   }
-
+  
+  /* Povolení scrollování pro prodejní systém */
   .pos-system {
-    overflow-y: visible;
+    overflow-y: visible; /* Povolení scrollování */
     height: auto;
     min-height: 100vh;
-    overflow-anchor: none;
+    overflow-anchor: none; /* Košík dole neruší scroll při přidání položky */
   }
-
+  
+  /* Povolení scrollování pro obsah prodejny */
   .store-content {
     overflow-y: visible;
     height: auto;
@@ -274,6 +89,7 @@ input, textarea, select {
   user-select: none;
 }
 
+/* Allow text selection in inputs and textareas */
 input, textarea, [contenteditable] {
   -webkit-user-select: text;
   -moz-user-select: text;
@@ -281,6 +97,7 @@ input, textarea, [contenteditable] {
   user-select: text;
 }
 
+/* Touch-friendly buttons */
 button, [role="button"], .clickable {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -289,16 +106,19 @@ button, [role="button"], .clickable {
   min-width: 44px;
 }
 
+/* Prevent double-tap zoom */
 * {
   touch-action: manipulation;
 }
 
+/* Improve touch responsiveness */
 @media (hover: none) and (pointer: coarse) {
   button, [role="button"], .clickable {
     min-height: 48px;
     min-width: 48px;
   }
-
+  
+  /* Larger touch targets for mobile */
   .touch-target {
     min-height: 48px;
     min-width: 48px;
@@ -306,6 +126,7 @@ button, [role="button"], .clickable {
   }
 }
 
+/* Support for safe areas */
 @supports (padding: max(0px)) {
   body {
     padding-left: max(0px, env(safe-area-inset-left));
@@ -315,20 +136,21 @@ button, [role="button"], .clickable {
   }
 }
 
+/* Custom scrollbar styles */
 .overflow-x-auto {
   overflow-x: auto;
 }
 
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;
+  display: none;  /* Safari and Chrome */
 }
 
-/* Global dark-mode overrides for Tailwind text grays — zpětná kompatibilita */
+/* Global dark-mode overrides for Tailwind text grays to ensure readability */
 @media (prefers-color-scheme: dark) {
   .dark .text-gray-900 { color: #e5e7eb !important; }
   .dark .text-gray-800 { color: #e5e7eb !important; }
