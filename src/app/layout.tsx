@@ -4,7 +4,11 @@ import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin', 'latin-ext'],
+  variable: '--font-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Účtárna - Profesionální prodejní systém',
@@ -41,7 +45,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="format-detection" content="telephone=no" />
       </head>
-      <body className={`${inter.className} h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200`}>
+      <body
+        className={`${inter.variable} ${inter.className} font-sans h-full bg-surface text-ink-primary antialiased transition-colors duration-200`}
+      >
         <AuthProvider>
           <ServiceWorkerRegister />
           {children}
