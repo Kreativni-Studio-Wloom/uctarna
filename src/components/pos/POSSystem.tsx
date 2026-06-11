@@ -136,6 +136,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const cartPersistGenerationRef = useRef(0);
   const cartSaveTimerRef = useRef<number | null>(null);
   const skipCartSnapshotRef = useRef(false);
+  /** Každá lokální změna košíku; snapshot z Firestore nesmí přepsat novější stav. */
+  const cartRevisionRef = useRef(0);
+  const lastSavedRevisionRef = useRef(0);
+
+  const bumpCartRevision = () => {
+    cartRevisionRef.current += 1;
+  };
 
   const persistCartToFirestore = useCallback(
     async (items: CartItem[], generationAtCall?: number) => {
@@ -166,6 +173,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   const clearCartState = useCallback(async () => {
     const generationAtClear = ++cartPersistGenerationRef.current;
+    const revisionAtClear = ++cartRevisionRef.current;
     if (cartSaveTimerRef.current !== null) {
       window.clearTimeout(cartSaveTimerRef.current);
       cartSaveTimerRef.current = null;
@@ -177,6 +185,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
     try {
       await persistCartToFirestore([], generationAtClear);
+      if (revisionAtClear === cartRevisionRef.current) {
+        lastSavedRevisionRef.current = revisionAtClear;
+      }
     } catch (error) {
       console.error('❌ Chyba při mazání košíku ve Firestore:', error);
     }
@@ -190,16 +201,24 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     const unsubscribe = onSnapshot(cartDocRef, (snapshot) => {
       if (skipCartSnapshotRef.current) return;
 
-      if (snapshot.exists()) {
-        const data: any = snapshot.data();
-        const items: CartItem[] = Array.isArray(data.items) ? data.items : [];
+      const data = snapshot.data();
+      const items: CartItem[] =
+        snapshot.exists() && data && Array.isArray(data.items) ? data.items : [];
+
+      if (!hasLoadedCartRef.current) {
         suppressNextSaveRef.current = true;
         setCart(items);
-      } else {
-        suppressNextSaveRef.current = true;
-        setCart([]);
+        hasLoadedCartRef.current = true;
+        lastSavedRevisionRef.current = cartRevisionRef.current;
+        return;
       }
-      hasLoadedCartRef.current = true;
+
+      if (cartRevisionRef.current > lastSavedRevisionRef.current) {
+        return;
+      }
+
+      suppressNextSaveRef.current = true;
+      setCart(items);
     }, (error) => {
       console.error('Error loading cart:', error);
       hasLoadedCartRef.current = true;
@@ -302,6 +321,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     }
 
     skipCartSnapshotRef.current = true;
+    bumpCartRevision();
+    const revisionAtRestore = cartRevisionRef.current;
     setCart(items);
     setDiscount(pendingPurchase.discount || null);
 
@@ -310,6 +331,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       await deletePendingPurchase(pendingPurchase.id);
       // Druhý zápis – starý deleteDoc z clearCartState mohl proběhnout až po prvním setDoc
       await persistCartToFirestore(items);
+      if (revisionAtRestore === cartRevisionRef.current) {
+        lastSavedRevisionRef.current = revisionAtRestore;
+      }
       suppressNextSaveRef.current = true;
     } catch (error) {
       console.error('❌ Chyba při obnovení odloženého nákupu:', error);
@@ -349,6 +373,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
     const itemsToSave = cart;
     const generationAtSchedule = cartPersistGenerationRef.current;
+    const revisionAtSchedule = cartRevisionRef.current;
 
     cartSaveTimerRef.current = window.setTimeout(async () => {
       cartSaveTimerRef.current = null;
@@ -356,6 +381,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
       try {
         await persistCartToFirestore(itemsToSave, generationAtSchedule);
+        if (revisionAtSchedule === cartRevisionRef.current) {
+          lastSavedRevisionRef.current = revisionAtSchedule;
+        }
       } catch (error) {
         console.error('❌ Chyba při ukládání košíku do Firestore:', error);
       }
@@ -559,6 +587,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   // Funkce pro přidání produktu (normální nebo vratka)
   const addToCart = (product: Product) => {
+    bumpCartRevision();
     if (isReturnMode) {
       setCart((prevCart) => {
         const existingItem = prevCart.find((item) => item.productId === product.id);
@@ -619,6 +648,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   };
 
   const removeItemByItemId = (itemId: string) => {
+    bumpCartRevision();
     setCart(prevCart => prevCart.filter(item => item.itemId !== itemId && item.parentItemId !== itemId));
   };
 
@@ -638,7 +668,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       if (cartItem?.itemId) removeItemByItemId(cartItem.itemId);
       return;
     }
-    
+
+    bumpCartRevision();
     setCart(prevCart =>
       prevCart.map(item =>
         item.itemId === itemId
@@ -655,6 +686,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   const handleSelectExtras = (selectedExtras: Product[]) => {
     if (!extrasParentItemId) return;
+    bumpCartRevision();
     setCart(prev => {
       const updated = [...prev];
       for (const p of selectedExtras) {
