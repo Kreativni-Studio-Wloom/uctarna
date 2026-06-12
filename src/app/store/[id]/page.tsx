@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { LoginRequiredModal } from '@/components/auth/LoginRequiredModal';
 import { StoreProvider } from '@/contexts/StoreContext';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -43,16 +44,23 @@ type ViewType = 'pos' | 'receipts' | 'dispatch' | 'reports' | 'settings';
 export default function StorePage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const searchParams = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const storeId = params.id as string;
 
   const [store, setStore] = useState<Store | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [storeLoading, setStoreLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>('pos');
 
   useEffect(() => {
-    if (!user || !storeId) return;
+    if (authLoading) return;
 
+    if (!user || !storeId) {
+      setStoreLoading(false);
+      return;
+    }
+
+    setStoreLoading(true);
     const storeRef = doc(db, 'users', user.uid, 'stores', storeId);
 
     const unsubscribe = onSnapshot(storeRef, (snapshot) => {
@@ -61,11 +69,11 @@ export default function StorePage() {
       } else {
         router.push('/');
       }
-      setLoading(false);
+      setStoreLoading(false);
     });
 
     return unsubscribe;
-  }, [user, storeId, router]);
+  }, [user, authLoading, storeId, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -74,12 +82,18 @@ export default function StorePage() {
     if (v) setCurrentView(v);
   }, []);
 
-  if (loading) {
+  if (authLoading || (user && storeLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
       </div>
     );
+  }
+
+  if (!user) {
+    const query = searchParams.toString();
+    const redirectPath = `/store/${storeId}${query ? `?${query}` : ''}`;
+    return <LoginRequiredModal redirectPath={redirectPath} />;
   }
 
   if (!store) {

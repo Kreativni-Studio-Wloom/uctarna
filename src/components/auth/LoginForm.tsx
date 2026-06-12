@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +13,8 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { rememberAccountSession } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -40,7 +43,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
         await createUserWithEmailAndPassword(auth, email, password);
       }
       rememberAccountSession(email, password);
-      onSuccess();
+
+      const redirect = searchParams.get('redirect');
+      if (redirect?.startsWith('/store/')) {
+        router.replace(redirect);
+      } else {
+        onSuccess();
+      }
     } catch (error: any) {
       setError(error.message);
     } finally {
