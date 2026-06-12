@@ -113,11 +113,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           animate={{ opacity: 1, y: 0 }}
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
         >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
+          <div className="flex items-start mb-4">
+            <div className="w-12 h-12 shrink-0 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
               <Euro className="h-6 w-6 text-blue-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Kurz EUR
               </h3>
@@ -176,11 +176,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             transition={{ delay: 0.05 }}
             className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
           >
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
+            <div className="flex items-start mb-4">
+              <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
                 <CreditCard className="h-6 w-6 text-purple-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Platba kartou
                 </h3>
@@ -244,11 +244,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             transition={{ delay: 0.08 }}
             className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
           >
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/20 rounded-lg flex items-center justify-center mr-4">
-                <Banknote className="h-6 w-6 text-amber-700 dark:text-amber-300" />
+            <div className="flex items-start mb-4">
+              <div className="w-12 h-12 shrink-0 bg-amber-100 dark:bg-amber-900/20 rounded-lg flex items-center justify-center mr-4">
+                <Banknote className="h-6 w-6 text-amber-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Spropitné
                 </h3>
@@ -289,11 +289,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             transition={{ delay: 0.1 }}
             className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
           >
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
+            <div className="flex items-start mb-4">
+              <div className="w-12 h-12 shrink-0 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-4">
                 <QrCode className="h-6 w-6 text-blue-600" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Platba QR kódem
                 </h3>
@@ -329,11 +329,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           transition={{ delay: 0.1 }}
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
         >
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
+          <div className="flex items-start mb-4">
+            <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
               <Settings className="h-6 w-6 text-purple-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Fakturační údaje
               </h3>
