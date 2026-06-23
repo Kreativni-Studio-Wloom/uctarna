@@ -399,16 +399,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   // --- konec perzistence košíku ---
 
+  /** Zachová focus vyhledávacího pole — na mobilu se nezavře klávesnice při výběru produktu */
+  const keepSearchKeyboardOpen = (e: React.PointerEvent) => {
+    e.preventDefault();
+  };
+
   // Zavřít vyhledávač po kliknutí mimo oblast vyhledávání/popupu
   useEffect(() => {
     if (!showAllProducts) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
         setShowAllProducts(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [showAllProducts]);
 
   // Zavřít menu po kliknutí mimo
@@ -1109,6 +1118,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                     Všechny produkty ({filteredProducts.length})
                   </h3>
                   <button
+                    type="button"
+                    onPointerDown={keepSearchKeyboardOpen}
                     onClick={() => setShowAllProducts(false)}
                     className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 p-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors inline-flex items-center justify-center"
                   >
@@ -1140,6 +1151,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           <motion.button
                             key={product.id}
                             type="button"
+                            onPointerDown={keepSearchKeyboardOpen}
                             onClick={() => addToCart(product)}
                             className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
                         >
