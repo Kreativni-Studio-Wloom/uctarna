@@ -8,7 +8,11 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { Timestamp } from 'firebase-admin/firestore';
-import { endOfDay, isValid, parseISO, startOfDay } from 'date-fns';
+import { endOfDay, format, isValid, parseISO, startOfDay } from 'date-fns';
+import { cs } from 'date-fns/locale';
+import nodemailer from 'nodemailer';
+import { buildEmailReportData, generateEmailContent } from '@/lib/email';
+import { saleTipInCzk } from '@/lib/saleTip';
 import { adminDb } from '@/lib/firebase-admin';
 
 const anthropic = createAnthropic({
@@ -16,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send.';
 
 export const maxDuration = 30;
 
@@ -596,6 +600,405 @@ async function fetchClosure(
   return { closure: computed };
 }
 
+type ClosureScope = 'daily' | 'period' | 'total';
+
+type SendClosureParams = {
+  type: ClosureScope;
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  eventName: string;
+  confirmed?: boolean;
+};
+
+type ClosureSummaryPreview = {
+  eventName: string;
+  period: string;
+  startDate: string;
+  endDate: string;
+  totalSales: number;
+  customerCount: number;
+  cashSales: number;
+  cardSales: number;
+  qrSales: number;
+  totalProfit: number;
+};
+
+const EVENT_NAME_REQUIRED_MESSAGE =
+  'Please provide the name of the event/location for this closure.';
+
+function todayUtcPlus2DateString(): string {
+  const shifted = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  return `${shifted.getUTCFullYear()}-${padTimePart(shifted.getUTCMonth() + 1)}-${padTimePart(shifted.getUTCDate())}`;
+}
+
+function formatDisplayDate(date: Date): string {
+  return format(date, 'd.M.yyyy', { locale: cs });
+}
+
+async function fetchUserEmail(userId: string): Promise<string | null> {
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  if (!userDoc.exists) return null;
+  return (userDoc.data()?.email as string | undefined) ?? null;
+}
+
+async function fetchStoreName(userId: string, storeId: string): Promise<string> {
+  const storeDoc = await storeRef(userId, storeId).get();
+  return (storeDoc.data()?.name as string | undefined) ?? 'Neznámá prodejna';
+}
+
+async function fetchProductsForReport(userId: string, storeId: string) {
+  const productsSnapshot = await storeRef(userId, storeId).collection('products').get();
+  return productsSnapshot.docs.map((productDoc) => ({
+    id: productDoc.id,
+    cost: productDoc.data().cost as number | undefined,
+  }));
+}
+
+async function fetchSalesForClosurePeriod(
+  userId: string,
+  storeId: string,
+  type: ClosureScope,
+  date?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<{
+  sales: FirebaseFirestore.DocumentData[];
+  period: string;
+  startDate: string;
+  endDate: string;
+  error?: string;
+}> {
+  const storeDoc = await storeRef(userId, storeId).get();
+  const storeCreatedAt = normalizeCreatedAt(storeDoc.data()?.createdAt) ?? new Date();
+
+  if (type === 'daily') {
+    const day = date ?? todayUtcPlus2DateString();
+    const dayRange = getUtcPlus2DayRange(day);
+    if (!dayRange) {
+      return {
+        sales: [],
+        period: 'Denní',
+        startDate: '',
+        endDate: '',
+        error: 'Invalid date format. Use YYYY-MM-DD.',
+      };
+    }
+
+    const salesSnapshot = await storeRef(userId, storeId)
+      .collection('sales')
+      .where('createdAt', '>=', Timestamp.fromDate(dayRange.start))
+      .where('createdAt', '<=', Timestamp.fromDate(dayRange.end))
+      .get();
+
+    const label = formatDisplayDate(dayRange.start);
+    return {
+      sales: salesSnapshot.docs.map((doc) => doc.data()),
+      period: 'Denní',
+      startDate: label,
+      endDate: label,
+    };
+  }
+
+  if (type === 'period') {
+    if (!startDate || !endDate) {
+      return {
+        sales: [],
+        period: 'Vlastní období',
+        startDate: '',
+        endDate: '',
+        error: 'For period closures, both startDate and endDate are required (YYYY-MM-DD).',
+      };
+    }
+
+    const rangeStart = getUtcPlus2DayRange(startDate)?.start;
+    const rangeEnd = getUtcPlus2DayRange(endDate)?.end;
+    if (!rangeStart || !rangeEnd) {
+      return {
+        sales: [],
+        period: 'Vlastní období',
+        startDate: '',
+        endDate: '',
+        error: 'Invalid startDate or endDate. Use YYYY-MM-DD.',
+      };
+    }
+
+    if (rangeStart.getTime() > rangeEnd.getTime()) {
+      return {
+        sales: [],
+        period: 'Vlastní období',
+        startDate: '',
+        endDate: '',
+        error: 'startDate must be before or equal to endDate.',
+      };
+    }
+
+    const salesSnapshot = await storeRef(userId, storeId)
+      .collection('sales')
+      .where('createdAt', '>=', Timestamp.fromDate(rangeStart))
+      .where('createdAt', '<=', Timestamp.fromDate(rangeEnd))
+      .get();
+
+    return {
+      sales: salesSnapshot.docs.map((doc) => doc.data()),
+      period: 'Vlastní období',
+      startDate: formatDisplayDate(rangeStart),
+      endDate: formatDisplayDate(rangeEnd),
+    };
+  }
+
+  const salesSnapshot = await storeRef(userId, storeId)
+    .collection('sales')
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  return {
+    sales: salesSnapshot.docs.map((doc) => doc.data()),
+    period: 'Celková',
+    startDate: formatDisplayDate(storeCreatedAt),
+    endDate: formatDisplayDate(new Date()),
+  };
+}
+
+function computeClosureTotals(
+  sales: FirebaseFirestore.DocumentData[],
+  products: Array<{ id: string; cost?: number }>
+) {
+  const productMap = new Map(products.map((product) => [product.id, product]));
+
+  let totalSales = 0;
+  let salesInCZK = 0;
+  let salesInEUR = 0;
+  let cashSales = 0;
+  let cardSales = 0;
+  let qrSales = 0;
+  let totalCosts = 0;
+  let totalDiscounts = 0;
+  let totalTips = 0;
+
+  for (const sale of sales) {
+    const totalAmount = (sale.totalAmount as number) ?? 0;
+    const currency = sale.currency as string | undefined;
+    const eurRate = sale.eurRate as number | undefined;
+
+    if (currency === 'EUR' && typeof eurRate === 'number') {
+      totalSales += totalAmount * eurRate;
+      if (sale.paidAmount && sale.paidCurrency === 'EUR') {
+        const returnedEur =
+          sale.changeAmountEUR && (sale.changeAmountEUR as number) > 0
+            ? (sale.changeAmountEUR as number)
+            : 0;
+        salesInEUR += (sale.paidAmount as number) - returnedEur;
+      } else {
+        salesInEUR += totalAmount;
+      }
+    } else {
+      totalSales += totalAmount;
+      salesInCZK += totalAmount;
+    }
+
+    const amountInCzk =
+      currency === 'EUR' && typeof eurRate === 'number' ? totalAmount * eurRate : totalAmount;
+
+    if (sale.paymentMethod === 'cash') cashSales += amountInCzk;
+    if (sale.paymentMethod === 'card') cardSales += amountInCzk;
+    if (sale.paymentMethod === 'qr') qrSales += amountInCzk;
+
+    totalDiscounts += (sale.discountAmount as number) ?? 0;
+    totalTips += saleTipInCzk({
+      tipAmount: sale.tipAmount as number | undefined,
+      currency: (sale.currency as 'CZK' | 'EUR') ?? 'CZK',
+      eurRate,
+    });
+
+    for (const item of (sale.items ?? []) as Array<{ productId?: string; quantity?: number }>) {
+      const product = item.productId ? productMap.get(item.productId) : undefined;
+      if (product && typeof product.cost === 'number') {
+        totalCosts += product.cost * (item.quantity ?? 0);
+      }
+    }
+  }
+
+  const salesWithDiscount = sales.filter(
+    (sale) => sale.discount && (sale.discountAmount as number) > 0
+  ).length;
+
+  return {
+    totalSales,
+    salesInCZK,
+    salesInEUR,
+    cashSales,
+    cardSales,
+    qrSales,
+    customerCount: sales.length,
+    totalCosts,
+    totalProfit: totalSales - totalCosts,
+    totalDiscounts,
+    salesWithDiscount,
+    totalTips,
+  };
+}
+
+async function sendClosureReportEmail(
+  to: string,
+  reportData: ReturnType<typeof buildEmailReportData>,
+  eventName: string
+) {
+  const emailContent = generateEmailContent(reportData, eventName);
+  const emailSubject = `${reportData.period} uzávěrka - ${eventName} - ${reportData.storeName}`;
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.seznam.cz',
+    port: Number(process.env.SMTP_PORT || 465),
+    secure: true,
+    pool: true,
+    maxConnections: 1,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
+    auth: {
+      user: process.env.SMTP_USER || 'info@uctarna.fun',
+      pass: process.env.SMTP_PASS || 'xeQvep-coccec-watza7',
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || 'info@uctarna.fun',
+    to,
+    subject: emailSubject,
+    html: emailContent.html,
+    text: emailContent.text,
+  });
+}
+
+async function executeSendClosure(
+  userId: string,
+  storeId: string,
+  params: SendClosureParams
+) {
+  const eventName = params.eventName?.trim();
+  if (!eventName) {
+    return {
+      sent: false,
+      requiresConfirmation: false,
+      requiresEventName: true,
+      message: EVENT_NAME_REQUIRED_MESSAGE,
+    };
+  }
+
+  const periodData = await fetchSalesForClosurePeriod(
+    userId,
+    storeId,
+    params.type,
+    params.date,
+    params.startDate,
+    params.endDate
+  );
+
+  if (periodData.error) {
+    return {
+      sent: false,
+      requiresConfirmation: false,
+      error: periodData.error,
+      message: periodData.error,
+    };
+  }
+
+  if (periodData.sales.length === 0) {
+    return {
+      sent: false,
+      requiresConfirmation: false,
+      message: 'No sales found for the selected closure period.',
+      summary: {
+        eventName,
+        period: periodData.period,
+        startDate: periodData.startDate,
+        endDate: periodData.endDate,
+        totalSales: 0,
+        customerCount: 0,
+        cashSales: 0,
+        cardSales: 0,
+        qrSales: 0,
+        totalProfit: 0,
+      } satisfies ClosureSummaryPreview,
+    };
+  }
+
+  const [storeName, products, userEmail] = await Promise.all([
+    fetchStoreName(userId, storeId),
+    fetchProductsForReport(userId, storeId),
+    fetchUserEmail(userId),
+  ]);
+
+  const totals = computeClosureTotals(periodData.sales, products);
+  const summary: ClosureSummaryPreview = {
+    eventName,
+    period: periodData.period,
+    startDate: periodData.startDate,
+    endDate: periodData.endDate,
+    totalSales: totals.totalSales,
+    customerCount: totals.customerCount,
+    cashSales: totals.cashSales,
+    cardSales: totals.cardSales,
+    qrSales: totals.qrSales,
+    totalProfit: totals.totalProfit,
+  };
+
+  const previewMessage = `Closure preview for "${eventName}" (${summary.period}, ${summary.startDate}${summary.startDate !== summary.endDate ? ` - ${summary.endDate}` : ''}): total ${summary.totalSales.toLocaleString('cs-CZ')} CZK across ${summary.customerCount} transactions. Ask the user to confirm before sending.`;
+
+  if (!params.confirmed) {
+    return {
+      sent: false,
+      requiresConfirmation: true,
+      summary,
+      message: previewMessage,
+    };
+  }
+
+  if (!userEmail) {
+    return {
+      sent: false,
+      requiresConfirmation: false,
+      summary,
+      error: 'User email not found. Cannot send closure report.',
+      message: 'User email not found. Cannot send closure report.',
+    };
+  }
+
+  const emailPayload = buildEmailReportData(
+    {
+      storeName,
+      period: periodData.period,
+      startDate: periodData.startDate,
+      endDate: periodData.endDate,
+    },
+    totals,
+    periodData.sales as Array<{
+      items?: Array<{
+        productId: string;
+        productName: string;
+        quantity: number;
+        price: number;
+      }>;
+      paymentMethod: string;
+    }>,
+    products
+  );
+
+  await sendClosureReportEmail(userEmail, emailPayload, eventName);
+
+  return {
+    sent: true,
+    requiresConfirmation: false,
+    summary,
+    recipient: userEmail,
+    message: `Closure report sent to ${userEmail} for "${eventName}". Total ${summary.totalSales.toLocaleString('cs-CZ')} CZK, ${summary.customerCount} transactions.`,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const {
@@ -737,8 +1140,57 @@ export async function POST(req: Request) {
             }
           },
         }),
+        sendClosure: tool({
+          description:
+            'Prepare or send a closure report (uzávěrka) by email. Always call first with confirmed=false to show a preview, then call again with confirmed=true only after explicit user approval.',
+          inputSchema: z.object({
+            type: z.enum(['daily', 'period', 'total']).describe('Scope of the closure report'),
+            date: z
+              .string()
+              .optional()
+              .describe("Required for type 'daily' in YYYY-MM-DD format (UTC+2). Defaults to today."),
+            startDate: z
+              .string()
+              .optional()
+              .describe("Required for type 'period' in YYYY-MM-DD format (UTC+2)."),
+            endDate: z
+              .string()
+              .optional()
+              .describe("Required for type 'period' in YYYY-MM-DD format (UTC+2)."),
+            eventName: z
+              .string()
+              .describe('Name of the event/location to associate the closure with'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms sending.'),
+          }),
+          execute: async ({ type, date, startDate, endDate, eventName, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), sent: false };
+            }
+
+            try {
+              return await executeSendClosure(context.userId, context.storeId, {
+                type,
+                date,
+                startDate,
+                endDate,
+                eventName,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ sendClosure tool error:', error);
+              return {
+                sent: false,
+                error: 'Failed to send closure report.',
+                message: 'Failed to send closure report.',
+              };
+            }
+          },
+        }),
       },
-      stopWhen: stepCountIs(8),
+      stopWhen: stepCountIs(10),
     });
 
     return result.toUIMessageStreamResponse();
