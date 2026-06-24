@@ -116,36 +116,109 @@ function parseRequestedDate(date?: string): Date | null {
 }
 
 const INVOICE_TIME_MATCH_WINDOW_MS = 2 * 60 * 1000;
+const STORE_TIMEZONE_SUFFIX = '+02:00';
+const STORE_TIMEZONE_LABEL = 'UTC+2';
 
-function parseDateAndTime(date: string, time: string): Date | null {
+const FIRESTORE_MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+
+const FIRESTORE_DISPLAY_REGEX =
+  /^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2}):(\d{2})\s+(AM|PM)\s+UTC\+2$/i;
+
+function padTimePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function parseDateAndTimeUtcPlus2(date: string, time: string): Date | null {
   const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   const timeMatch = time.match(/^(\d{1,2}):(\d{2})$/);
   if (!dateMatch || !timeMatch) return null;
 
   const [, year, month, day] = dateMatch;
   const [, hour, minute] = timeMatch;
-  const parsed = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    0,
-    0
-  );
+  const iso = `${year}-${month}-${day}T${padTimePart(Number(hour))}:${minute}:00${STORE_TIMEZONE_SUFFIX}`;
+  const parsed = parseISO(iso);
 
   return isValid(parsed) ? parsed : null;
 }
 
-function toTimestamp(value: unknown): Date | null {
+function getUtcPlus2DayRange(date: string): { start: Date; end: Date } | null {
+  const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const start = parseISO(`${year}-${month}-${day}T00:00:00${STORE_TIMEZONE_SUFFIX}`);
+  const end = parseISO(`${year}-${month}-${day}T23:59:59.999${STORE_TIMEZONE_SUFFIX}`);
+
+  if (!isValid(start) || !isValid(end)) return null;
+  return { start, end };
+}
+
+function formatFirestoreUtcPlus2String(instant: Date): string {
+  const shifted = new Date(instant.getTime() + 2 * 60 * 60 * 1000);
+  const year = shifted.getUTCFullYear();
+  const month = FIRESTORE_MONTH_NAMES[shifted.getUTCMonth()];
+  const day = shifted.getUTCDate();
+  let hour = shifted.getUTCHours();
+  const minute = shifted.getUTCMinutes();
+  const second = shifted.getUTCSeconds();
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+
+  return `${month} ${day}, ${year} at ${hour}:${padTimePart(minute)}:${padTimePart(second)} ${ampm} ${STORE_TIMEZONE_LABEL}`;
+}
+
+function parseFirestoreUtcPlus2String(value: string): Date | null {
+  const match = value.trim().match(FIRESTORE_DISPLAY_REGEX);
+  if (!match) return null;
+
+  const [, monthName, day, year, hour12, minute, second, ampm] = match;
+  const monthIndex = FIRESTORE_MONTH_NAMES.findIndex(
+    (name) => name.toLowerCase() === monthName.toLowerCase()
+  );
+  if (monthIndex < 0) return null;
+
+  let hour = Number(hour12) % 12;
+  if (ampm.toUpperCase() === 'PM') hour += 12;
+
+  const iso = `${year}-${padTimePart(monthIndex + 1)}-${padTimePart(Number(day))}T${padTimePart(hour)}:${minute}:${second}${STORE_TIMEZONE_SUFFIX}`;
+  const parsed = parseISO(iso);
+  return isValid(parsed) ? parsed : null;
+}
+
+function normalizeCreatedAt(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Timestamp) return value.toDate();
   if (value instanceof Date) return value;
+
   if (typeof value === 'string') {
-    const parsed = new Date(value);
-    return isValid(parsed) ? parsed : null;
+    const firestoreDisplay = parseFirestoreUtcPlus2String(value);
+    if (firestoreDisplay) return firestoreDisplay;
+
+    const isoParsed = parseISO(value);
+    if (isValid(isoParsed)) return isoParsed;
+
+    const genericParsed = new Date(value);
+    return isValid(genericParsed) ? genericParsed : null;
   }
+
   return null;
+}
+
+function toTimestamp(value: unknown): Date | null {
+  return normalizeCreatedAt(value);
 }
 
 function saleAmountInCzk(sale: FirebaseFirestore.DocumentData): number {
@@ -276,45 +349,68 @@ async function fetchInvoiceByDetails(
   date: string,
   time: string
 ): Promise<{ invoice: InvoiceDetail | null; error?: string; candidates?: number }> {
-  const targetTime = parseDateAndTime(date, time);
+  const targetTime = parseDateAndTimeUtcPlus2(date, time);
   if (!targetTime) {
     return {
       invoice: null,
-      error: 'Invalid date or time format. Use date YYYY-MM-DD and time HH:MM.',
+      error: 'Invalid date or time format. Use date YYYY-MM-DD and time HH:MM (interpreted as UTC+2).',
     };
   }
 
-  const rangeStart = new Date(targetTime.getTime() - INVOICE_TIME_MATCH_WINDOW_MS);
-  const rangeEnd = new Date(targetTime.getTime() + INVOICE_TIME_MATCH_WINDOW_MS);
+  const dayRange = getUtcPlus2DayRange(date);
+  if (!dayRange) {
+    return { invoice: null, error: 'Invalid date format. Use YYYY-MM-DD.' };
+  }
 
-  const salesSnapshot = await storeRef(userId, storeId)
+  const targetDisplay = formatFirestoreUtcPlus2String(targetTime);
+  const rangeStartMs = targetTime.getTime() - INVOICE_TIME_MATCH_WINDOW_MS;
+  const rangeEndMs = targetTime.getTime() + INVOICE_TIME_MATCH_WINDOW_MS;
+
+  let salesSnapshot = await storeRef(userId, storeId)
     .collection('sales')
-    .where('createdAt', '>=', Timestamp.fromDate(rangeStart))
-    .where('createdAt', '<=', Timestamp.fromDate(rangeEnd))
+    .where('createdAt', '>=', Timestamp.fromDate(dayRange.start))
+    .where('createdAt', '<=', Timestamp.fromDate(dayRange.end))
     .get();
 
   if (salesSnapshot.empty) {
-    return { invoice: null, candidates: 0 };
+    salesSnapshot = await storeRef(userId, storeId).collection('sales').get();
   }
 
   const rankedMatches = salesSnapshot.docs
     .map((saleDoc) => {
-      const createdAt = toTimestamp(saleDoc.data().createdAt);
+      const rawCreatedAt = saleDoc.data().createdAt;
+      const createdAt = normalizeCreatedAt(rawCreatedAt);
       if (!createdAt) return null;
+
+      const createdAtMs = createdAt.getTime();
+      const withinRange = createdAtMs >= rangeStartMs && createdAtMs <= rangeEndMs;
+
+      const rawString = typeof rawCreatedAt === 'string' ? rawCreatedAt.trim() : null;
+      const stringMatches =
+        rawString !== null &&
+        (rawString === targetDisplay ||
+          (() => {
+            const parsedString = parseFirestoreUtcPlus2String(rawString);
+            if (!parsedString) return false;
+            const parsedMs = parsedString.getTime();
+            return parsedMs >= rangeStartMs && parsedMs <= rangeEndMs;
+          })());
+
+      if (!withinRange && !stringMatches) return null;
 
       return {
         saleDoc,
-        diffMs: Math.abs(createdAt.getTime() - targetTime.getTime()),
+        diffMs: Math.abs(createdAtMs - targetTime.getTime()),
       };
     })
     .filter((match): match is NonNullable<typeof match> => match !== null)
     .sort((a, b) => a.diffMs - b.diffMs);
 
-  const bestMatch = rankedMatches[0];
-  if (!bestMatch) {
+  if (rankedMatches.length === 0) {
     return { invoice: null, candidates: 0 };
   }
 
+  const bestMatch = rankedMatches[0];
   const data = bestMatch.saleDoc.data();
   const items = ((data.items ?? []) as Array<{
     productId?: string;
@@ -328,13 +424,13 @@ async function fetchInvoiceByDetails(
     price: item.price ?? 0,
   }));
 
-  const createdAt = toTimestamp(data.createdAt);
+  const createdAt = normalizeCreatedAt(data.createdAt);
 
   return {
     invoice: {
       invoiceId: (data.documentId as string | undefined) ?? bestMatch.saleDoc.id,
       id: bestMatch.saleDoc.id,
-      createdAt: createdAt?.toISOString() ?? targetTime.toISOString(),
+      createdAt: createdAt ? formatFirestoreUtcPlus2String(createdAt) : targetDisplay,
       items,
       totalAmount: (data.totalAmount as number) ?? 0,
       paymentMethod: (data.paymentMethod as string) ?? 'unknown',
@@ -555,10 +651,10 @@ export async function POST(req: Request) {
         }),
         getInvoiceByDetails: tool({
           description:
-            'Finds a specific invoice (sales document) by exact date and time within a 2-minute window.',
+            'Finds a specific invoice (sales document) by exact date and time within a 2-minute window. Date/time are always interpreted as UTC+2.',
           inputSchema: z.object({
-            date: z.string().describe('Invoice date in YYYY-MM-DD format'),
-            time: z.string().describe('Invoice time in HH:MM format (24-hour clock)'),
+            date: z.string().describe('Invoice date in YYYY-MM-DD format (UTC+2)'),
+            time: z.string().describe('Invoice time in HH:MM format, 24-hour clock, always UTC+2'),
           }),
           execute: async ({ date, time }) => {
             if (!context.storeId || !context.userId) {
