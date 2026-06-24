@@ -20,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves. You can manage pinned items in the POS menu using the togglePinnedItem tool. Always confirm the action with the user. Always call togglePinnedItem first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can manage extras using the addExtra tool. Always confirm details before saving. Always call addExtra first with confirmed=false to show a summary and ask for confirmation. Only call addExtra with confirmed=true after the user explicitly approves. You are now an administrator of the system. You can update configuration parameters like exchange rates, billing details, and payment settings via the updateSettings tool. ALWAYS confirm significant changes like IBAN or company details with the user. Always call updateSettings first with confirmed=false, then call again with confirmed=true only after explicit user approval.';
 
 export const maxDuration = 30;
 
@@ -613,6 +613,424 @@ async function executeCreateProduct(userId: string, storeId: string, params: Cre
     productId: docRef.id,
     product: preview,
     message: `Product "${name}" was created successfully with ID ${docRef.id}.`,
+  };
+}
+
+type TogglePinnedItemParams = {
+  productId: string;
+  confirmed?: boolean;
+};
+
+async function executeTogglePinnedItem(
+  userId: string,
+  storeId: string,
+  params: TogglePinnedItemParams
+) {
+  const productId = params.productId?.trim();
+  if (!productId) {
+    return {
+      toggled: false,
+      requiresConfirmation: false,
+      error: 'productId is required.',
+      message: 'productId is required.',
+    };
+  }
+
+  const productDoc = await storeRef(userId, storeId).collection('products').doc(productId).get();
+  if (!productDoc.exists) {
+    return {
+      toggled: false,
+      requiresConfirmation: false,
+      error: `Product with id "${productId}" was not found.`,
+      message: `Product with id "${productId}" was not found.`,
+    };
+  }
+
+  const productName = (productDoc.data()?.name as string) ?? 'Unknown product';
+  const storeDoc = await storeRef(userId, storeId).get();
+  const pinnedProductIds = (storeDoc.data()?.pinnedProductIds as string[] | undefined) ?? [];
+  const isPinned = pinnedProductIds.includes(productId);
+  const action = isPinned ? 'unpin' : 'pin';
+  const previewMessage = `I am about to ${action} the product '${productName}'. Do you confirm?`;
+
+  if (!params.confirmed) {
+    return {
+      toggled: false,
+      requiresConfirmation: true,
+      productId,
+      productName,
+      currentlyPinned: isPinned,
+      nextPinned: !isPinned,
+      message: previewMessage,
+    };
+  }
+
+  const nextPinnedProductIds = isPinned
+    ? pinnedProductIds.filter((id) => id !== productId)
+    : [...pinnedProductIds, productId];
+
+  await storeRef(userId, storeId).update({
+    pinnedProductIds: nextPinnedProductIds,
+    updatedAt: Timestamp.now(),
+  });
+
+  return {
+    toggled: true,
+    requiresConfirmation: false,
+    productId,
+    productName,
+    pinned: !isPinned,
+    message: `Product "${productName}" was ${isPinned ? 'unpinned' : 'pinned'} successfully.`,
+  };
+}
+
+type AddExtraParams = {
+  name: string;
+  price: number;
+  category: string;
+  confirmed?: boolean;
+};
+
+function buildAddExtraPreviewMessage(params: { name: string; price: number; category: string }): string {
+  return `I am ready to add a new extra: ${params.name}, Price: ${params.price}, Category: ${params.category}. Do you confirm?`;
+}
+
+async function executeAddExtra(userId: string, storeId: string, params: AddExtraParams) {
+  const name = params.name?.trim();
+  if (!name) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Extra name is required.',
+      message: 'Extra name is required.',
+    };
+  }
+
+  if (!Number.isFinite(params.price) || params.price < 0) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Price must be a non-negative number.',
+      message: 'Price must be a non-negative number.',
+    };
+  }
+
+  const category = params.category?.trim();
+  if (!category) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Category is required.',
+      message: 'Category is required.',
+    };
+  }
+
+  const preview = {
+    name,
+    price: params.price,
+    category,
+  };
+
+  const previewMessage = buildAddExtraPreviewMessage(preview);
+
+  if (!params.confirmed) {
+    return {
+      created: false,
+      requiresConfirmation: true,
+      extra: preview,
+      message: previewMessage,
+    };
+  }
+
+  const now = Timestamp.now();
+  const docRef = await storeRef(userId, storeId).collection('products').add({
+    name,
+    price: params.price,
+    category,
+    cost: null,
+    isExtra: true,
+    isPopular: false,
+    soldCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return {
+    created: true,
+    requiresConfirmation: false,
+    extraId: docRef.id,
+    extra: preview,
+    message: `Extra "${name}" was created successfully with ID ${docRef.id}.`,
+  };
+}
+
+type SettingTarget = 'store' | 'user';
+
+type SettingDefinition = {
+  field: string;
+  target: SettingTarget;
+  type: 'number' | 'boolean' | 'string' | 'theme';
+  label: string;
+  aliases: string[];
+};
+
+const SETTING_DEFINITIONS: SettingDefinition[] = [
+  {
+    field: 'eurRate',
+    target: 'store',
+    type: 'number',
+    label: 'EUR exchange rate',
+    aliases: ['exchangeRate', 'eurRate', 'exchange_rate'],
+  },
+  {
+    field: 'redirectToSumUp',
+    target: 'store',
+    type: 'boolean',
+    label: 'SumUp redirect',
+    aliases: ['sumUpRedirect', 'redirectToSumUp', 'sumup_redirect'],
+  },
+  {
+    field: 'tipsEnabled',
+    target: 'store',
+    type: 'boolean',
+    label: 'Tips enabled',
+    aliases: ['tipsEnabled', 'tips'],
+  },
+  {
+    field: 'iban',
+    target: 'store',
+    type: 'string',
+    label: 'IBAN',
+    aliases: ['iban'],
+  },
+  {
+    field: 'companyName',
+    target: 'store',
+    type: 'string',
+    label: 'Company name',
+    aliases: ['companyName', 'company_name'],
+  },
+  {
+    field: 'ico',
+    target: 'store',
+    type: 'string',
+    label: 'Company ID (IČO)',
+    aliases: ['ico'],
+  },
+  {
+    field: 'companyAddress',
+    target: 'store',
+    type: 'string',
+    label: 'Company address',
+    aliases: ['companyAddress', 'company_address', 'address'],
+  },
+  {
+    field: 'theme',
+    target: 'user',
+    type: 'theme',
+    label: 'Theme',
+    aliases: ['theme'],
+  },
+];
+
+const SUPPORTED_SETTING_KEYS = SETTING_DEFINITIONS.flatMap((definition) => [
+  definition.field,
+  ...definition.aliases,
+]);
+
+function resolveSettingDefinition(settingKey: string): SettingDefinition | null {
+  const normalized = settingKey.trim().toLowerCase();
+  return (
+    SETTING_DEFINITIONS.find(
+      (definition) =>
+        definition.field.toLowerCase() === normalized ||
+        definition.aliases.some((alias) => alias.toLowerCase() === normalized)
+    ) ?? null
+  );
+}
+
+function formatSettingValue(value: unknown, definition: SettingDefinition): string {
+  if (value === null || value === undefined || value === '') {
+    return '(not set)';
+  }
+
+  if (definition.type === 'boolean') {
+    return value ? 'enabled' : 'disabled';
+  }
+
+  if (definition.type === 'number' && typeof value === 'number') {
+    if (definition.field === 'eurRate') {
+      return `${value.toFixed(2)} CZK/EUR`;
+    }
+    return String(value);
+  }
+
+  return String(value);
+}
+
+function normalizeSettingValue(
+  definition: SettingDefinition,
+  rawValue: unknown
+): { value?: string | number | boolean; error?: string } {
+  if (rawValue === null || rawValue === undefined) {
+    return { error: 'newValue is required.' };
+  }
+
+  switch (definition.type) {
+    case 'number': {
+      const parsed =
+        typeof rawValue === 'number' ? rawValue : Number(String(rawValue).trim().replace(',', '.'));
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return { error: `${definition.label} must be a positive number.` };
+      }
+      return { value: parsed };
+    }
+    case 'boolean': {
+      if (typeof rawValue === 'boolean') {
+        return { value: rawValue };
+      }
+      const normalized = String(rawValue).trim().toLowerCase();
+      if (['true', '1', 'yes', 'on', 'enabled'].includes(normalized)) {
+        return { value: true };
+      }
+      if (['false', '0', 'no', 'off', 'disabled'].includes(normalized)) {
+        return { value: false };
+      }
+      return { error: `${definition.label} must be true or false.` };
+    }
+    case 'theme': {
+      const normalized = String(rawValue).trim().toLowerCase();
+      if (normalized === 'light' || normalized === 'dark' || normalized === 'auto') {
+        return { value: normalized };
+      }
+      return { error: 'Theme must be light, dark, or auto.' };
+    }
+    case 'string':
+    default:
+      return { value: String(rawValue).trim() };
+  }
+}
+
+function settingsValuesEqual(
+  currentValue: unknown,
+  nextValue: string | number | boolean,
+  definition: SettingDefinition
+): boolean {
+  if (definition.type === 'number') {
+    const currentNumber = typeof currentValue === 'number' ? currentValue : Number(currentValue);
+    return Number.isFinite(currentNumber) && currentNumber === nextValue;
+  }
+
+  if (definition.type === 'boolean') {
+    return Boolean(currentValue) === nextValue;
+  }
+
+  const currentString =
+    currentValue === null || currentValue === undefined ? '' : String(currentValue).trim();
+  return currentString === String(nextValue).trim();
+}
+
+async function getSettingCurrentValue(
+  userId: string,
+  storeId: string,
+  definition: SettingDefinition
+): Promise<unknown> {
+  if (definition.target === 'store') {
+    const storeDoc = await storeRef(userId, storeId).get();
+    return storeDoc.data()?.[definition.field] ?? null;
+  }
+
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  const settings = userDoc.data()?.settings as Record<string, unknown> | undefined;
+  return settings?.[definition.field] ?? null;
+}
+
+type UpdateSettingsParams = {
+  settingKey: string;
+  newValue: unknown;
+  confirmed?: boolean;
+};
+
+function buildUpdateSettingsPreviewMessage(
+  definition: SettingDefinition,
+  currentValue: unknown,
+  nextValue: string | number | boolean
+): string {
+  return `You are about to change the ${definition.label} from ${formatSettingValue(currentValue, definition)} to ${formatSettingValue(nextValue, definition)}. Do you confirm?`;
+}
+
+async function executeUpdateSettings(userId: string, storeId: string, params: UpdateSettingsParams) {
+  const definition = resolveSettingDefinition(params.settingKey);
+  if (!definition) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error: `Unsupported settingKey "${params.settingKey}".`,
+      message: `Unsupported settingKey "${params.settingKey}". Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}.`,
+      supportedKeys: SUPPORTED_SETTING_KEYS,
+    };
+  }
+
+  const { value: nextValue, error: normalizationError } = normalizeSettingValue(
+    definition,
+    params.newValue
+  );
+  if (normalizationError || nextValue === undefined) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error: normalizationError ?? 'Invalid newValue.',
+      message: normalizationError ?? 'Invalid newValue.',
+    };
+  }
+
+  const currentValue = await getSettingCurrentValue(userId, storeId, definition);
+
+  if (settingsValuesEqual(currentValue, nextValue, definition)) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      settingKey: definition.field,
+      currentValue,
+      message: `No changes detected. ${definition.label} already matches the requested value.`,
+    };
+  }
+
+  const previewMessage = buildUpdateSettingsPreviewMessage(definition, currentValue, nextValue);
+
+  if (!params.confirmed) {
+    return {
+      updated: false,
+      requiresConfirmation: true,
+      settingKey: definition.field,
+      label: definition.label,
+      currentValue,
+      newValue: nextValue,
+      target: definition.target,
+      message: previewMessage,
+    };
+  }
+
+  if (definition.target === 'store') {
+    await storeRef(userId, storeId).update({
+      [definition.field]: nextValue,
+      updatedAt: Timestamp.now(),
+    });
+  } else {
+    await adminDb.collection('users').doc(userId).update({
+      [`settings.${definition.field}`]: nextValue,
+    });
+  }
+
+  return {
+    updated: true,
+    requiresConfirmation: false,
+    settingKey: definition.field,
+    label: definition.label,
+    previousValue: currentValue,
+    newValue: nextValue,
+    target: definition.target,
+    message: `${definition.label} was updated successfully.`,
   };
 }
 
@@ -1619,6 +2037,108 @@ export async function POST(req: Request) {
                 created: false,
                 error: 'Failed to create product.',
                 message: 'Failed to create product.',
+              };
+            }
+          },
+        }),
+        togglePinnedItem: tool({
+          description:
+            'Pin or unpin a product in the POS quick-access menu. Always call first with confirmed=false to preview the action and ask for user confirmation. Call again with confirmed=true only after the user explicitly approves.',
+          inputSchema: z.object({
+            productId: z.string().describe('Firestore document ID of the product to pin or unpin'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms the pin/unpin action.'),
+          }),
+          execute: async ({ productId, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), toggled: false };
+            }
+
+            try {
+              return await executeTogglePinnedItem(context.userId, context.storeId, {
+                productId,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ togglePinnedItem tool error:', error);
+              return {
+                toggled: false,
+                error: 'Failed to toggle pinned item.',
+                message: 'Failed to toggle pinned item.',
+              };
+            }
+          },
+        }),
+        addExtra: tool({
+          description:
+            'Preview or create a new extra/modifier option for POS products. Extras are stored in the products collection with isExtra=true. Always call first with confirmed=false to show a summary and ask for user confirmation. Call again with confirmed=true only after the user explicitly approves.',
+          inputSchema: z.object({
+            name: z.string().describe('Extra name, for example "Oat milk"'),
+            price: z.number().nonnegative().describe('Extra price in CZK'),
+            category: z.string().describe('Extra category, for example "milk" or "syrup"'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms creation.'),
+          }),
+          execute: async ({ name, price, category, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), created: false };
+            }
+
+            try {
+              return await executeAddExtra(context.userId, context.storeId, {
+                name,
+                price,
+                category,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ addExtra tool error:', error);
+              return {
+                created: false,
+                error: 'Failed to create extra.',
+                message: 'Failed to create extra.',
+              };
+            }
+          },
+        }),
+        updateSettings: tool({
+          description:
+            'Preview or update POS/store configuration such as exchange rate, SumUp redirect, tips, IBAN, and billing details. Store settings are saved on the store document; theme is saved on the user document. Always call first with confirmed=false, then call again with confirmed=true only after explicit user approval.',
+          inputSchema: z.object({
+            settingKey: z
+              .string()
+              .describe(
+                'Setting to change. Supported keys include exchangeRate, sumUpRedirect, tipsEnabled, iban, companyName, ico, companyAddress, theme.'
+              ),
+            newValue: z
+              .union([z.string(), z.number(), z.boolean()])
+              .describe('New value for the selected setting'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms the change.'),
+          }),
+          execute: async ({ settingKey, newValue, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), updated: false };
+            }
+
+            try {
+              return await executeUpdateSettings(context.userId, context.storeId, {
+                settingKey,
+                newValue,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ updateSettings tool error:', error);
+              return {
+                updated: false,
+                error: 'Failed to update settings.',
+                message: 'Failed to update settings.',
               };
             }
           },
