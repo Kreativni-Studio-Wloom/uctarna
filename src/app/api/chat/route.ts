@@ -20,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves.';
 
 export const maxDuration = 30;
 
@@ -521,6 +521,98 @@ async function executeUpdateProduct(userId: string, storeId: string, params: Upd
     productName: updatedName,
     appliedChanges: changes,
     message: `Product "${updatedName}" was updated successfully.`,
+  };
+}
+
+type CreateProductParams = {
+  name: string;
+  price: number;
+  cost: number;
+  category?: string;
+  confirmed?: boolean;
+};
+
+function buildCreateProductPreviewMessage(params: {
+  name: string;
+  price: number;
+  cost: number;
+  category?: string;
+}): string {
+  const categorySuffix = params.category ? `, Category: ${params.category}` : '';
+  return `I am ready to add a new product: ${params.name}, Price: ${params.price}, Cost: ${params.cost}${categorySuffix}. Do you confirm?`;
+}
+
+async function executeCreateProduct(userId: string, storeId: string, params: CreateProductParams) {
+  const name = params.name?.trim();
+  if (!name) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Product name is required.',
+      message: 'Product name is required.',
+    };
+  }
+
+  if (!Number.isFinite(params.price) || params.price < 0) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Price must be a non-negative number.',
+      message: 'Price must be a non-negative number.',
+    };
+  }
+
+  if (!Number.isFinite(params.cost) || params.cost < 0) {
+    return {
+      created: false,
+      requiresConfirmation: false,
+      error: 'Cost must be a non-negative number.',
+      message: 'Cost must be a non-negative number.',
+    };
+  }
+
+  const category = params.category?.trim() || undefined;
+  const preview = {
+    name,
+    price: params.price,
+    cost: params.cost,
+    category,
+  };
+
+  const previewMessage = buildCreateProductPreviewMessage(preview);
+
+  if (!params.confirmed) {
+    return {
+      created: false,
+      requiresConfirmation: true,
+      product: preview,
+      message: previewMessage,
+    };
+  }
+
+  const now = Timestamp.now();
+  const productData: Record<string, unknown> = {
+    name,
+    price: params.price,
+    cost: params.cost,
+    isPopular: false,
+    soldCount: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (category) {
+    productData.category = category;
+  }
+
+  const docRef = await storeRef(userId, storeId).collection('products').add(productData);
+
+  return {
+    created: true,
+    requiresConfirmation: false,
+    productId: docRef.id,
+    product: preview,
+    message: `Product "${name}" was created successfully with ID ${docRef.id}.`,
   };
 }
 
@@ -1491,6 +1583,42 @@ export async function POST(req: Request) {
                 updated: false,
                 error: 'Failed to update product.',
                 message: 'Failed to update product.',
+              };
+            }
+          },
+        }),
+        createProduct: tool({
+          description:
+            'Preview or create a new product in the catalog. Always call first with confirmed=false to show a summary and ask for user confirmation. Call again with confirmed=true only after the user explicitly approves.',
+          inputSchema: z.object({
+            name: z.string().describe('Product name'),
+            price: z.number().nonnegative().describe('Selling price in CZK'),
+            cost: z.number().nonnegative().describe('Purchase cost (nákupka) in CZK'),
+            category: z.string().optional().describe('Optional product category'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms creation.'),
+          }),
+          execute: async ({ name, price, cost, category, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), created: false };
+            }
+
+            try {
+              return await executeCreateProduct(context.userId, context.storeId, {
+                name,
+                price,
+                cost,
+                category,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ createProduct tool error:', error);
+              return {
+                created: false,
+                error: 'Failed to create product.',
+                message: 'Failed to create product.',
               };
             }
           },

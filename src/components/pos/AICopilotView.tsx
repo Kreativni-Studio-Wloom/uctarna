@@ -284,20 +284,14 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Sparkles className="h-7 w-7 text-purple-600" />
-            AI Chat
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Asistent pro prodejnu {storeName}
-          </p>
-        </div>
-        <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 card-elevated px-3 py-2">
-          <Bot className="h-4 w-4 text-purple-500" />
-          Claude Haiku 4.5
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <Sparkles className="h-7 w-7 text-purple-600" />
+          AI Chat
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Asistent pro prodejnu {storeName}
+        </p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4">
