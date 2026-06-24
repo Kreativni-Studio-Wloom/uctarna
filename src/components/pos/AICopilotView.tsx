@@ -19,6 +19,47 @@ function getMessageText(message: UIMessage): string {
     .join('');
 }
 
+function renderFormattedText(text: string, isUser: boolean): React.ReactNode {
+  const boldClass = isUser
+    ? 'font-semibold text-white'
+    : 'font-semibold text-gray-900 dark:text-white';
+
+  const formatLine = (line: string, lineKey: number): React.ReactNode => {
+    const segments: React.ReactNode[] = [];
+    const pattern = /(\*\*\*\*(.+?)\*\*\*\*|\*\*(.+?)\*\*|__(.+?)__)/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let segmentKey = 0;
+
+    while ((match = pattern.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(line.slice(lastIndex, match.index));
+      }
+
+      const boldText = match[2] ?? match[3] ?? match[4];
+      segments.push(
+        <strong key={`${lineKey}-${segmentKey++}`} className={boldClass}>
+          {boldText}
+        </strong>
+      );
+      lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < line.length) {
+      segments.push(line.slice(lastIndex));
+    }
+
+    return segments.length > 0 ? segments : line;
+  };
+
+  return text.split('\n').map((line, index) => (
+    <React.Fragment key={index}>
+      {index > 0 && <br />}
+      {formatLine(line, index)}
+    </React.Fragment>
+  ));
+}
+
 export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName }) => {
   const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -121,7 +162,9 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
                         : 'bg-gray-100 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 rounded-bl-md'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{text}</p>
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                      {renderFormattedText(text, isUser)}
+                    </div>
                   </div>
 
                   {isUser && (

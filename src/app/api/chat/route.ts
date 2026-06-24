@@ -16,7 +16,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find the exact document.';
 
 export const maxDuration = 30;
 
@@ -51,6 +51,22 @@ type InvoiceSummary = {
   currency: string;
   itemCount: number;
   isRefund: boolean;
+};
+
+type InvoiceDetail = {
+  invoiceId: string;
+  id: string;
+  createdAt: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+  }>;
+  totalAmount: number;
+  paymentMethod: string;
+  currency: string;
+  finalAmount: number | null;
 };
 
 type ClosureReport = {
@@ -96,6 +112,39 @@ function parseRequestedDate(date?: string): Date | null {
     return isValid(fallback) ? fallback : null;
   }
 
+  return null;
+}
+
+const INVOICE_TIME_MATCH_WINDOW_MS = 2 * 60 * 1000;
+
+function parseDateAndTime(date: string, time: string): Date | null {
+  const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [, hour, minute] = timeMatch;
+  const parsed = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    0,
+    0
+  );
+
+  return isValid(parsed) ? parsed : null;
+}
+
+function toTimestamp(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Timestamp) return value.toDate();
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const parsed = new Date(value);
+    return isValid(parsed) ? parsed : null;
+  }
   return null;
 }
 
@@ -219,6 +268,81 @@ async function fetchInvoices(
       isRefund: Boolean(data.isRefund),
     };
   });
+}
+
+async function fetchInvoiceByDetails(
+  userId: string,
+  storeId: string,
+  date: string,
+  time: string
+): Promise<{ invoice: InvoiceDetail | null; error?: string; candidates?: number }> {
+  const targetTime = parseDateAndTime(date, time);
+  if (!targetTime) {
+    return {
+      invoice: null,
+      error: 'Invalid date or time format. Use date YYYY-MM-DD and time HH:MM.',
+    };
+  }
+
+  const rangeStart = new Date(targetTime.getTime() - INVOICE_TIME_MATCH_WINDOW_MS);
+  const rangeEnd = new Date(targetTime.getTime() + INVOICE_TIME_MATCH_WINDOW_MS);
+
+  const salesSnapshot = await storeRef(userId, storeId)
+    .collection('sales')
+    .where('createdAt', '>=', Timestamp.fromDate(rangeStart))
+    .where('createdAt', '<=', Timestamp.fromDate(rangeEnd))
+    .get();
+
+  if (salesSnapshot.empty) {
+    return { invoice: null, candidates: 0 };
+  }
+
+  const rankedMatches = salesSnapshot.docs
+    .map((saleDoc) => {
+      const createdAt = toTimestamp(saleDoc.data().createdAt);
+      if (!createdAt) return null;
+
+      return {
+        saleDoc,
+        diffMs: Math.abs(createdAt.getTime() - targetTime.getTime()),
+      };
+    })
+    .filter((match): match is NonNullable<typeof match> => match !== null)
+    .sort((a, b) => a.diffMs - b.diffMs);
+
+  const bestMatch = rankedMatches[0];
+  if (!bestMatch) {
+    return { invoice: null, candidates: 0 };
+  }
+
+  const data = bestMatch.saleDoc.data();
+  const items = ((data.items ?? []) as Array<{
+    productId?: string;
+    productName?: string;
+    quantity?: number;
+    price?: number;
+  }>).map((item) => ({
+    productId: item.productId ?? '',
+    productName: item.productName ?? 'Unknown product',
+    quantity: item.quantity ?? 0,
+    price: item.price ?? 0,
+  }));
+
+  const createdAt = toTimestamp(data.createdAt);
+
+  return {
+    invoice: {
+      invoiceId: (data.documentId as string | undefined) ?? bestMatch.saleDoc.id,
+      id: bestMatch.saleDoc.id,
+      createdAt: createdAt?.toISOString() ?? targetTime.toISOString(),
+      items,
+      totalAmount: (data.totalAmount as number) ?? 0,
+      paymentMethod: (data.paymentMethod as string) ?? 'unknown',
+      currency: (data.currency as string) ?? 'CZK',
+      finalAmount: (data.finalAmount as number | undefined) ?? null,
+    },
+    candidates: rankedMatches.length,
+  };
 }
 
 async function fetchSavedClosure(
@@ -426,6 +550,26 @@ export async function POST(req: Request) {
             } catch (error) {
               console.error('❌ getInvoices tool error:', error);
               return { error: 'Failed to load invoices from Firebase.', invoices: [] as InvoiceSummary[] };
+            }
+          },
+        }),
+        getInvoiceByDetails: tool({
+          description:
+            'Finds a specific invoice (sales document) by exact date and time within a 2-minute window.',
+          inputSchema: z.object({
+            date: z.string().describe('Invoice date in YYYY-MM-DD format'),
+            time: z.string().describe('Invoice time in HH:MM format (24-hour clock)'),
+          }),
+          execute: async ({ date, time }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), invoice: null };
+            }
+
+            try {
+              return await fetchInvoiceByDetails(context.userId, context.storeId, date, time);
+            } catch (error) {
+              console.error('❌ getInvoiceByDetails tool error:', error);
+              return { error: 'Failed to load invoice details from Firebase.', invoice: null };
             }
           },
         }),
