@@ -20,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation.';
 
 export const maxDuration = 30;
 
@@ -365,6 +365,163 @@ async function fetchProductCost(
     .map(({ matchRank: _matchRank, ...product }) => product);
 
   return { products, query };
+}
+
+type ProductUpdates = {
+  name?: string;
+  price?: number;
+  cost?: number;
+};
+
+type UpdateProductParams = {
+  productId: string;
+  updates: ProductUpdates;
+  confirmed?: boolean;
+};
+
+function formatProductMoney(value: number | null): string {
+  if (value === null) return 'not set';
+  return `${value.toLocaleString('cs-CZ')} CZK`;
+}
+
+function buildProductUpdatePayload(
+  current: { name: string; price: number; cost: number | null },
+  updates: ProductUpdates
+): { payload: Record<string, unknown>; changes: string[]; error?: string } {
+  const payload: Record<string, unknown> = {};
+  const changes: string[] = [];
+
+  if (updates.name !== undefined) {
+    const nextName = updates.name.trim();
+    if (!nextName) {
+      return { payload, changes, error: 'Product name cannot be empty.' };
+    }
+    if (nextName !== current.name) {
+      payload.name = nextName;
+      changes.push(`name: "${current.name}" -> "${nextName}"`);
+    }
+  }
+
+  if (updates.price !== undefined) {
+    if (!Number.isFinite(updates.price) || updates.price < 0) {
+      return { payload, changes, error: 'Price must be a non-negative number.' };
+    }
+    if (updates.price !== current.price) {
+      payload.price = updates.price;
+      changes.push(
+        `price: ${formatProductMoney(current.price)} -> ${formatProductMoney(updates.price)}`
+      );
+    }
+  }
+
+  if (updates.cost !== undefined) {
+    if (!Number.isFinite(updates.cost) || updates.cost < 0) {
+      return { payload, changes, error: 'Cost must be a non-negative number.' };
+    }
+    const currentCost = current.cost;
+    if (updates.cost !== currentCost) {
+      payload.cost = updates.cost;
+      changes.push(
+        `cost: ${formatProductMoney(currentCost)} -> ${formatProductMoney(updates.cost)}`
+      );
+    }
+  }
+
+  return { payload, changes };
+}
+
+async function executeUpdateProduct(userId: string, storeId: string, params: UpdateProductParams) {
+  const productId = params.productId?.trim();
+  if (!productId) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error: 'productId is required.',
+      message: 'productId is required.',
+    };
+  }
+
+  const updates = params.updates ?? {};
+  const hasUpdates =
+    updates.name !== undefined || updates.price !== undefined || updates.cost !== undefined;
+
+  if (!hasUpdates) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error: 'At least one field in updates (name, price, cost) is required.',
+      message: 'At least one field in updates (name, price, cost) is required.',
+    };
+  }
+
+  const productRef = storeRef(userId, storeId).collection('products').doc(productId);
+  const productDoc = await productRef.get();
+
+  if (!productDoc.exists) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error: `Product with id "${productId}" was not found.`,
+      message: `Product with id "${productId}" was not found.`,
+    };
+  }
+
+  const data = productDoc.data()!;
+  const current = {
+    name: (data.name as string) ?? 'Unknown product',
+    price: (data.price as number) ?? 0,
+    cost: typeof data.cost === 'number' ? data.cost : null,
+  };
+
+  const { payload, changes, error } = buildProductUpdatePayload(current, updates);
+  if (error) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      error,
+      message: error,
+    };
+  }
+
+  if (changes.length === 0) {
+    return {
+      updated: false,
+      requiresConfirmation: false,
+      productId,
+      productName: current.name,
+      message: 'No changes detected. The requested values already match the current product data.',
+    };
+  }
+
+  const previewMessage = `I plan to make the following changes to ${current.name}: ${changes.join('; ')}. Do you confirm I should proceed?`;
+
+  if (!params.confirmed) {
+    return {
+      updated: false,
+      requiresConfirmation: true,
+      productId,
+      productName: current.name,
+      current,
+      plannedChanges: changes,
+      message: previewMessage,
+    };
+  }
+
+  await productRef.update({
+    ...payload,
+    updatedAt: Timestamp.now(),
+  });
+
+  const updatedName = (payload.name as string | undefined) ?? current.name;
+
+  return {
+    updated: true,
+    requiresConfirmation: false,
+    productId,
+    productName: updatedName,
+    appliedChanges: changes,
+    message: `Product "${updatedName}" was updated successfully.`,
+  };
 }
 
 async function fetchProductsCatalog(userId: string, storeId: string): Promise<CatalogProduct[]> {
@@ -1296,6 +1453,44 @@ export async function POST(req: Request) {
                 sent: false,
                 error: 'Failed to send closure report.',
                 message: 'Failed to send closure report.',
+              };
+            }
+          },
+        }),
+        updateProduct: tool({
+          description:
+            'Preview or apply updates to a product (name, price, cost). Always call first with confirmed=false to show planned changes and ask for user confirmation. Call again with confirmed=true only after the user explicitly approves.',
+          inputSchema: z.object({
+            productId: z.string().describe('Firestore document ID of the product to update'),
+            updates: z
+              .object({
+                name: z.string().optional().describe('New product name'),
+                price: z.number().nonnegative().optional().describe('New selling price in CZK'),
+                cost: z.number().nonnegative().optional().describe('New purchase cost (nákupka) in CZK'),
+              })
+              .describe('Fields to change on the product'),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms the update.'),
+          }),
+          execute: async ({ productId, updates, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), updated: false };
+            }
+
+            try {
+              return await executeUpdateProduct(context.userId, context.storeId, {
+                productId,
+                updates,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ updateProduct tool error:', error);
+              return {
+                updated: false,
+                error: 'Failed to update product.',
+                message: 'Failed to update product.',
               };
             }
           },
