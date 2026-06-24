@@ -13,7 +13,7 @@ import { cs } from 'date-fns/locale';
 import nodemailer from 'nodemailer';
 import { buildEmailReportData, generateEmailContent } from '@/lib/email';
 import { saleTipInCzk } from '@/lib/saleTip';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, saveChat } from '@/lib/firebase-admin';
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -1005,7 +1005,9 @@ export async function POST(req: Request) {
       messages,
       storeId,
       userId,
-    }: { messages: UIMessage[]; storeId?: string; userId?: string } = await req.json();
+      id: chatId,
+    }: { messages: UIMessage[]; storeId?: string; userId?: string; id?: string } =
+      await req.json();
 
     const context: StoreContext = { storeId, userId };
 
@@ -1193,7 +1195,23 @@ export async function POST(req: Request) {
       stopWhen: stepCountIs(10),
     });
 
-    return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      onFinish: async ({ messages: updatedMessages, isAborted }) => {
+        if (isAborted || !chatId || !userId || !storeId) return;
+
+        try {
+          await saveChat({
+            chatId,
+            userId,
+            storeId,
+            messages: updatedMessages,
+          });
+        } catch (error) {
+          console.error('❌ Failed to persist chat history:', error);
+        }
+      },
+    });
   } catch (error) {
     console.error('❌ Error in chat API:', error);
     return new Response(JSON.stringify({ error: 'Chat API error' }), {
