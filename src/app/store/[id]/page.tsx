@@ -10,7 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed } from 'lucide-react';
+import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed, Sparkles } from 'lucide-react';
 
 const ViewLoading = () => (
   <div className="flex items-center justify-center py-12">
@@ -38,8 +38,12 @@ const DispatchView = dynamic(
   () => import('@/components/pos/DispatchView').then((m) => ({ default: m.DispatchView })),
   { loading: () => <ViewLoading /> }
 );
+const AICopilotView = dynamic(
+  () => import('@/components/pos/AICopilotView').then((m) => ({ default: m.AICopilotView })),
+  { loading: () => <ViewLoading /> }
+);
 
-type ViewType = 'pos' | 'receipts' | 'dispatch' | 'reports' | 'settings';
+type ViewType = 'pos' | 'receipts' | 'dispatch' | 'aichat' | 'reports' | 'settings';
 
 export default function StorePage() {
   const params = useParams();
@@ -101,20 +105,18 @@ export default function StorePage() {
   }
 
   const renderView = () => {
-    switch (currentView) {
-      case 'pos':
-        return <POSSystem storeId={storeId} storeName={store.name} />;
-      case 'receipts':
-        return <ReceiptsView storeId={storeId} />;
-      case 'dispatch':
-        return store.type === 'bistro' ? <DispatchView storeId={storeId} /> : <POSSystem storeId={storeId} storeName={store.name} />;
-      case 'reports':
-        return <ReportsView storeId={storeId} />;
-      case 'settings':
-        return <SettingsView storeId={storeId} />;
-      default:
-        return <POSSystem storeId={storeId} storeName={store.name} />;
-    }
+    return (
+      <>
+        <div className={currentView === 'pos' ? undefined : 'hidden'} aria-hidden={currentView !== 'pos'}>
+          <POSSystem storeId={storeId} storeName={store.name} />
+        </div>
+        {currentView === 'receipts' && <ReceiptsView storeId={storeId} />}
+        {currentView === 'dispatch' && store.type === 'bistro' && <DispatchView storeId={storeId} />}
+        {currentView === 'aichat' && <AICopilotView storeId={storeId} storeName={store.name} />}
+        {currentView === 'reports' && <ReportsView storeId={storeId} />}
+        {currentView === 'settings' && <SettingsView storeId={storeId} />}
+      </>
+    );
   };
 
   const getViewIcon = (view: ViewType) => {
@@ -125,6 +127,8 @@ export default function StorePage() {
         return <Receipt className="h-5 w-5" />;
       case 'dispatch':
         return <UtensilsCrossed className="h-5 w-5" />;
+      case 'aichat':
+        return <Sparkles className="h-5 w-5" />;
       case 'reports':
         return <BarChart3 className="h-5 w-5" />;
       case 'settings':
@@ -140,6 +144,8 @@ export default function StorePage() {
         return 'Doklady';
       case 'dispatch':
         return 'Výdej';
+      case 'aichat':
+        return 'AI Chat';
       case 'reports':
         return 'Uzávěrky';
       case 'settings':
@@ -177,7 +183,7 @@ export default function StorePage() {
         <nav className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="w-full flex justify-between items-stretch">
-              {(['pos', 'receipts', ...(store.type === 'bistro' ? (['dispatch'] as ViewType[]) : []), 'reports', 'settings'] as ViewType[]).map((view) => (
+              {(['pos', 'receipts', ...(store.type === 'bistro' ? (['dispatch'] as ViewType[]) : []), 'aichat', 'reports', 'settings'] as ViewType[]).map((view) => (
                 <button
                   key={view}
                   onClick={() => setCurrentView(view)}

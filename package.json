@@ -16,8 +16,11 @@
     "firebase:serve": "cd functions && npm run serve"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.86",
+    "@ai-sdk/react": "^3.0.211",
     "@headlessui/react": "^1.7.17",
     "@hookform/resolvers": "^3.3.2",
+    "ai": "^6.0.209",
     "date-fns": "^2.30.0",
     "firebase": "^10.14.1",
     "framer-motion": "^10.16.0",
