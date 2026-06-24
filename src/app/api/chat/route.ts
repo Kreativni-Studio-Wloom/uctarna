@@ -1,5 +1,9 @@
-import { anthropic } from '@ai-sdk/anthropic';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+
+const anthropic = createAnthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 export const maxDuration = 30;
 
@@ -8,7 +12,7 @@ export async function POST(req: Request) {
     const { messages }: { messages: UIMessage[] } = await req.json();
 
     const result = streamText({
-      model: anthropic('claude-3-5-sonnet-latest'),
+      model: anthropic('claude-3-5-sonnet-20240620'),
       system: 'You are a helpful AI assistant for a premium POS system.',
       messages: await convertToModelMessages(messages),
     });
@@ -16,8 +20,7 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse();
   } catch (error) {
     console.error('❌ Error in chat API:', error);
-    const message = error instanceof Error ? error.message : 'Neznámá chyba';
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(JSON.stringify({ error: 'Chat API error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
