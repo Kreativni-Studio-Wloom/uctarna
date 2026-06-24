@@ -8,7 +8,7 @@ export async function POST(req: Request) {
     const { messages }: { messages: UIMessage[] } = await req.json();
 
     const result = streamText({
-      model: anthropic('claude-3-5-sonnet-20240620'),
+      model: anthropic('claude-3-haiku-20240307'),
       system: 'You are a helpful AI assistant for a premium POS system.',
       messages: await convertToModelMessages(messages),
     });
