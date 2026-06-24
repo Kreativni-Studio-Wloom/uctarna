@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { isTextUIPart, type UIMessage } from 'ai';
+import { DefaultChatTransport, isTextUIPart, type UIMessage } from 'ai';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 import { Bot, Loader2, Send, Sparkles, User } from 'lucide-react';
 
 interface AICopilotViewProps {
@@ -18,12 +19,24 @@ function getMessageText(message: UIMessage): string {
     .join('');
 }
 
-export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeName }) => {
+export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName }) => {
+  const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState('');
 
-  const { messages, sendMessage, status, error } = useChat();
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        body: {
+          storeId,
+          userId: user?.uid,
+        },
+      }),
+    [storeId, user?.uid]
+  );
+
+  const { messages, sendMessage, status, error } = useChat({ transport });
 
   const isLoading = status === 'submitted' || status === 'streaming';
 

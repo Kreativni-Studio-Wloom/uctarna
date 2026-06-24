@@ -23,6 +23,7 @@
     "ai": "^6.0.209",
     "date-fns": "^2.30.0",
     "firebase": "^10.14.1",
+    "firebase-admin": "^14.1.0",
     "framer-motion": "^10.16.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
