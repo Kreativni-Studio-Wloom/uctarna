@@ -20,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin.';
 
 export const maxDuration = 30;
 
@@ -43,6 +43,14 @@ type CatalogProduct = {
   stock: number | null;
   soldCount: number;
   isExtra: boolean;
+};
+
+type ProductCostMatch = {
+  id: string;
+  name: string;
+  price: number;
+  cost: number | null;
+  purchasePrice: number | null;
 };
 
 type InvoiceSummary = {
@@ -297,6 +305,66 @@ async function fetchTopProductsFromCatalog(
     })
     .sort((a, b) => b.quantitySold - a.quantitySold)
     .slice(0, limit);
+}
+
+function resolveProductCost(data: FirebaseFirestore.DocumentData): {
+  cost: number | null;
+  purchasePrice: number | null;
+} {
+  const cost = typeof data.cost === 'number' ? data.cost : null;
+  const purchasePrice = typeof data.purchasePrice === 'number' ? data.purchasePrice : null;
+
+  return { cost, purchasePrice };
+}
+
+function rankProductNameMatches(query: string, name: string): number {
+  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedName = name.trim().toLowerCase();
+
+  if (!normalizedQuery || !normalizedName.includes(normalizedQuery)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  if (normalizedName === normalizedQuery) return 0;
+  if (normalizedName.startsWith(normalizedQuery)) return 1;
+  return 2;
+}
+
+async function fetchProductCost(
+  userId: string,
+  storeId: string,
+  productName: string
+): Promise<{ products: ProductCostMatch[]; query: string }> {
+  const query = productName.trim();
+  if (!query) {
+    return { products: [], query: productName };
+  }
+
+  const productsSnapshot = await storeRef(userId, storeId).collection('products').get();
+
+  const products = productsSnapshot.docs
+    .map((productDoc) => {
+      const data = productDoc.data();
+      const name = (data.name as string) ?? 'Unknown product';
+      const { cost, purchasePrice } = resolveProductCost(data);
+
+      return {
+        id: productDoc.id,
+        name,
+        price: (data.price as number) ?? 0,
+        cost,
+        purchasePrice,
+        matchRank: rankProductNameMatches(query, name),
+      };
+    })
+    .filter((product) => product.matchRank !== Number.POSITIVE_INFINITY)
+    .sort((a, b) => {
+      if (a.matchRank !== b.matchRank) return a.matchRank - b.matchRank;
+      return a.name.localeCompare(b.name, 'cs');
+    })
+    .map(({ matchRank: _matchRank, ...product }) => product);
+
+  return { products, query };
 }
 
 async function fetchProductsCatalog(userId: string, storeId: string): Promise<CatalogProduct[]> {
@@ -1061,6 +1129,47 @@ export async function POST(req: Request) {
             } catch (error) {
               console.error('❌ getProductsCatalog tool error:', error);
               return { error: 'Failed to load product catalog from Firebase.', products: [] as CatalogProduct[] };
+            }
+          },
+        }),
+        getProductCost: tool({
+          description:
+            'Returns the purchase cost (nákupka) for products matching the given name. Supports exact and partial name matches.',
+          inputSchema: z.object({
+            productName: z.string().describe('Product name to search for (exact or partial match)'),
+          }),
+          execute: async ({ productName }) => {
+            if (!context.storeId || !context.userId) {
+              return {
+                error: missingContextError(),
+                query: productName,
+                products: [] as ProductCostMatch[],
+              };
+            }
+
+            try {
+              const result = await fetchProductCost(context.userId, context.storeId, productName);
+
+              if (result.products.length === 0) {
+                return {
+                  query: result.query,
+                  products: [] as ProductCostMatch[],
+                  message: `No products found matching "${result.query}".`,
+                };
+              }
+
+              return {
+                query: result.query,
+                products: result.products,
+                count: result.products.length,
+              };
+            } catch (error) {
+              console.error('❌ getProductCost tool error:', error);
+              return {
+                error: 'Failed to load product cost from Firebase.',
+                query: productName,
+                products: [] as ProductCostMatch[],
+              };
             }
           },
         }),
