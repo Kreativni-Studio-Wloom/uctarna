@@ -16,7 +16,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find the exact document.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one.';
 
 export const maxDuration = 30;
 
@@ -67,6 +67,13 @@ type InvoiceDetail = {
   paymentMethod: string;
   currency: string;
   finalAmount: number | null;
+};
+
+type InvoiceByDetailsResult = {
+  summary: string;
+  count: number;
+  invoices: InvoiceDetail[];
+  error?: string;
 };
 
 type ClosureReport = {
@@ -343,23 +350,76 @@ async function fetchInvoices(
   });
 }
 
+function mapSaleDocToInvoiceDetail(
+  saleDoc: FirebaseFirestore.QueryDocumentSnapshot,
+  fallbackCreatedAt?: string
+): InvoiceDetail | null {
+  const data = saleDoc.data();
+  const createdAt = normalizeCreatedAt(data.createdAt);
+  const items = ((data.items ?? []) as Array<{
+    productId?: string;
+    productName?: string;
+    quantity?: number;
+    price?: number;
+  }>).map((item) => ({
+    productId: item.productId ?? '',
+    productName: item.productName ?? 'Unknown product',
+    quantity: item.quantity ?? 0,
+    price: item.price ?? 0,
+  }));
+
+  return {
+    invoiceId: (data.documentId as string | undefined) ?? saleDoc.id,
+    id: saleDoc.id,
+    createdAt: createdAt ? formatFirestoreUtcPlus2String(createdAt) : (fallbackCreatedAt ?? 'Unknown time'),
+    items,
+    totalAmount: (data.totalAmount as number) ?? 0,
+    paymentMethod: (data.paymentMethod as string) ?? 'unknown',
+    currency: (data.currency as string) ?? 'CZK',
+    finalAmount: (data.finalAmount as number | undefined) ?? null,
+  };
+}
+
+function buildInvoiceSearchSummary(invoices: InvoiceDetail[]): string {
+  if (invoices.length === 0) {
+    return 'No invoices found in the requested time frame.';
+  }
+
+  const list = invoices
+    .map(
+      (invoice) =>
+        `ID: ${invoice.invoiceId}, Time: ${invoice.createdAt}, Total: ${invoice.totalAmount} ${invoice.currency}`
+    )
+    .join('; ');
+
+  const label = invoices.length === 1 ? 'invoice' : 'invoices';
+  return `Here are ${invoices.length} ${label} found in the requested time frame: [${list}]`;
+}
+
 async function fetchInvoiceByDetails(
   userId: string,
   storeId: string,
   date: string,
   time: string
-): Promise<{ invoice: InvoiceDetail | null; error?: string; candidates?: number }> {
+): Promise<InvoiceByDetailsResult> {
   const targetTime = parseDateAndTimeUtcPlus2(date, time);
   if (!targetTime) {
     return {
-      invoice: null,
+      summary: 'No invoices found in the requested time frame.',
+      count: 0,
+      invoices: [],
       error: 'Invalid date or time format. Use date YYYY-MM-DD and time HH:MM (interpreted as UTC+2).',
     };
   }
 
   const dayRange = getUtcPlus2DayRange(date);
   if (!dayRange) {
-    return { invoice: null, error: 'Invalid date format. Use YYYY-MM-DD.' };
+    return {
+      summary: 'No invoices found in the requested time frame.',
+      count: 0,
+      invoices: [],
+      error: 'Invalid date format. Use YYYY-MM-DD.',
+    };
   }
 
   const targetDisplay = formatFirestoreUtcPlus2String(targetTime);
@@ -406,38 +466,14 @@ async function fetchInvoiceByDetails(
     .filter((match): match is NonNullable<typeof match> => match !== null)
     .sort((a, b) => a.diffMs - b.diffMs);
 
-  if (rankedMatches.length === 0) {
-    return { invoice: null, candidates: 0 };
-  }
-
-  const bestMatch = rankedMatches[0];
-  const data = bestMatch.saleDoc.data();
-  const items = ((data.items ?? []) as Array<{
-    productId?: string;
-    productName?: string;
-    quantity?: number;
-    price?: number;
-  }>).map((item) => ({
-    productId: item.productId ?? '',
-    productName: item.productName ?? 'Unknown product',
-    quantity: item.quantity ?? 0,
-    price: item.price ?? 0,
-  }));
-
-  const createdAt = normalizeCreatedAt(data.createdAt);
+  const invoices = rankedMatches
+    .map(({ saleDoc }) => mapSaleDocToInvoiceDetail(saleDoc, targetDisplay))
+    .filter((invoice): invoice is InvoiceDetail => invoice !== null);
 
   return {
-    invoice: {
-      invoiceId: (data.documentId as string | undefined) ?? bestMatch.saleDoc.id,
-      id: bestMatch.saleDoc.id,
-      createdAt: createdAt ? formatFirestoreUtcPlus2String(createdAt) : targetDisplay,
-      items,
-      totalAmount: (data.totalAmount as number) ?? 0,
-      paymentMethod: (data.paymentMethod as string) ?? 'unknown',
-      currency: (data.currency as string) ?? 'CZK',
-      finalAmount: (data.finalAmount as number | undefined) ?? null,
-    },
-    candidates: rankedMatches.length,
+    summary: buildInvoiceSearchSummary(invoices),
+    count: invoices.length,
+    invoices,
   };
 }
 
@@ -651,21 +687,31 @@ export async function POST(req: Request) {
         }),
         getInvoiceByDetails: tool({
           description:
-            'Finds a specific invoice (sales document) by exact date and time within a 2-minute window. Date/time are always interpreted as UTC+2.',
+            'Finds all invoices (sales documents) matching the requested date and time within a 2-minute window. Date/time are always interpreted as UTC+2. Returns every match so the user can choose the correct document.',
           inputSchema: z.object({
             date: z.string().describe('Invoice date in YYYY-MM-DD format (UTC+2)'),
             time: z.string().describe('Invoice time in HH:MM format, 24-hour clock, always UTC+2'),
           }),
           execute: async ({ date, time }) => {
             if (!context.storeId || !context.userId) {
-              return { error: missingContextError(), invoice: null };
+              return {
+                error: missingContextError(),
+                summary: 'No invoices found in the requested time frame.',
+                count: 0,
+                invoices: [] as InvoiceDetail[],
+              };
             }
 
             try {
               return await fetchInvoiceByDetails(context.userId, context.storeId, date, time);
             } catch (error) {
               console.error('❌ getInvoiceByDetails tool error:', error);
-              return { error: 'Failed to load invoice details from Firebase.', invoice: null };
+              return {
+                error: 'Failed to load invoice details from Firebase.',
+                summary: 'No invoices found in the requested time frame.',
+                count: 0,
+                invoices: [] as InvoiceDetail[],
+              };
             }
           },
         }),
