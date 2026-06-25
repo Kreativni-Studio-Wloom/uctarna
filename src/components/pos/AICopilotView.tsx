@@ -131,7 +131,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
   };
 
   return (
-    <div className="card-elevated flex flex-col h-[calc(100vh-16rem)] min-h-[480px] overflow-hidden">
+    <div className="card-elevated flex flex-col h-[55vh] md:h-[calc(100vh-16rem)] min-h-[320px] md:min-h-[480px] overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-hide">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
@@ -295,16 +295,7 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
       </div>
 
       <div className="flex flex-col md:flex-row gap-4">
-        <ChatSidebar
-          userId={user?.uid}
-          storeId={storeId}
-          activeChatId={chatId}
-          refreshKey={sidebarRefreshKey}
-          onSelectChat={(selectedChatId) => void handleSelectChat(selectedChatId)}
-          onNewChat={handleNewChat}
-        />
-
-        <div className="flex-1 min-w-0">
+        <div className="order-1 md:order-2 flex-1 min-w-0">
           {loadError && (
             <div className="mb-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 text-sm text-red-700 dark:text-red-300">
               {loadError}
@@ -312,7 +303,7 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
           )}
 
           {loadingChat ? (
-            <div className="card-elevated flex items-center justify-center h-[calc(100vh-16rem)] min-h-[480px]">
+            <div className="card-elevated flex items-center justify-center h-[55vh] md:h-[calc(100vh-16rem)] min-h-[320px] md:min-h-[480px]">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                 <Loader2 className="h-6 w-6 animate-spin" />
                 Načítám chat…
@@ -329,6 +320,17 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
               onChatUpdated={handleChatUpdated}
             />
           )}
+        </div>
+
+        <div className="order-2 md:order-1">
+          <ChatSidebar
+            userId={user?.uid}
+            storeId={storeId}
+            activeChatId={chatId}
+            refreshKey={sidebarRefreshKey}
+            onSelectChat={(selectedChatId) => void handleSelectChat(selectedChatId)}
+            onNewChat={handleNewChat}
+          />
         </div>
       </div>
     </div>
