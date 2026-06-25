@@ -131,7 +131,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
   };
 
   return (
-    <div className="card-elevated flex flex-col h-[55vh] md:h-[calc(100vh-16rem)] min-h-[320px] md:min-h-[480px] overflow-hidden">
+    <div className="card-elevated flex flex-col h-[70vh] md:h-[calc(100vh-16rem)] min-h-[420px] md:min-h-[480px] overflow-hidden">
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-hide">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
@@ -303,7 +303,7 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
           )}
 
           {loadingChat ? (
-            <div className="card-elevated flex items-center justify-center h-[55vh] md:h-[calc(100vh-16rem)] min-h-[320px] md:min-h-[480px]">
+            <div className="card-elevated flex items-center justify-center h-[70vh] md:h-[calc(100vh-16rem)] min-h-[420px] md:min-h-[480px]">
               <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                 <Loader2 className="h-6 w-6 animate-spin" />
                 Načítám chat…

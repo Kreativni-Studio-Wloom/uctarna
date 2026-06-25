@@ -76,7 +76,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
   }, [loadChats, refreshKey]);
 
   return (
-    <aside className="w-full md:w-72 flex-shrink-0 card-elevated flex flex-col h-auto max-h-[35vh] md:h-[calc(100vh-16rem)] md:max-h-none md:min-h-[480px] overflow-hidden">
+    <aside className="w-full md:w-72 flex-shrink-0 card-elevated flex flex-col h-auto min-h-[240px] max-h-[48vh] md:h-[calc(100vh-16rem)] md:max-h-none md:min-h-[480px] overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <button
           type="button"
