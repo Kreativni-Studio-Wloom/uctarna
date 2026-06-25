@@ -221,7 +221,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Napište zprávu… (Enter pro odeslání, Shift+Enter pro nový řádek)"
+            placeholder="Napište zprávu..."
             rows={1}
             disabled={isLoading}
             className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-60 select-text min-h-[48px] max-h-32"
