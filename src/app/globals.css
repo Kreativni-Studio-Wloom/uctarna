@@ -136,6 +136,16 @@ button, [role="button"], .clickable {
   }
 }
 
+@layer components {
+  .card-elevated {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700;
+  }
+
+  .glass-panel {
+    @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-200/60 dark:border-gray-700/60;
+  }
+}
+
 /* Custom scrollbar styles */
 .overflow-x-auto {
   overflow-x: auto;
