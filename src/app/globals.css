@@ -97,7 +97,7 @@ input, textarea, [contenteditable] {
   user-select: text;
 }
 
-/* Allow text selection in marked regions (e.g. chat messages) */
+/* Allow text selection in marked regions (e.g. chat messages, receipts) */
 .select-text,
 .select-text * {
   -webkit-user-select: text;
@@ -105,6 +105,9 @@ input, textarea, [contenteditable] {
   -ms-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;
+}
+
+.select-text *:not(button):not([role="button"]):not(a):not(input):not(textarea):not(select) {
   touch-action: auto;
   cursor: text;
 }
