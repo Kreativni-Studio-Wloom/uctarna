@@ -46,8 +46,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({
   initialMessages,
   onChatUpdated,
 }) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const followConversationRef = useRef(false);
   const [input, setInput] = useState('');
 
   const transport = useMemo(
@@ -70,8 +71,21 @@ const ChatSession: React.FC<ChatSessionProps> = ({
   const isLoading = status === 'submitted' || status === 'streaming';
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!followConversationRef.current) return;
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      followConversationRef.current = false;
+    }
+  }, [isLoading]);
 
   const handleSubmit = async (event?: React.FormEvent) => {
     event?.preventDefault?.();
@@ -79,9 +93,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({
     if (!text || isLoading) return;
 
     setInput('');
+    followConversationRef.current = true;
     await sendMessage({ text });
     onChatUpdated();
-    inputRef.current?.focus();
+
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      inputRef.current?.blur();
+    } else {
+      inputRef.current?.focus({ preventScroll: true });
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -93,7 +113,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({
 
   return (
     <div className="card-elevated flex flex-col h-[70vh] md:h-[calc(100vh-16rem)] min-h-[420px] md:min-h-[480px] overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-hide select-text">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain p-4 sm:p-6 space-y-4 scrollbar-hide select-text"
+      >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
             <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-4">
@@ -208,7 +231,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({
           </div>
         )}
 
-        <div ref={messagesEndRef} />
       </div>
 
       {error && (
