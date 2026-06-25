@@ -22,6 +22,31 @@ const anthropic = createAnthropic({
 const SYSTEM_PROMPT =
   'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves. You can manage pinned items in the POS menu using the togglePinnedItem tool. Always confirm the action with the user. Always call togglePinnedItem first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can manage extras using the addExtra tool. Always confirm details before saving. Always call addExtra first with confirmed=false to show a summary and ask for confirmation. Only call addExtra with confirmed=true after the user explicitly approves. You are now an administrator of the system. You can update configuration parameters like exchange rates, billing details, and payment settings via the updateSettings tool. ALWAYS confirm significant changes like IBAN or company details with the user. Always call updateSettings first with confirmed=false, then call again with confirmed=true only after explicit user approval.';
 
+const STORE_TIMEZONE = 'Europe/Prague';
+
+function buildSystemPrompt(now = new Date()): string {
+  const currentDateTime = new Intl.DateTimeFormat('cs-CZ', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: STORE_TIMEZONE,
+    hour12: false,
+  }).format(now);
+
+  const calendarDate = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: STORE_TIMEZONE,
+  }).format(now);
+
+  return `${SYSTEM_PROMPT}\n\nCurrent date and time in store timezone (${STORE_TIMEZONE}): ${currentDateTime} (calendar date ${calendarDate}). Treat this as authoritative "now" when the user asks about today, yesterday, this week, or the current time.`;
+}
+
 export const maxDuration = 30;
 
 type StoreContext = {
@@ -1748,7 +1773,7 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model: anthropic('claude-haiku-4-5-20251001'),
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(),
       messages: await convertToModelMessages(messages),
       tools: {
         getTopProducts: tool({
