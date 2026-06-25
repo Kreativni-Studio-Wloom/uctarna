@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isTextUIPart, type UIMessage } from 'ai';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useAuth } from '@/contexts/AuthContext';
 import { Bot, Loader2, Send, Sparkles, User } from 'lucide-react';
 import { ChatSidebar } from './ChatSidebar';
@@ -34,47 +36,6 @@ function getMessageText(message: UIMessage): string {
     .filter(isTextUIPart)
     .map((part) => part.text)
     .join('');
-}
-
-function renderFormattedText(text: string, isUser: boolean): React.ReactNode {
-  const boldClass = isUser
-    ? 'font-semibold text-white'
-    : 'font-semibold text-gray-900 dark:text-white';
-
-  const formatLine = (line: string, lineKey: number): React.ReactNode => {
-    const segments: React.ReactNode[] = [];
-    const pattern = /(\*\*\*\*(.+?)\*\*\*\*|\*\*(.+?)\*\*|__(.+?)__)/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    let segmentKey = 0;
-
-    while ((match = pattern.exec(line)) !== null) {
-      if (match.index > lastIndex) {
-        segments.push(line.slice(lastIndex, match.index));
-      }
-
-      const boldText = match[2] ?? match[3] ?? match[4];
-      segments.push(
-        <strong key={`${lineKey}-${segmentKey++}`} className={boldClass}>
-          {boldText}
-        </strong>
-      );
-      lastIndex = pattern.lastIndex;
-    }
-
-    if (lastIndex < line.length) {
-      segments.push(line.slice(lastIndex));
-    }
-
-    return segments.length > 0 ? segments : line;
-  };
-
-  return text.split('\n').map((line, index) => (
-    <React.Fragment key={index}>
-      {index > 0 && <br />}
-      {formatLine(line, index)}
-    </React.Fragment>
-  ));
 }
 
 const ChatSession: React.FC<ChatSessionProps> = ({
@@ -173,8 +134,53 @@ const ChatSession: React.FC<ChatSessionProps> = ({
                       : 'bg-gray-100 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 rounded-bl-md'
                   }`}
                 >
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
-                    {renderFormattedText(text, isUser)}
+                  <div className="text-sm leading-relaxed break-words select-text">
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap">{text}</p>
+                    ) : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          table: ({ node, ...props }) => (
+                            <div className="overflow-x-auto my-4 rounded-lg border border-slate-700">
+                              <table
+                                className="min-w-full divide-y divide-slate-700 text-left text-sm text-slate-200"
+                                {...props}
+                              />
+                            </div>
+                          ),
+                          thead: ({ node, ...props }) => (
+                            <thead className="bg-slate-800 text-xs uppercase text-slate-400" {...props} />
+                          ),
+                          th: ({ node, ...props }) => (
+                            <th className="px-4 py-3 font-semibold" {...props} />
+                          ),
+                          tbody: ({ node, ...props }) => (
+                            <tbody className="divide-y divide-slate-800" {...props} />
+                          ),
+                          td: ({ node, ...props }) => (
+                            <td className="px-4 py-3 whitespace-nowrap" {...props} />
+                          ),
+                          ul: ({ node, ...props }) => (
+                            <ul className="my-2 list-disc list-inside space-y-1" {...props} />
+                          ),
+                          ol: ({ node, ...props }) => (
+                            <ol className="my-2 list-decimal list-inside space-y-1" {...props} />
+                          ),
+                          li: ({ node, ...props }) => (
+                            <li className="leading-relaxed" {...props} />
+                          ),
+                          strong: ({ node, ...props }) => (
+                            <strong className="font-semibold text-gray-900 dark:text-white" {...props} />
+                          ),
+                          p: ({ node, ...props }) => (
+                            <p className="my-1.5 leading-relaxed" {...props} />
+                          ),
+                        }}
+                      >
+                        {text}
+                      </ReactMarkdown>
+                    )}
                   </div>
                 </div>
 
