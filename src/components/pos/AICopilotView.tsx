@@ -132,7 +132,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
 
   return (
     <div className="card-elevated flex flex-col h-[70vh] md:h-[calc(100vh-16rem)] min-h-[420px] md:min-h-[480px] overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 scrollbar-hide select-text">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
             <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-4">
@@ -173,7 +173,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
                       : 'bg-gray-100 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 rounded-bl-md'
                   }`}
                 >
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap break-words select-text">
                     {renderFormattedText(text, isUser)}
                   </div>
                 </div>

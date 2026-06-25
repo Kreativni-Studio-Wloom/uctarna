@@ -97,6 +97,18 @@ input, textarea, [contenteditable] {
   user-select: text;
 }
 
+/* Allow text selection in marked regions (e.g. chat messages) */
+.select-text,
+.select-text * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+  touch-action: auto;
+  cursor: text;
+}
+
 /* Touch-friendly buttons */
 button, [role="button"], .clickable {
   touch-action: manipulation;
