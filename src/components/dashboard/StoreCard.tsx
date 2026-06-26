@@ -49,10 +49,12 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
       {/* Duplicate Button */}
       {onDuplicate && showDuplicateButton && (
         <motion.button
+          type="button"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           onClick={handleDuplicate}
+          onPointerUp={(e) => e.stopPropagation()}
           className="absolute top-3 right-3 z-10 w-9 h-9 bg-white dark:bg-gray-700 rounded-lg shadow-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center justify-center"
           title="Duplikovat prodejnu"
         >
