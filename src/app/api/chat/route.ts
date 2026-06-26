@@ -47,7 +47,7 @@ function buildSystemPrompt(now = new Date()): string {
   return `${SYSTEM_PROMPT}\n\nCurrent date and time in store timezone (${STORE_TIMEZONE}): ${currentDateTime} (calendar date ${calendarDate}). Treat this as authoritative "now" when the user asks about today, yesterday, this week, or the current time.`;
 }
 
-export const maxDuration = 30;
+export const maxDuration = 300;
 
 type StoreContext = {
   storeId?: string;
@@ -1775,6 +1775,7 @@ export async function POST(req: Request) {
       model: anthropic('claude-haiku-4-5-20251001'),
       system: buildSystemPrompt(),
       messages: await convertToModelMessages(messages),
+      maxOutputTokens: 64000,
       tools: {
         getTopProducts: tool({
           description: 'Returns the top-selling products for the current store by quantity sold.',
@@ -2169,7 +2170,7 @@ export async function POST(req: Request) {
           },
         }),
       },
-      stopWhen: stepCountIs(10),
+      stopWhen: stepCountIs(20),
     });
 
     return result.toUIMessageStreamResponse({
