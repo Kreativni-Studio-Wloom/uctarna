@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -15,6 +15,7 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const { user } = useAuth();
   const storeDoc = useStore();
+  const [storeName, setStoreName] = useState('');
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [tipsEnabled, setTipsEnabled] = useState(false);
@@ -28,6 +29,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   // Synchronizace z jediného store listeneru na úrovni stránky prodejny.
   useEffect(() => {
     if (!storeDoc) return;
+    setStoreName(typeof storeDoc.name === 'string' ? storeDoc.name : '');
     if (typeof storeDoc.eurRate === 'number') {
       setEurRate(storeDoc.eurRate);
     }
@@ -48,9 +50,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const handleSave = async () => {
     if (!user) return;
 
+    const trimmedName = storeName.trim();
+    if (!trimmedName) return;
+
     setSaving(true);
     try {
       await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
+        name: trimmedName,
         eurRate,
         redirectToSumUp,
         tipsEnabled,
@@ -83,7 +89,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !storeName.trim()}
           className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
         >
           {saving ? (
@@ -104,6 +110,41 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           )}
         </motion.button>
       </div>
+
+      {/* Store Name */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+      >
+        <div className="flex items-start mb-4">
+          <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
+            <StoreIcon className="h-6 w-6 text-purple-600" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Název prodejny
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Zobrazuje se na úvodní stránce a v hlavičce prodejny
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <label htmlFor="storeName" className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+            Název
+          </label>
+          <input
+            id="storeName"
+            type="text"
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder="Např. Hlavní prodejna"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+          />
+        </div>
+      </motion.div>
 
       {/* Settings Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
