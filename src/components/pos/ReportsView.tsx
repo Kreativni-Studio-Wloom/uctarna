@@ -49,6 +49,43 @@ function formatCustomPeriodDate(date: Date, time: string, boundary: 'start' | 'e
   return `${dateLabel} ${prefix} ${time}`;
 }
 
+function formatCustomPeriodRange(
+  startDate: Date,
+  startTime: string,
+  endDate: Date,
+  endTime: string
+): string {
+  const sameDay = format(startDate, 'yyyy-MM-dd') === format(endDate, 'yyyy-MM-dd');
+  if (sameDay) {
+    const dateLabel = format(startDate, 'd.M.yyyy', { locale: cs });
+    return `${dateLabel} od ${startTime} do ${endTime}`;
+  }
+  return `${formatCustomPeriodDate(startDate, startTime, 'start')} – ${formatCustomPeriodDate(endDate, endTime, 'end')}`;
+}
+
+function getCustomPeriodEmailLabels(
+  startDate: Date,
+  startTime: string,
+  endDate: Date,
+  endTime: string
+): { startDate: string; endDate: string } {
+  const sameDay = format(startDate, 'yyyy-MM-dd') === format(endDate, 'yyyy-MM-dd');
+  if (sameDay) {
+    const dateLabel = format(startDate, 'd.M.yyyy', { locale: cs });
+    return {
+      startDate: `${dateLabel} od ${startTime}`,
+      endDate: `do ${endTime}`,
+    };
+  }
+  return {
+    startDate: formatCustomPeriodDate(startDate, startTime, 'start'),
+    endDate: formatCustomPeriodDate(endDate, endTime, 'end'),
+  };
+}
+
+const periodInputClassName =
+  'px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm';
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const { user, firebaseUser } = useAuth();
   const storeDoc = useStore();
@@ -323,6 +360,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
   const buildEmailPayload = (): EmailReportData => {
     const reportData = getReportData();
+    const customPeriodLabels =
+      selectedPeriod === 'custom'
+        ? getCustomPeriodEmailLabels(customStartDate, customStartTime, customEndDate, customEndTime)
+        : null;
 
     return buildEmailReportData(
       {
@@ -341,7 +382,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
-                ? formatCustomPeriodDate(customStartDate, customStartTime, 'start')
+                ? customPeriodLabels!.startDate
                 : storeDoc?.createdAt
                   ? format(storeDoc.createdAt instanceof Date ? storeDoc.createdAt : new Date(storeDoc.createdAt), 'd.M.yyyy', { locale: cs })
                   : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
@@ -353,7 +394,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
-                ? formatCustomPeriodDate(customEndDate, customEndTime, 'end')
+                ? customPeriodLabels!.endDate
                 : format(new Date(), 'd.M.yyyy', { locale: cs }),
       },
       {
@@ -495,7 +536,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       if (isCustomRangeInvalid) {
         return 'Neplatný interval';
       }
-      return `${formatCustomPeriodDate(customStartDate, customStartTime, 'start')} – ${formatCustomPeriodDate(customEndDate, customEndTime, 'end')}`;
+      return formatCustomPeriodRange(customStartDate, customStartTime, customEndDate, customEndTime);
     } else {
       return 'Od založení obchodu';
     }
@@ -546,107 +587,111 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
       {/* Period Selection */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-4">
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handlePeriodChange('day')}
-              className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                selectedPeriod === 'day'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Den
-            </button>
-            <button
-              onClick={() => handlePeriodChange('month')}
-              className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                selectedPeriod === 'month'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Měsíc
-            </button>
-            <button
-              onClick={() => handlePeriodChange('custom')}
-              className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                selectedPeriod === 'custom'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Období
-            </button>
-            <button
-              onClick={() => handlePeriodChange('total')}
-              className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
-                selectedPeriod === 'total'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              Celkem
-            </button>
-          </div>
-          {selectedPeriod !== 'total' && (
-            <>
-              {selectedPeriod === 'custom' ? (
-                <div className="flex flex-col gap-3 w-full sm:w-auto">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        Od:
-                      </label>
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => handlePeriodChange('day')}
+            className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+              selectedPeriod === 'day'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Den
+          </button>
+          <button
+            onClick={() => handlePeriodChange('month')}
+            className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+              selectedPeriod === 'month'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Měsíc
+          </button>
+          <button
+            onClick={() => handlePeriodChange('custom')}
+            className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+              selectedPeriod === 'custom'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Období
+          </button>
+          <button
+            onClick={() => handlePeriodChange('total')}
+            className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
+              selectedPeriod === 'total'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Celkem
+          </button>
+        </div>
+
+        {selectedPeriod !== 'total' && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            {selectedPeriod === 'custom' ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Začátek období
+                    </label>
+                    <div className="flex gap-2">
                       <input
                         type="date"
                         value={format(customStartDate, 'yyyy-MM-dd')}
                         onChange={(e) => setCustomStartDate(new Date(e.target.value))}
-                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        className={`${periodInputClassName} flex-1 min-w-0`}
                       />
                       <input
                         type="time"
                         value={customStartTime}
                         onChange={(e) => setCustomStartTime(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        className={`${periodInputClassName} w-[7.5rem] shrink-0`}
                         title="Čas od kterého platí první den období"
                       />
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        Do:
-                      </label>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Konec období
+                    </label>
+                    <div className="flex gap-2">
                       <input
                         type="date"
                         value={format(customEndDate, 'yyyy-MM-dd')}
                         onChange={(e) => setCustomEndDate(new Date(e.target.value))}
-                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        className={`${periodInputClassName} flex-1 min-w-0`}
                       />
                       <input
                         type="time"
                         value={customEndTime}
                         onChange={(e) => setCustomEndTime(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        className={`${periodInputClassName} w-[7.5rem] shrink-0`}
                         title="Čas do kterého platí poslední den období"
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Např. od 3.7. od 10:00 do 4.7. do 02:00 zahrne prodeje od 10:00 prvního dne do 02:00 posledního dne.
-                  </p>
                 </div>
-              ) : (
-                <input
-                  type="date"
-                  value={format(selectedDate, 'yyyy-MM-dd')}
-                  onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                />
-              )}
-            </>
-          )}
-        </div>
-        <div className="text-lg font-medium text-gray-900 dark:text-white">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Pro vícedenní akce nastavte jiné datum u začátku a konce. Čas platí jen pro první a poslední den.
+                </p>
+              </div>
+            ) : (
+              <input
+                type="date"
+                value={format(selectedDate, 'yyyy-MM-dd')}
+                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                className={periodInputClassName}
+              />
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-lg font-medium text-gray-900 dark:text-white">
           {formatDate(selectedDate)}
         </div>
         {selectedPeriod === 'custom' && isCustomRangeInvalid && (
