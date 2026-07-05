@@ -36,6 +36,19 @@ interface ReportsViewProps {
   storeId: string;
 }
 
+function combineDateAndTime(date: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
+  const combined = startOfDay(date);
+  combined.setHours(hours, minutes, 0, 0);
+  return combined;
+}
+
+function formatCustomPeriodDate(date: Date, time: string, boundary: 'start' | 'end'): string {
+  const dateLabel = format(date, 'd.M.yyyy', { locale: cs });
+  const prefix = boundary === 'start' ? 'od' : 'do';
+  return `${dateLabel} ${prefix} ${time}`;
+}
+
 export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const { user, firebaseUser } = useAuth();
   const storeDoc = useStore();
@@ -47,6 +60,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [customStartDate, setCustomStartDate] = useState(new Date());
   const [customEndDate, setCustomEndDate] = useState(new Date());
+  const [customStartTime, setCustomStartTime] = useState('00:00');
+  const [customEndTime, setCustomEndTime] = useState('23:59');
   const [showActionNameModal, setShowActionNameModal] = useState(false);
   const [actionName, setActionName] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -54,6 +69,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
   // Cast user na ExtendedUser
   const extendedUser = user as ExtendedUser | null;
+
+  const customRangeStart = useMemo(
+    () => combineDateAndTime(customStartDate, customStartTime),
+    [customStartDate, customStartTime]
+  );
+  const customRangeEnd = useMemo(
+    () => combineDateAndTime(customEndDate, customEndTime),
+    [customEndDate, customEndTime]
+  );
+  const isCustomRangeInvalid = customRangeStart.getTime() > customRangeEnd.getTime();
 
   useEffect(() => {
     if (!user || !user.uid || !storeId) return;
@@ -70,8 +95,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       rangeStart = startOfMonth(selectedDate);
       rangeEnd = endOfMonth(selectedDate);
     } else if (selectedPeriod === 'custom') {
-      rangeStart = startOfDay(customStartDate);
-      rangeEnd = endOfDay(customEndDate);
+      rangeStart = customRangeStart;
+      rangeEnd = customRangeEnd;
     }
 
     const productsQuery = query(
@@ -80,7 +105,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
     let unsubscribeSales: (() => void) | undefined;
 
-    if (selectedPeriod === 'custom' && customStartDate > customEndDate) {
+    if (selectedPeriod === 'custom' && isCustomRangeInvalid) {
       setSales([]);
     } else if (selectedPeriod === 'total') {
       const salesQuery = query(salesRef, orderBy('createdAt', 'desc'));
@@ -136,7 +161,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       unsubscribeSales?.();
       unsubscribeProducts();
     };
-  }, [user, storeId, selectedPeriod, selectedDate, customStartDate, customEndDate]);
+  }, [user, storeId, selectedPeriod, selectedDate, customRangeStart, customRangeEnd, isCustomRangeInvalid]);
 
   const handlePeriodChange = (period: 'day' | 'month' | 'total' | 'custom') => {
     setSelectedPeriod(period);
@@ -316,7 +341,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
-                ? format(customStartDate, 'd.M.yyyy', { locale: cs })
+                ? formatCustomPeriodDate(customStartDate, customStartTime, 'start')
                 : storeDoc?.createdAt
                   ? format(storeDoc.createdAt instanceof Date ? storeDoc.createdAt : new Date(storeDoc.createdAt), 'd.M.yyyy', { locale: cs })
                   : extendedUser?.stores?.find((s) => s.id === storeId)?.createdAt
@@ -328,7 +353,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
-                ? format(customEndDate, 'd.M.yyyy', { locale: cs })
+                ? formatCustomPeriodDate(customEndDate, customEndTime, 'end')
                 : format(new Date(), 'd.M.yyyy', { locale: cs }),
       },
       {
@@ -467,10 +492,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     } else if (selectedPeriod === 'month') {
       return format(date, 'MMMM yyyy', { locale: cs });
     } else if (selectedPeriod === 'custom') {
-      if (customStartDate > customEndDate) {
+      if (isCustomRangeInvalid) {
         return 'Neplatný interval';
       }
-      return `${format(customStartDate, 'd.M.yyyy', { locale: cs })} - ${format(customEndDate, 'd.M.yyyy', { locale: cs })}`;
+      return `${formatCustomPeriodDate(customStartDate, customStartTime, 'start')} – ${formatCustomPeriodDate(customEndDate, customEndTime, 'end')}`;
     } else {
       return 'Od založení obchodu';
     }
@@ -567,29 +592,48 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           {selectedPeriod !== 'total' && (
             <>
               {selectedPeriod === 'custom' ? (
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      Od:
-                    </label>
-                    <input
-                      type="date"
-                      value={format(customStartDate, 'yyyy-MM-dd')}
-                      onChange={(e) => setCustomStartDate(new Date(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    />
+                <div className="flex flex-col gap-3 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        Od:
+                      </label>
+                      <input
+                        type="date"
+                        value={format(customStartDate, 'yyyy-MM-dd')}
+                        onChange={(e) => setCustomStartDate(new Date(e.target.value))}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      />
+                      <input
+                        type="time"
+                        value={customStartTime}
+                        onChange={(e) => setCustomStartTime(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        title="Čas od kterého platí první den období"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        Do:
+                      </label>
+                      <input
+                        type="date"
+                        value={format(customEndDate, 'yyyy-MM-dd')}
+                        onChange={(e) => setCustomEndDate(new Date(e.target.value))}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      />
+                      <input
+                        type="time"
+                        value={customEndTime}
+                        onChange={(e) => setCustomEndTime(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                        title="Čas do kterého platí poslední den období"
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                      Do:
-                    </label>
-                    <input
-                      type="date"
-                      value={format(customEndDate, 'yyyy-MM-dd')}
-                      onChange={(e) => setCustomEndDate(new Date(e.target.value))}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    />
-                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Např. od 3.7. od 10:00 do 4.7. do 02:00 zahrne prodeje od 10:00 prvního dne do 02:00 posledního dne.
+                  </p>
                 </div>
               ) : (
                 <input
@@ -605,14 +649,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         <div className="text-lg font-medium text-gray-900 dark:text-white">
           {formatDate(selectedDate)}
         </div>
-        {selectedPeriod === 'custom' && customStartDate > customEndDate && (
+        {selectedPeriod === 'custom' && isCustomRangeInvalid && (
           <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
             <div className="flex items-center">
               <svg className="h-5 w-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <span className="text-red-700 dark:text-red-300 font-medium">
-                Neplatný interval: Datum začátku musí být před datem konce
+                Neplatný interval: Začátek období musí být před koncem (včetně času)
               </span>
             </div>
           </div>

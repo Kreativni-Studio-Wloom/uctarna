@@ -1367,6 +1367,8 @@ type SendClosureParams = {
   date?: string;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
   eventName: string;
   confirmed?: boolean;
 };
@@ -1396,6 +1398,12 @@ function formatDisplayDate(date: Date): string {
   return format(date, 'd.M.yyyy', { locale: cs });
 }
 
+function formatDisplayDateTime(date: Date, boundary: 'start' | 'end'): string {
+  const time = format(date, 'HH:mm', { locale: cs });
+  const prefix = boundary === 'start' ? 'od' : 'do';
+  return `${formatDisplayDate(date)} ${prefix} ${time}`;
+}
+
 async function fetchUserEmail(userId: string): Promise<string | null> {
   const userDoc = await adminDb.collection('users').doc(userId).get();
   if (!userDoc.exists) return null;
@@ -1421,7 +1429,9 @@ async function fetchSalesForClosurePeriod(
   type: ClosureScope,
   date?: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  startTime?: string,
+  endTime?: string
 ): Promise<{
   sales: FirebaseFirestore.DocumentData[];
   period: string;
@@ -1471,15 +1481,19 @@ async function fetchSalesForClosurePeriod(
       };
     }
 
-    const rangeStart = getUtcPlus2DayRange(startDate)?.start;
-    const rangeEnd = getUtcPlus2DayRange(endDate)?.end;
+    const rangeStart = startTime
+      ? parseDateAndTimeUtcPlus2(startDate, startTime)
+      : getUtcPlus2DayRange(startDate)?.start;
+    const rangeEnd = endTime
+      ? parseDateAndTimeUtcPlus2(endDate, endTime)
+      : getUtcPlus2DayRange(endDate)?.end;
     if (!rangeStart || !rangeEnd) {
       return {
         sales: [],
         period: 'Vlastní období',
         startDate: '',
         endDate: '',
-        error: 'Invalid startDate or endDate. Use YYYY-MM-DD.',
+        error: 'Invalid startDate, endDate, startTime or endTime. Use YYYY-MM-DD and HH:mm.',
       };
     }
 
@@ -1489,7 +1503,7 @@ async function fetchSalesForClosurePeriod(
         period: 'Vlastní období',
         startDate: '',
         endDate: '',
-        error: 'startDate must be before or equal to endDate.',
+        error: 'startDate/startTime must be before or equal to endDate/endTime.',
       };
     }
 
@@ -1502,8 +1516,8 @@ async function fetchSalesForClosurePeriod(
     return {
       sales: salesSnapshot.docs.map((doc) => doc.data()),
       period: 'Vlastní období',
-      startDate: formatDisplayDate(rangeStart),
-      endDate: formatDisplayDate(rangeEnd),
+      startDate: formatDisplayDateTime(rangeStart, 'start'),
+      endDate: formatDisplayDateTime(rangeEnd, 'end'),
     };
   }
 
@@ -1655,7 +1669,9 @@ async function executeSendClosure(
     params.type,
     params.date,
     params.startDate,
-    params.endDate
+    params.endDate,
+    params.startTime,
+    params.endTime
   );
 
   if (periodData.error) {
@@ -1961,6 +1977,14 @@ export async function POST(req: Request) {
               .string()
               .optional()
               .describe("Required for type 'period' in YYYY-MM-DD format (UTC+2)."),
+            startTime: z
+              .string()
+              .optional()
+              .describe("Optional for type 'period'. Start time on startDate in HH:mm format (UTC+2). Defaults to 00:00."),
+            endTime: z
+              .string()
+              .optional()
+              .describe("Optional for type 'period'. End time on endDate in HH:mm format (UTC+2). Defaults to 23:59."),
             eventName: z
               .string()
               .describe('Name of the event/location to associate the closure with'),
@@ -1969,7 +1993,7 @@ export async function POST(req: Request) {
               .default(false)
               .describe('Must be false for preview. Set true only after the user explicitly confirms sending.'),
           }),
-          execute: async ({ type, date, startDate, endDate, eventName, confirmed }) => {
+          execute: async ({ type, date, startDate, endDate, startTime, endTime, eventName, confirmed }) => {
             if (!context.storeId || !context.userId) {
               return { error: missingContextError(), sent: false };
             }
@@ -1980,6 +2004,8 @@ export async function POST(req: Request) {
                 date,
                 startDate,
                 endDate,
+                startTime,
+                endTime,
                 eventName,
                 confirmed,
               });

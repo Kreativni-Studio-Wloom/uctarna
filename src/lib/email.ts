@@ -113,7 +113,7 @@ function formatPeriodLabel(reportData: EmailReportData) {
     return `Uzávěrka za měsíc ${reportData.startDate}`;
   }
   if (reportData.period === 'Vlastní období') {
-    return `Uzávěrka od ${reportData.startDate} do ${reportData.endDate}`;
+    return `Uzávěrka ${reportData.startDate} – ${reportData.endDate}`;
   }
   return `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`;
 }
