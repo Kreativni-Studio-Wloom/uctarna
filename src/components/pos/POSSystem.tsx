@@ -8,7 +8,7 @@ import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp,
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus, Pin } from 'lucide-react';
+import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus, Pin, CheckCircle } from 'lucide-react';
 import { AddProductModal } from './AddProductModal';
 import { DiscountModal } from './DiscountModal';
 
@@ -90,6 +90,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showSelectExtras, setShowSelectExtras] = useState(false);
   const [extrasParentItemId, setExtrasParentItemId] = useState<string | null>(null);
   const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
+  /** Odpočet popupu úspěšné platby; null = popup skrytý */
+  const [successPopupCountdown, setSuccessPopupCountdown] = useState<number | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
   const addBurstRef = useRef<Map<string, { count: number; lastAt: number }>>(new Map());
@@ -290,12 +292,26 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     }
   }, []);
 
+  // Automatické zavření popupu úspěšné platby po odpočtu
+  useEffect(() => {
+    if (successPopupCountdown === null) return;
+    if (successPopupCountdown <= 0) {
+      setSuccessPopupCountdown(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setSuccessPopupCountdown((current) => (current === null ? null : current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [successPopupCountdown]);
+
   // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
     const handlePaymentSuccess = () => {
       void clearCartState();
       setShowCheckout(false);
       setDiscount(null);
+      setSuccessPopupCountdown(3);
       console.log('✅ Úspěšná platba – košík vyčištěn');
     };
 
@@ -1541,6 +1557,52 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             onClose={() => { setShowSelectExtras(false); setExtrasParentItemId(null); }}
             onSelect={handleSelectExtras}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Popup potvrzení úspěšné platby (SumUp návrat) – zavře se samo po odpočtu */}
+      <AnimatePresence>
+        {successPopupCountdown !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
+            onClick={() => setSuccessPopupCountdown(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 text-center relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setSuccessPopupCountdown(null)}
+                aria-label="Zavřít"
+                className="absolute top-3 right-3 w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400"
+              >
+                ✕
+              </button>
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 20 }}
+                className="mx-auto w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mb-5"
+              >
+                <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400" />
+              </motion.div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Platba byla úspěšná!
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Prodej byl zaznamenán a košík vyčištěn.
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Okno se zavře za {successPopupCountdown} s
+              </p>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
