@@ -20,74 +20,75 @@ function PaymentSuccessContent() {
     const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code') || searchParams.get('txCode');
     const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id') || searchParams.get('foreignTxId');
 
-    // Pokud tuto stránku otevřel SumUp jako duplicitní tab (existuje window.opener),
-    // předáme dokončení checkoutu původnímu oknu a tento tab okamžitě zavřeme.
-    // Uložení prodeje pak provede POS v původním okně (pendingSave: true).
+    // Úspěšná platba: tato stránka se v Safari (iOS) otevírá jako nový duplicitní tab.
+    // Předáme dokončení checkoutu původnímu oknu (pendingSave) a tab se pokusíme zavřít.
+    // Prodej uloží POS v původním okně; ten si data „zamkne" smazáním uctarna_payment_data.
     if (status === 'success') {
+      const payload = { type: 'PAYMENT_SUCCESS', pendingSave: true, txCode, foreignTxId };
+
+      // 1) Notifikace původního okna všemi kanály (BroadcastChannel, storage event, opener)
       try {
-        if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
-          window.opener.postMessage(
-            { type: 'PAYMENT_SUCCESS', pendingSave: true, txCode, foreignTxId },
-            '*'
-          );
-          window.close();
-          // Fallback pro případ, že prohlížeč zavření zablokuje – zobrazíme success UI,
-          // ale prodej neukládáme (to udělá původní okno).
-          setCallbackData({
-            status,
-            txCode: txCode || undefined,
-            foreignTxId: foreignTxId || undefined,
-            storeId: undefined,
-            userId: undefined,
-            cartItems: []
-          });
-          try {
-            const paymentData = localStorage.getItem('uctarna_payment_data');
-            if (paymentData) {
-              const { storeId } = JSON.parse(paymentData);
-              if (storeId) setStoreIdState(storeId);
-            }
-          } catch {}
-          setLoading(false);
-          return;
+        const bc = new BroadcastChannel('uctarna_payments');
+        bc.postMessage(payload);
+      } catch {}
+      try {
+        localStorage.setItem('uctarna_payment_result', JSON.stringify({ ...payload, at: Date.now() }));
+      } catch {}
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(payload, window.location.origin);
         }
       } catch {}
+
+      // 2) Pokus o zavření duplicitního tabu. Safari dovolí zavřít tab, který má
+      //    jen jednu položku historie (přesně případ tabu otevřeného SumUp aplikací).
+      try {
+        window.close();
+      } catch {}
+      try {
+        window.open('', '_self');
+        window.close();
+      } catch {}
+
+      // 3) Fallback: pokud se tab nepodařilo zavřít, po chvíli zkontrolujeme,
+      //    zda si prodej převzalo původní okno (uctarna_payment_data zmizí).
+      //    Pokud ne (původní okno neexistuje), uložíme prodej sami.
+      const timer = window.setTimeout(() => {
+        setCallbackData({
+          status,
+          txCode: txCode || undefined,
+          foreignTxId: foreignTxId || undefined,
+          storeId: undefined,
+          userId: undefined,
+          cartItems: []
+        });
+        try {
+          const paymentData = localStorage.getItem('uctarna_payment_data');
+          if (paymentData) {
+            const { storeId } = JSON.parse(paymentData);
+            if (storeId) setStoreIdState(storeId);
+            handleSaveSale(status, txCode, foreignTxId || '');
+          }
+        } catch {}
+        setLoading(false);
+      }, 1500);
+      return () => window.clearTimeout(timer);
     }
 
-    // Bez opener: notifikace původního okna přes BroadcastChannel + storage event
-    try {
-      const bc = new BroadcastChannel('uctarna_payments');
-      bc.postMessage({ type: 'PAYMENT_SUCCESS' });
-      // storage event (jistota na Safari)
-      localStorage.setItem('uctarna_payment_result', JSON.stringify({ type: 'PAYMENT_SUCCESS', at: Date.now() }));
-    } catch {}
-    
-    // Debug logování pro různé typy plateb
-    console.log('🔍 URL parametry:', {
-      'smp-status': searchParams.get('smp-status'),
-      'status': searchParams.get('status'),
-      'smp-tx-code': searchParams.get('smp-tx-code'),
-      'tx_code': searchParams.get('tx_code'),
-      'txCode': searchParams.get('txCode'),
-      'foreign-tx-id': searchParams.get('foreign-tx-id'),
-      'foreign_tx_id': searchParams.get('foreign_tx_id'),
-      'foreignTxId': searchParams.get('foreignTxId'),
-      'všechny parametry': Object.fromEntries(searchParams.entries())
-    });
-    
+    // Neúspěšné / neznámé stavy: jen zobrazíme detaily
     console.log('📊 Extrahované hodnoty:', { status, txCode, foreignTxId });
-    
+
     if (status) {
       setCallbackData({
         status,
         txCode: txCode || undefined,
         foreignTxId: foreignTxId || undefined,
-        storeId: undefined, // Budeme číst z localStorage
-        userId: undefined,  // Budeme číst z localStorage
-        cartItems: [] // Cart items se budou načítat z localStorage
+        storeId: undefined,
+        userId: undefined,
+        cartItems: []
       });
     }
-    
+
     // Předběžně si zkusíme načíst storeId pro navigaci tlačítkem
     try {
       const paymentData = localStorage.getItem('uctarna_payment_data');
@@ -97,11 +98,6 @@ function PaymentSuccessContent() {
       }
     } catch {}
 
-    // Pokud je platba úspěšná, uložíme prodej do databáze
-    if (status === 'success') {
-      handleSaveSale(status, txCode, foreignTxId || '');
-    }
-    
     setLoading(false);
   }, [searchParams]);
 

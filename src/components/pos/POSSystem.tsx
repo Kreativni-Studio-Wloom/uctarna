@@ -252,6 +252,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         console.error('❌ Chybí data pro dokončení prodeje v localStorage');
         return;
       }
+
+      // „Zámek": okamžitě odstraníme payment data, aby prodej neuložila
+      // i návratová stránka (její fallback kontroluje přítomnost tohoto klíče).
+      localStorage.removeItem('uctarna_payment_data');
+
       const tipAmount = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
 
       const response = await fetch('/api/sumup-callback', {
@@ -282,8 +287,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       }
     } catch (error) {
       console.error('❌ Chyba při dokončování SumUp platby:', error);
-    } finally {
-      localStorage.removeItem('uctarna_payment_data');
     }
   }, []);
 
@@ -296,11 +299,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       console.log('✅ Úspěšná platba – košík vyčištěn');
     };
 
-    const onMessage = (event: MessageEvent) => {
-      if (event.data?.type !== 'PAYMENT_SUCCESS') return;
-      if (event.data.pendingSave && event.origin === window.location.origin) {
-        // Zpráva z návratové stránky (window.opener.postMessage) – prodej ještě není uložen
-        void finishSumUpCheckout(event.data.txCode ?? null, event.data.foreignTxId ?? null).then(
+    // Návratová stránka posílá pendingSave: prodej ještě není uložen a duplicitní
+    // tab se zavírá – uložení převezme toto (původní) okno.
+    const handleSuccessData = (data: { type?: string; pendingSave?: boolean; txCode?: string | null; foreignTxId?: string | null } | undefined) => {
+      if (data?.type !== 'PAYMENT_SUCCESS') return;
+      if (data.pendingSave) {
+        void finishSumUpCheckout(data.txCode ?? null, data.foreignTxId ?? null).then(
           handlePaymentSuccess
         );
         return;
@@ -308,12 +312,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       handlePaymentSuccess();
     };
 
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'PAYMENT_SUCCESS') return;
+      if (event.data.pendingSave && event.origin !== window.location.origin) return;
+      handleSuccessData(event.data);
+    };
+
     let bc: BroadcastChannel | null = null;
     try {
       bc = new BroadcastChannel('uctarna_payments');
-      bc.onmessage = (ev) => {
-        if (ev?.data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
-      };
+      bc.onmessage = (ev) => handleSuccessData(ev?.data);
     } catch {
       /* BroadcastChannel nemusí být k dispozici */
     }
@@ -321,8 +329,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     const onStorage = (e: StorageEvent) => {
       if (e.key !== 'uctarna_payment_result' || !e.newValue) return;
       try {
-        const data = JSON.parse(e.newValue);
-        if (data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
+        handleSuccessData(JSON.parse(e.newValue));
       } catch {
         /* ignore */
       }
