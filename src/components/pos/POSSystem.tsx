@@ -227,6 +227,66 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     return unsubscribe;
   }, [user, storeId]);
 
+  // Dokončení checkoutu v původním okně: uloží prodej přes API z dat v localStorage.
+  // Volá se, když návratová stránka SumUp poslala PAYMENT_SUCCESS s pendingSave
+  // (duplicitní tab se zavřel dřív, než stihl prodej uložit sám).
+  const finishSumUpCheckout = useCallback(async (txCode: string | null, foreignTxId: string | null) => {
+    try {
+      const raw = localStorage.getItem('uctarna_payment_data');
+      if (!raw) return;
+      const {
+        storeId: paymentStoreId,
+        userId,
+        cartItems,
+        totalAmount,
+        documentId,
+        foreignTxId: storedForeign,
+        discount: storedDiscount,
+        discountAmount,
+        finalAmount,
+        customerName,
+        tipAmount: storedTip
+      } = JSON.parse(raw);
+
+      if (!paymentStoreId || !userId || !Array.isArray(cartItems) || cartItems.length === 0) {
+        console.error('❌ Chybí data pro dokončení prodeje v localStorage');
+        return;
+      }
+      const tipAmount = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
+
+      const response = await fetch('/api/sumup-callback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'success',
+          txCode,
+          foreignTxId: foreignTxId || storedForeign,
+          documentId: documentId || foreignTxId || storedForeign,
+          amount: totalAmount,
+          currency: 'CZK',
+          storeId: paymentStoreId,
+          userId,
+          cartItems,
+          discount: storedDiscount || null,
+          discountAmount: discountAmount || 0,
+          finalAmount: finalAmount || totalAmount,
+          customerName: customerName || null,
+          tipAmount
+        }),
+      });
+
+      if (response.ok) {
+        console.log('✅ Prodej uložen z původního okna (SumUp návrat)');
+      } else {
+        console.error('❌ Chyba při ukládání prodeje:', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('❌ Chyba při dokončování SumUp platby:', error);
+    } finally {
+      localStorage.removeItem('uctarna_payment_data');
+    }
+  }, []);
+
   // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
     const handlePaymentSuccess = () => {
@@ -237,7 +297,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     };
 
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'PAYMENT_SUCCESS') handlePaymentSuccess();
+      if (event.data?.type !== 'PAYMENT_SUCCESS') return;
+      if (event.data.pendingSave && event.origin === window.location.origin) {
+        // Zpráva z návratové stránky (window.opener.postMessage) – prodej ještě není uložen
+        void finishSumUpCheckout(event.data.txCode ?? null, event.data.foreignTxId ?? null).then(
+          handlePaymentSuccess
+        );
+        return;
+      }
+      handlePaymentSuccess();
     };
 
     let bc: BroadcastChannel | null = null;
@@ -271,7 +339,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         /* ignore */
       }
     };
-  }, [clearCartState]);
+  }, [clearCartState, finishSumUpCheckout]);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
