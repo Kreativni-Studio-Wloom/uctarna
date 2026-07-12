@@ -15,8 +15,12 @@ interface StoreCardProps {
 export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
   const router = useRouter();
   const [showDuplicateButton, setShowDuplicateButton] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
 
   const handleOpenStore = () => {
+    if (isOpening) return;
+    // Okamžitá vizuální odezva – načtení stránky prodejny chvíli trvá
+    setIsOpening(true);
     router.push(`/store/${store.id}`);
   };
 
@@ -46,6 +50,13 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
       onMouseEnter={() => setShowDuplicateButton(true)}
       onMouseLeave={() => setShowDuplicateButton(false)}
     >
+      {/* Overlay s loaderem po kliknutí – okamžitá odezva během načítání prodejny */}
+      {isOpening && (
+        <div className="absolute inset-0 z-20 bg-black/40 flex items-center justify-center rounded-xl">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/30 border-t-white"></div>
+        </div>
+      )}
+
       {/* Duplicate Button */}
       {onDuplicate && showDuplicateButton && (
         <motion.button
