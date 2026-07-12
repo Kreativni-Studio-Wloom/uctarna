@@ -319,7 +319,7 @@ function CatalogTable({
                             <button
                               onClick={onSaveEdit}
                               disabled={saving || !editing.name.trim()}
-                              className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40 transition-colors"
                               title="Uložit"
                             >
                               <Check className="h-4 w-4" />
@@ -327,7 +327,7 @@ function CatalogTable({
                             <button
                               onClick={onCancelEdit}
                               disabled={saving}
-                              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                               title="Zrušit"
                             >
                               <X className="h-4 w-4" />
@@ -336,7 +336,7 @@ function CatalogTable({
                         ) : (
                           <button
                             onClick={() => onStartEdit(product)}
-                            className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
                             title="Upravit"
                           >
                             <Pencil className="h-4 w-4" />
