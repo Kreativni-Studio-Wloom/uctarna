@@ -19,6 +19,10 @@ const ProductEditor = dynamic(
   () => import('./ProductEditor').then((m) => ({ default: m.ProductEditor })),
   { ssr: false }
 );
+const PinnedProductsGrid = dynamic(
+  () => import('./PinnedProductsGrid').then((m) => ({ default: m.PinnedProductsGrid })),
+  { ssr: false }
+);
 const SelectExtrasModal = dynamic(
   () => import('./SelectExtrasModal').then((m) => ({ default: m.SelectExtrasModal })),
   { ssr: false }
@@ -829,6 +833,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     }
   };
 
+  const reorderPinnedProducts = async (orderedIds: string[]) => {
+    if (!user || !storeId) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'stores', storeId), {
+        pinnedProductIds: orderedIds,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('❌ Chyba při ukládání pořadí připnutých položek:', error);
+    }
+  };
+
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
   // Výpočet slevy
@@ -1303,34 +1319,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
           {/* Připnuté položky */}
           {pinnedProducts.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Připnuté položky
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {pinnedProducts.map((product) => {
-                  const isHighlighted = addedHighlight?.productId === product.id;
-                  return (
-                    <motion.button
-                      key={product.id}
-                      type="button"
-                      onClick={() => addToCart(product)}
-                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
-                    >
-                      {isHighlighted && addedHighlight && (
-                        <ProductAddedBadge count={addedHighlight.count} />
-                      )}
-                      <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
-                        {product.name}
-                      </h4>
-                      <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                        {product.price} Kč
-                      </p>
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </div>
+            <PinnedProductsGrid
+              products={pinnedProducts}
+              highlightedProductId={addedHighlight?.productId ?? null}
+              renderBadge={() =>
+                addedHighlight ? <ProductAddedBadge count={addedHighlight.count} /> : null
+              }
+              pickButtonClass={productPickButtonClass}
+              onProductClick={addToCart}
+              onReorder={reorderPinnedProducts}
+            />
           )}
 
           {/* Top 20 Nejprodávanějších */}
