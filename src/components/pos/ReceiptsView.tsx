@@ -682,8 +682,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     >
                       {deleting ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Mazání...
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2 flex-shrink-0"></div>
+                          Mazání…
                         </>
                       ) : (
                         <>
