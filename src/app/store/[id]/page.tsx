@@ -10,7 +10,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed, Sparkles } from 'lucide-react';
+import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed, Sparkles, BookOpen } from 'lucide-react';
 
 const ViewLoading = () => (
   <div className="flex items-center justify-center py-12">
@@ -42,8 +42,12 @@ const AICopilotView = dynamic(
   () => import('@/components/pos/AICopilotView').then((m) => ({ default: m.AICopilotView })),
   { loading: () => <ViewLoading /> }
 );
+const CatalogView = dynamic(
+  () => import('@/components/pos/CatalogView').then((m) => ({ default: m.CatalogView })),
+  { loading: () => <ViewLoading /> }
+);
 
-type ViewType = 'pos' | 'receipts' | 'dispatch' | 'aichat' | 'reports' | 'settings';
+type ViewType = 'pos' | 'receipts' | 'dispatch' | 'katalog' | 'aichat' | 'reports' | 'settings';
 
 export default function StorePage() {
   const params = useParams();
@@ -112,6 +116,7 @@ export default function StorePage() {
         </div>
         {currentView === 'receipts' && <ReceiptsView storeId={storeId} />}
         {currentView === 'dispatch' && store.type === 'bistro' && <DispatchView storeId={storeId} />}
+        {currentView === 'katalog' && <CatalogView storeId={storeId} />}
         {currentView === 'aichat' && <AICopilotView storeId={storeId} storeName={store.name} />}
         {currentView === 'reports' && <ReportsView storeId={storeId} />}
         {currentView === 'settings' && <SettingsView storeId={storeId} />}
@@ -127,6 +132,8 @@ export default function StorePage() {
         return <Receipt className="h-5 w-5" />;
       case 'dispatch':
         return <UtensilsCrossed className="h-5 w-5" />;
+      case 'katalog':
+        return <BookOpen className="h-5 w-5" />;
       case 'aichat':
         return <Sparkles className="h-5 w-5" />;
       case 'reports':
@@ -144,6 +151,8 @@ export default function StorePage() {
         return 'Doklady';
       case 'dispatch':
         return 'Výdej';
+      case 'katalog':
+        return 'Katalog';
       case 'aichat':
         return 'AI Chat';
       case 'reports':
@@ -183,7 +192,7 @@ export default function StorePage() {
         <nav className="sticky top-16 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="w-full flex justify-between items-stretch">
-              {(['pos', 'receipts', ...(store.type === 'bistro' ? (['dispatch'] as ViewType[]) : []), 'aichat', 'reports', 'settings'] as ViewType[]).map((view) => (
+              {(['pos', 'receipts', ...(store.type === 'bistro' ? (['dispatch'] as ViewType[]) : []), 'katalog', 'aichat', 'reports', 'settings'] as ViewType[]).map((view) => (
                 <button
                   key={view}
                   onClick={() => setCurrentView(view)}

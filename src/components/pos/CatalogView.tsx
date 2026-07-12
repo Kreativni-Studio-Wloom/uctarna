@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { LoginRequiredModal } from '@/components/auth/LoginRequiredModal';
 import { db } from '@/lib/firebase';
 import {
   collection,
@@ -15,11 +13,9 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { Product, Store, CartItem } from '@/types';
+import { Product, CartItem } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft,
-  BookOpen,
   Package,
   Sparkles,
   Search,
@@ -31,6 +27,10 @@ import {
   CalendarDays,
   CalendarRange,
 } from 'lucide-react';
+
+interface CatalogViewProps {
+  storeId: string;
+}
 
 type TabType = 'products' | 'extras';
 
@@ -330,13 +330,8 @@ function CatalogTable({
   );
 }
 
-export default function KatalogPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-
-  const [stores, setStores] = useState<Store[]>([]);
-  const [storesLoading, setStoresLoading] = useState(true);
-  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<TabType>('products');
 
@@ -353,30 +348,12 @@ export default function KatalogPage() {
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Provozovny uživatele
-  useEffect(() => {
-    if (!user) return;
-    const storesQuery = query(
-      collection(db, 'users', user.uid, 'stores'),
-      where('isActive', '==', true)
-    );
-    const unsubscribe = onSnapshot(storesQuery, (snapshot) => {
-      const data: Store[] = snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() } as Store))
-        .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
-      setStores(data);
-      setSelectedStoreId((prev) => (prev && data.some((s) => s.id === prev) ? prev : data[0]?.id || ''));
-      setStoresLoading(false);
-    });
-    return unsubscribe;
-  }, [user]);
-
   // Kompletní katalog (produkty i extras v jedné kolekci, extras mají isExtra: true)
   useEffect(() => {
-    if (!user || !selectedStoreId) return;
+    if (!user || !storeId) return;
     setProductsLoading(true);
     const productsQuery = query(
-      collection(db, 'users', user.uid, 'stores', selectedStoreId, 'products')
+      collection(db, 'users', user.uid, 'stores', storeId, 'products')
     );
     const unsubscribe = onSnapshot(productsQuery, (snapshot) => {
       const data: Product[] = snapshot.docs.map((d) => {
@@ -398,18 +375,18 @@ export default function KatalogPage() {
       setProductsLoading(false);
     });
     return unsubscribe;
-  }, [user, selectedStoreId]);
+  }, [user, storeId]);
 
   // Prodeje pro žebříčky – od začátku měsíce nebo týdne (co nastalo dřív)
   useEffect(() => {
-    if (!user || !selectedStoreId) return;
+    if (!user || !storeId) return;
     setSalesLoading(true);
     const now = new Date();
     const since = new Date(
       Math.min(startOfMonth(now).getTime(), startOfWeekMonday(now).getTime())
     );
     const salesQuery = query(
-      collection(db, 'users', user.uid, 'stores', selectedStoreId, 'sales'),
+      collection(db, 'users', user.uid, 'stores', storeId, 'sales'),
       where('createdAt', '>=', Timestamp.fromDate(since))
     );
     const unsubscribe = onSnapshot(salesQuery, (snapshot) => {
@@ -425,7 +402,7 @@ export default function KatalogPage() {
       setSalesLoading(false);
     });
     return unsubscribe;
-  }, [user, selectedStoreId]);
+  }, [user, storeId]);
 
   const mainProducts = useMemo(() => allProducts.filter((p) => !p.isExtra), [allProducts]);
   const extras = useMemo(() => allProducts.filter((p) => p.isExtra), [allProducts]);
@@ -472,12 +449,12 @@ export default function KatalogPage() {
   };
 
   const saveEdit = async () => {
-    if (!user || !selectedStoreId || !editing || !editing.name.trim()) return;
+    if (!user || !storeId || !editing || !editing.name.trim()) return;
     setSaving(true);
     try {
       const parsedCost = editing.cost.trim() === '' ? null : Number(editing.cost);
       await updateDoc(
-        doc(db, 'users', user.uid, 'stores', selectedStoreId, 'products', editing.id),
+        doc(db, 'users', user.uid, 'stores', storeId, 'products', editing.id),
         {
           name: editing.name.trim(),
           price: Number(editing.price) || 0,
@@ -496,243 +473,175 @@ export default function KatalogPage() {
   const searchInputClass =
     'w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow';
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#131722] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LoginRequiredModal redirectPath="/katalog" />;
-  }
-
   return (
-    <div className="min-h-screen bg-[#131722]">
-      {/* Hlavička */}
-      <header className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-4">
-            <div className="flex items-center min-w-0">
-              <button
-                onClick={() => router.push('/')}
-                className="mr-3 w-10 h-10 rounded-lg hover:bg-slate-800 transition-colors flex items-center justify-center flex-shrink-0"
-                title="Zpět na přehled"
-              >
-                <ArrowLeft className="h-5 w-5 text-slate-300" />
-              </button>
-              <BookOpen className="h-7 w-7 text-purple-500 mr-3 flex-shrink-0" />
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold text-white truncate">Katalog</h1>
-                <p className="text-xs text-slate-400">Produkty a extras</p>
-              </div>
-            </div>
-            {stores.length > 0 && (
-              <select
-                value={selectedStoreId}
-                onChange={(e) => {
-                  setSelectedStoreId(e.target.value);
-                  setEditing(null);
-                }}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 max-w-[14rem]"
-              >
-                {stores.map((store) => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-      </header>
-
+    <div className="bg-[#131722] border border-slate-800 rounded-2xl p-4 sm:p-6">
       {/* Taby Produkty / Extras */}
-      <nav className="sticky top-16 z-40 bg-slate-900/95 backdrop-blur border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex">
-            {(
-              [
-                { id: 'products' as TabType, label: 'Produkty', icon: <Package className="h-5 w-5" /> },
-                { id: 'extras' as TabType, label: 'Extras', icon: <Sparkles className="h-5 w-5" /> },
-              ]
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setEditing(null);
-                }}
-                className={`flex items-center gap-2 px-5 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-purple-500 text-purple-400'
-                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </nav>
+      <div className="flex border-b border-slate-800 mb-6 -mx-4 sm:-mx-6 px-4 sm:px-6">
+        {(
+          [
+            { id: 'products' as TabType, label: 'Produkty', icon: <Package className="h-5 w-5" /> },
+            { id: 'extras' as TabType, label: 'Extras', icon: <Sparkles className="h-5 w-5" /> },
+          ]
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              setActiveTab(tab.id);
+              setEditing(null);
+            }}
+            className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-purple-500 text-purple-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {storesLoading || !selectedStoreId ? (
-          storesLoading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
-            </div>
-          ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-10 text-center text-slate-400">
-              Nemáte žádnou aktivní provozovnu. Nejprve ji vytvořte na hlavním přehledu.
-            </div>
-          )
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.15 }}
-            >
-              {activeTab === 'products' ? (
-                <div className="space-y-6">
-                  {/* Žebříčky */}
-                  <section>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Trophy className="h-5 w-5 text-purple-400" />
-                      <h2 className="text-base font-semibold text-slate-100">
-                        Nejprodávanější produkty
-                      </h2>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <LeaderboardCard
-                        title="Top Dnes"
-                        icon={<Calendar className="h-4 w-4" />}
-                        entries={leaderboards.day}
-                        loading={salesLoading}
-                      />
-                      <LeaderboardCard
-                        title="Top Tento Týden"
-                        icon={<CalendarDays className="h-4 w-4" />}
-                        entries={leaderboards.week}
-                        loading={salesLoading}
-                      />
-                      <LeaderboardCard
-                        title="Top Tento Měsíc"
-                        icon={<CalendarRange className="h-4 w-4" />}
-                        entries={leaderboards.month}
-                        loading={salesLoading}
-                      />
-                    </div>
-                  </section>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.15 }}
+        >
+          {activeTab === 'products' ? (
+            <div className="space-y-6">
+              {/* Žebříčky */}
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <Trophy className="h-5 w-5 text-purple-400" />
+                  <h2 className="text-base font-semibold text-slate-100">
+                    Nejprodávanější produkty
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <LeaderboardCard
+                    title="Top Dnes"
+                    icon={<Calendar className="h-4 w-4" />}
+                    entries={leaderboards.day}
+                    loading={salesLoading}
+                  />
+                  <LeaderboardCard
+                    title="Top Tento Týden"
+                    icon={<CalendarDays className="h-4 w-4" />}
+                    entries={leaderboards.week}
+                    loading={salesLoading}
+                  />
+                  <LeaderboardCard
+                    title="Top Tento Měsíc"
+                    icon={<CalendarRange className="h-4 w-4" />}
+                    entries={leaderboards.month}
+                    loading={salesLoading}
+                  />
+                </div>
+              </section>
 
-                  {/* Ovládání */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                      <input
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        placeholder="Hledat produkt…"
-                        className={searchInputClass}
-                      />
-                    </div>
-                    <select
-                      value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 sm:w-56"
-                    >
-                      <option value="">Všechny kategorie</option>
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Ovládání */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <input
+                    value={productSearch}
+                    onChange={(e) => setProductSearch(e.target.value)}
+                    placeholder="Hledat produkt…"
+                    className={searchInputClass}
+                  />
+                </div>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 sm:w-56"
+                >
+                  <option value="">Všechny kategorie</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  {/* Tabulka produktů */}
-                  {productsLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
-                    </div>
-                  ) : (
-                    <>
-                      <CatalogTable
-                        items={filteredProducts}
-                        showCategory
-                        editing={editing}
-                        saving={saving}
-                        onStartEdit={startEdit}
-                        onCancelEdit={() => setEditing(null)}
-                        onSaveEdit={saveEdit}
-                        onEditChange={(patch) =>
-                          setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
-                        }
-                        emptyMessage={
-                          mainProducts.length === 0
-                            ? 'Katalog je prázdný. Produkty přidáte v prodejním systému.'
-                            : 'Hledání nevrátilo žádné produkty.'
-                        }
-                      />
-                      <p className="text-xs text-slate-500">
-                        {filteredProducts.length} z {mainProducts.length} produktů
-                      </p>
-                    </>
-                  )}
+              {/* Tabulka produktů */}
+              {productsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {/* Ovládání extras */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                    <input
-                      value={extrasSearch}
-                      onChange={(e) => setExtrasSearch(e.target.value)}
-                      placeholder="Hledat extra…"
-                      className={searchInputClass}
-                    />
-                  </div>
-
-                  {/* Tabulka extras */}
-                  {productsLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
-                    </div>
-                  ) : (
-                    <>
-                      <CatalogTable
-                        items={filteredExtras}
-                        showCategory={false}
-                        editing={editing}
-                        saving={saving}
-                        onStartEdit={startEdit}
-                        onCancelEdit={() => setEditing(null)}
-                        onSaveEdit={saveEdit}
-                        onEditChange={(patch) =>
-                          setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
-                        }
-                        emptyMessage={
-                          extras.length === 0
-                            ? 'Zatím žádná extras. Přidáte je v prodejním systému přes správu extras.'
-                            : 'Hledání nevrátilo žádná extras.'
-                        }
-                      />
-                      <p className="text-xs text-slate-500">
-                        {filteredExtras.length} z {extras.length} extras
-                      </p>
-                    </>
-                  )}
-                </div>
+                <>
+                  <CatalogTable
+                    items={filteredProducts}
+                    showCategory
+                    editing={editing}
+                    saving={saving}
+                    onStartEdit={startEdit}
+                    onCancelEdit={() => setEditing(null)}
+                    onSaveEdit={saveEdit}
+                    onEditChange={(patch) =>
+                      setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
+                    }
+                    emptyMessage={
+                      mainProducts.length === 0
+                        ? 'Katalog je prázdný. Produkty přidáte v prodejním systému.'
+                        : 'Hledání nevrátilo žádné produkty.'
+                    }
+                  />
+                  <p className="text-xs text-slate-500">
+                    {filteredProducts.length} z {mainProducts.length} produktů
+                  </p>
+                </>
               )}
-            </motion.div>
-          </AnimatePresence>
-        )}
-      </main>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Ovládání extras */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <input
+                  value={extrasSearch}
+                  onChange={(e) => setExtrasSearch(e.target.value)}
+                  placeholder="Hledat extra…"
+                  className={searchInputClass}
+                />
+              </div>
+
+              {/* Tabulka extras */}
+              {productsLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
+                </div>
+              ) : (
+                <>
+                  <CatalogTable
+                    items={filteredExtras}
+                    showCategory={false}
+                    editing={editing}
+                    saving={saving}
+                    onStartEdit={startEdit}
+                    onCancelEdit={() => setEditing(null)}
+                    onSaveEdit={saveEdit}
+                    onEditChange={(patch) =>
+                      setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
+                    }
+                    emptyMessage={
+                      extras.length === 0
+                        ? 'Zatím žádná extras. Přidáte je přes správu extras v prodeji.'
+                        : 'Hledání nevrátilo žádná extras.'
+                    }
+                  />
+                  <p className="text-xs text-slate-500">
+                    {filteredExtras.length} z {extras.length} extras
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
-}
+};
