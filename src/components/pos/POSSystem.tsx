@@ -15,10 +15,6 @@ const CheckoutModal = dynamic(
   () => import('./CheckoutModal').then((m) => ({ default: m.CheckoutModal })),
   { ssr: false }
 );
-const ProductEditor = dynamic(
-  () => import('./ProductEditor').then((m) => ({ default: m.ProductEditor })),
-  { ssr: false }
-);
 const PinnedProductsGrid = dynamic(
   () => import('./PinnedProductsGrid').then((m) => ({ default: m.PinnedProductsGrid })),
   { ssr: false }
@@ -77,7 +73,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [showProductEditor, setShowProductEditor] = useState(false);
   const [isReturnMode, setIsReturnMode] = useState(false);
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
@@ -900,18 +895,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           <div className="p-2">
             <button
               onClick={() => {
-                setShowProductEditor(true);
-                setShowMenu(false);
-              }}
-              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
-            >
-              <span className="w-8 flex items-center justify-center flex-shrink-0">
-                <Package className="w-5 h-5 text-purple-500" />
-              </span>
-              <span className="truncate">Editor</span>
-            </button>
-            <button
-              onClick={() => {
                 setShowPinnedManager(true);
                 setShowMenu(false);
               }}
@@ -1382,15 +1365,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               setShowCheckout(false);
               setDiscount(null); // Reset slevy po úspěšném prodeji
             }}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showProductEditor && (
-          <ProductEditor
-            storeId={storeId}
-            onClose={() => setShowProductEditor(false)}
           />
         )}
       </AnimatePresence>
