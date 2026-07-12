@@ -4,7 +4,7 @@ import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { CheckCircle, ArrowLeft, Receipt, Home } from 'lucide-react';
-import { SumUpCallbackParams } from '@/lib/sumup';
+import { SumUpCallbackParams, fetchSumUpTipAmount } from '@/lib/sumup';
 import { doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -108,6 +108,10 @@ function PaymentSuccessContent() {
     txCode: string | null, 
     foreignTxId: string
   ) => {
+    // Spropitné zadané zákazníkem přímo v SumUp (terminál/aplikace).
+    // Načítáme přes vlastní API; při chybě vrací 0, takže uložení dokladu nikdy neblokuje.
+    let sumUpTip = 0;
+
     try {
       // Načteme data o platbě z localStorage
       const paymentData = localStorage.getItem('uctarna_payment_data');
@@ -117,7 +121,15 @@ function PaymentSuccessContent() {
       }
       
       const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName, tipAmount: storedTip } = JSON.parse(paymentData);
-      const tipAmount = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
+      const appTip = typeof storedTip === 'number' && storedTip > 0 ? storedTip : 0;
+
+      sumUpTip = await fetchSumUpTipAmount(txCode);
+      const tipAmount = appTip + sumUpTip > 0 ? appTip + sumUpTip : null;
+
+      // SumUp tip byl zaplacen navíc nad částku poslanou do SumUp,
+      // proto ho přičítáme k celkové úhradě (totalAmount/finalAmount jsou vč. tipu).
+      const totalWithSumUpTip = (totalAmount || 0) + sumUpTip;
+      const finalWithSumUpTip = (finalAmount || totalAmount || 0) + sumUpTip;
       
       console.log('📋 Data z localStorage:', {
         storeId,
@@ -154,16 +166,17 @@ function PaymentSuccessContent() {
         txCode,
         foreignTxId: foreignTxId || storedForeign,
         documentId: documentId || foreignTxId || storedForeign,
-        amount: totalAmount,
+        amount: totalWithSumUpTip,
         currency: 'CZK',
         storeId,
         userId,
         cartItemsCount: cartItems.length,
         discount: discount || null,
         discountAmount: discountAmount || 0,
-        finalAmount: finalAmount || totalAmount,
+        finalAmount: finalWithSumUpTip,
         customerName: customerName || null,
-        tipAmount
+        tipAmount,
+        sumUpTip
       });
 
       const response = await fetch('/api/sumup-callback', {
@@ -176,14 +189,14 @@ function PaymentSuccessContent() {
           txCode,
           foreignTxId: foreignTxId || storedForeign,
           documentId: documentId || foreignTxId || storedForeign,
-          amount: totalAmount,
+          amount: totalWithSumUpTip,
           currency: 'CZK', // SumUp platby jsou vždy v CZK
           storeId,
           userId,
           cartItems,
           discount: discount || null,
           discountAmount: discountAmount || 0,
-          finalAmount: finalAmount || totalAmount,
+          finalAmount: finalWithSumUpTip,
           customerName: customerName || null,
           tipAmount
         }),
@@ -252,13 +265,15 @@ function PaymentSuccessContent() {
         if (!paymentDataRaw) return;
         const paymentData = JSON.parse(paymentDataRaw);
         const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName, tipAmount: rawTip } = paymentData;
-        const tipAmountFallback = typeof rawTip === 'number' && rawTip > 0 ? rawTip : null;
+        const appTipFallback = typeof rawTip === 'number' && rawTip > 0 ? rawTip : 0;
+        // sumUpTip už máme načtený z hlavní větve (při chybě SumUp API je 0)
+        const tipAmountFallback = appTipFallback + sumUpTip > 0 ? appTipFallback + sumUpTip : null;
         if (!storeId || !userId || !Array.isArray(cartItems)) return;
 
         const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
         await setDoc(saleRef, {
           items: cartItems,
-          totalAmount: totalAmount || 0,
+          totalAmount: (totalAmount || 0) + sumUpTip,
           paymentMethod: 'card',
           documentId: documentId || foreignTxId,
           createdAt: serverTimestamp(),
@@ -270,7 +285,7 @@ function PaymentSuccessContent() {
           served: false,
           discount: discount || null,
           discountAmount: discountAmount || 0,
-          finalAmount: finalAmount || totalAmount || 0,
+          finalAmount: (finalAmount || totalAmount || 0) + sumUpTip,
           tipAmount: tipAmountFallback,
           sumUpData: {
             foreignTxId: foreignTxId,

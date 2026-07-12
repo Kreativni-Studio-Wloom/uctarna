@@ -204,3 +204,34 @@ export class SumUpService {
 
 // Instance SumUp service s vaším API klíčem
 export const sumUpService = new SumUpService(process.env.NEXT_PUBLIC_SUMUP_AFFILIATE_KEY || '');
+
+/**
+ * Načte spropitné zadané v SumUp aplikaci/terminálu pro danou transakci
+ * přes naši API routu /api/sumup/transaction (ta volá SumUp REST API).
+ *
+ * Nikdy nevyhazuje chybu – při jakémkoli selhání (chybějící txCode, timeout,
+ * chyba SumUp API) vrací 0, aby se doklad vždy uložil.
+ */
+export async function fetchSumUpTipAmount(
+  txCode: string | null | undefined,
+  timeoutMs = 12000
+): Promise<number> {
+  if (!txCode || typeof window === 'undefined') return 0;
+
+  try {
+    const response = await fetch(
+      `/api/sumup/transaction?txCode=${encodeURIComponent(txCode)}`,
+      { signal: AbortSignal.timeout(timeoutMs) }
+    );
+    if (!response.ok) {
+      console.warn('⚠️ Spropitné ze SumUp se nepodařilo načíst:', response.status);
+      return 0;
+    }
+    const data = await response.json();
+    const tip = typeof data?.tipAmount === 'number' ? data.tipAmount : 0;
+    return tip > 0 ? tip : 0;
+  } catch (error) {
+    console.warn('⚠️ Spropitné ze SumUp se nepodařilo načíst:', error);
+    return 0;
+  }
+}

@@ -7,6 +7,7 @@ import { useStore } from '@/contexts/StoreContext';
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
+import { fetchSumUpTipAmount } from '@/lib/sumup';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, CheckCircle, X } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
@@ -253,7 +254,17 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       // i návratová stránka (její fallback kontroluje přítomnost tohoto klíče).
       localStorage.removeItem('uctarna_payment_data');
 
-      const tipAmount = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
+      const appTip = typeof storedTip === 'number' && storedTip > 0 ? storedTip : 0;
+
+      // Spropitné zadané zákazníkem přímo v SumUp (na terminálu/v aplikaci).
+      // Při chybě SumUp API vrací 0, takže se doklad uloží vždy – jen bez SumUp tipu.
+      const sumUpTip = await fetchSumUpTipAmount(txCode);
+      const tipAmount = appTip + sumUpTip > 0 ? appTip + sumUpTip : null;
+
+      // SumUp tip zákazník zaplatil navíc nad částku poslanou do SumUp,
+      // proto ho přičítáme i k celkové úhradě (konvence: totalAmount/finalAmount vč. tipu).
+      const totalWithSumUpTip = (totalAmount || 0) + sumUpTip;
+      const finalWithSumUpTip = (finalAmount || totalAmount || 0) + sumUpTip;
 
       const response = await fetch('/api/sumup-callback', {
         method: 'POST',
@@ -263,14 +274,14 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           txCode,
           foreignTxId: foreignTxId || storedForeign,
           documentId: documentId || foreignTxId || storedForeign,
-          amount: totalAmount,
+          amount: totalWithSumUpTip,
           currency: 'CZK',
           storeId: paymentStoreId,
           userId,
           cartItems,
           discount: storedDiscount || null,
           discountAmount: discountAmount || 0,
-          finalAmount: finalAmount || totalAmount,
+          finalAmount: finalWithSumUpTip,
           customerName: customerName || null,
           tipAmount
         }),
