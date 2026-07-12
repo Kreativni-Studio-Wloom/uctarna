@@ -92,6 +92,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
   /** Odpočet popupu úspěšné platby; null = popup skrytý */
   const [successPopupCountdown, setSuccessPopupCountdown] = useState<number | null>(null);
+  /** Čas posledního zpracovaného PAYMENT_SUCCESS – deduplikace zpráv z více kanálů */
+  const paymentSuccessHandledAtRef = useRef(0);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
   const addBurstRef = useRef<Map<string, { count: number; lastAt: number }>>(new Map());
@@ -308,6 +310,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
     const handlePaymentSuccess = () => {
+      // Stejná platba dorazí více kanály (BroadcastChannel, storage event,
+      // postMessage) – zpracujeme jen první signál, aby opožděný duplikát
+      // znovu neotevřel popup, který už uživatel zavřel.
+      const now = Date.now();
+      if (now - paymentSuccessHandledAtRef.current < 5000) return;
+      paymentSuccessHandledAtRef.current = now;
+
       void clearCartState();
       setShowCheckout(false);
       setDiscount(null);
