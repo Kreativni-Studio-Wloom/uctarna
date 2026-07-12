@@ -250,7 +250,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       console.error('❌ Chyba při mazání dokladu:', error);
       alert('Chyba při mazání dokladu. Zkuste to znovu.');
     } finally {
-      setDeleting(false);
+      // deleting se resetuje až po doběhnutí zavírací animace modálu
+      // (onExitComplete), jinak tlačítko během fade-outu přeblikne na „Smazat“
       setSaleToDelete(null);
     }
   };
@@ -604,7 +605,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
-      <AnimatePresence>
+      <AnimatePresence onExitComplete={() => setDeleting(false)}>
         {saleToDelete && (
           <motion.div
             initial={{ opacity: 0 }}
