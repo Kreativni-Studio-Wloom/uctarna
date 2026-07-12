@@ -174,7 +174,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ onClose, onImp
               </div>
               <button
                 onClick={onClose}
-                className="text-white hover:text-gray-200 transition-colors p-1 rounded-lg hover:bg-white hover:bg-opacity-20"
+                className="w-8 h-8 flex items-center justify-center text-white hover:text-gray-200 transition-colors rounded-lg hover:bg-white hover:bg-opacity-20"
               >
                 <X className="h-5 w-5" />
               </button>

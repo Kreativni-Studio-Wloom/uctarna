@@ -8,7 +8,7 @@ import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp,
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, CheckCircle } from 'lucide-react';
+import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, CheckCircle, X } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
 
 const CheckoutModal = dynamic(
@@ -1430,9 +1430,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                 </div>
                 <button
                   onClick={() => { setShowPinnedManager(false); setPinnedSearchTerm(''); }}
-                  className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                  className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center leading-none text-gray-600 dark:text-gray-300"
                 >
-                  ✕
+                  <X className="h-4 w-4" />
                 </button>
               </div>
               <div className="p-4 border-b border-gray-200 dark:border-gray-700">
