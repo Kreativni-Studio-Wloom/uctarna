@@ -11,11 +11,14 @@ interface DiscountModalProps {
 
 export const DiscountModal: React.FC<DiscountModalProps> = ({ onClose, onApply }) => {
   const [discountType, setDiscountType] = useState<'percentage' | 'amount'>('percentage');
-  const [discountValue, setDiscountValue] = useState<number>(0);
+  const [discountValue, setDiscountValue] = useState<string>('');
+
+  const parsedValue = parseFloat(discountValue.replace(',', '.'));
+  const isValidValue = Number.isFinite(parsedValue) && parsedValue > 0;
 
   const handleApply = () => {
-    if (discountValue > 0) {
-      onApply({ type: discountType, value: discountValue });
+    if (isValidValue) {
+      onApply({ type: discountType, value: parsedValue });
       onClose();
     }
   };
@@ -104,7 +107,8 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({ onClose, onApply }
                   max={discountType === 'percentage' ? 100 : undefined}
                   step={discountType === 'percentage' ? 1 : 0.01}
                   value={discountValue}
-                  onChange={(e) => setDiscountValue(Number(e.target.value))}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  autoFocus
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder={discountType === 'percentage' ? '0' : '0.00'}
                 />
@@ -134,7 +138,7 @@ export const DiscountModal: React.FC<DiscountModalProps> = ({ onClose, onApply }
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleApply}
-                disabled={discountValue <= 0}
+                disabled={!isValidValue}
                 className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 Aplikovat slevu
