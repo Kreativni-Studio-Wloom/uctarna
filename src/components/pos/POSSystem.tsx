@@ -1100,7 +1100,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       </span>
                       <button
                         onClick={() => setDiscount(null)}
-                        className="px-1.5 md:px-2 py-0.5 md:py-1 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded text-xs hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors flex items-center flex-shrink-0"
+                        className="w-5 h-5 md:w-6 md:h-6 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center flex-shrink-0"
                         title="Odstranit slevu"
                       >
                         <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
