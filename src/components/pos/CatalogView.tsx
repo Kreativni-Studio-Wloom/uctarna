@@ -11,6 +11,7 @@ import {
   doc,
   addDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -24,6 +25,8 @@ import {
   Check,
   X,
   Plus,
+  Trash2,
+  AlertTriangle,
   Trophy,
   Calendar,
   CalendarDays,
@@ -186,6 +189,7 @@ interface CatalogTableProps {
   onCancelEdit: () => void;
   onSaveEdit: () => void;
   onEditChange: (patch: Partial<EditState>) => void;
+  onDelete: (p: Product) => void;
   emptyMessage: string;
 }
 
@@ -198,6 +202,7 @@ function CatalogTable({
   onCancelEdit,
   onSaveEdit,
   onEditChange,
+  onDelete,
   emptyMessage,
 }: CatalogTableProps) {
   const inputClass =
@@ -334,13 +339,22 @@ function CatalogTable({
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => onStartEdit(product)}
-                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-                            title="Upravit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => onStartEdit(product)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                              title="Upravit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => onDelete(product)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Smazat"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -373,6 +387,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [addModal, setAddModal] = useState<'product' | 'extra' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Kompletní katalog (produkty i extras v jedné kolekci, extras mají isExtra: true)
   useEffect(() => {
@@ -493,6 +509,19 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
       console.error('Nepodařilo se uložit změny produktu', e);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!user || !storeId || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'stores', storeId, 'products', deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (e) {
+      console.error('Nepodařilo se smazat položku katalogu', e);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -638,14 +667,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                     onStartEdit={startEdit}
                     onCancelEdit={() => setEditing(null)}
                     onSaveEdit={saveEdit}
-                    onEditChange={(patch) =>
-                      setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
-                    }
-                    emptyMessage={
-                      mainProducts.length === 0
-                        ? 'Katalog je prázdný. Produkty přidáte v prodejním systému.'
-                        : 'Hledání nevrátilo žádné produkty.'
-                    }
+                        onEditChange={(patch) =>
+                          setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
+                        }
+                        onDelete={setDeleteTarget}
+                        emptyMessage={
+                          mainProducts.length === 0
+                            ? 'Katalog je prázdný. Přidejte první produkt tlačítkem výše.'
+                            : 'Hledání nevrátilo žádné produkty.'
+                        }
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     {filteredProducts.length} z {mainProducts.length} produktů
@@ -693,9 +723,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                     onEditChange={(patch) =>
                       setEditing((prev) => (prev ? { ...prev, ...patch } : prev))
                     }
+                    onDelete={setDeleteTarget}
                     emptyMessage={
                       extras.length === 0
-                        ? 'Zatím žádná extras. Přidáte je přes správu extras v prodeji.'
+                        ? 'Zatím žádná extras. Přidejte první tlačítkem výše.'
                         : 'Hledání nevrátilo žádná extras.'
                     }
                   />
@@ -717,6 +748,63 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
             title={addModal === 'extra' ? 'Nové extra' : 'Nový produkt'}
             submitLabel={addModal === 'extra' ? 'Vytvořit extra' : 'Vytvořit produkt'}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => !deleting && setDeleteTarget(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {deleteTarget.isExtra ? 'Smazat extra?' : 'Smazat produkt?'}
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                Opravdu chcete trvale smazat{' '}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {deleteTarget.name}
+                </span>
+                ? Tuto akci nelze vrátit zpět. Vystavené doklady zůstanou beze změny.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  Zrušit
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Smazat
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
