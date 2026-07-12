@@ -40,11 +40,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Chybí parametr txCode' }, { status: 400 });
   }
 
-  const apiKey = process.env.SUMUP_API_KEY?.trim();
+  const apiKey = (process.env.SUMUP_SECRET_API_KEY || process.env.SUMUP_API_KEY)?.trim();
   if (!apiKey) {
-    console.warn('⚠️ SUMUP_API_KEY není nakonfigurován – spropitné ze SumUp nelze načíst');
+    console.warn('⚠️ SUMUP_SECRET_API_KEY není nakonfigurován – spropitné ze SumUp nelze načíst');
     return NextResponse.json(
-      { error: 'SumUp API není nakonfigurováno (SUMUP_API_KEY)' },
+      { error: 'SumUp API není nakonfigurováno (SUMUP_SECRET_API_KEY)' },
       { status: 503 }
     );
   }
