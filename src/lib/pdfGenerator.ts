@@ -123,6 +123,10 @@ export const generateReceiptPdfBlob = async (
 
   estimatedHeight += DIVIDER_PADDING * 2;
   estimatedHeight += LINE_HEIGHT + SECTION_SPACING;
+  const discountAmount = sale.discountAmount ?? 0;
+  if (discountAmount > 0) {
+    estimatedHeight += LINE_HEIGHT * 2;
+  }
   if (sale.currency === 'EUR' && sale.eurRate) {
     estimatedHeight += LINE_HEIGHT * 3;
   }
@@ -226,6 +230,14 @@ export const generateReceiptPdfBlob = async (
 
   drawDivider();
   y += 1;
+
+  if (discountAmount > 0) {
+    const subtotal = sale.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountLabel =
+      sale.discount?.type === 'percentage' ? `Sleva ${sale.discount.value}%` : 'Sleva';
+    drawLabelValue('Mezisoucet', formatCZKAmount(subtotal));
+    drawLabelValue(discountLabel, `-${formatCZKAmount(discountAmount)}`);
+  }
 
   drawLabelValue('Zpusob uhrady', normalizePaymentMethod(sale.paymentMethod));
   if (sale.currency === 'EUR' && sale.eurRate) {
