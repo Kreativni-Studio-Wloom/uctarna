@@ -20,10 +20,40 @@ function PaymentSuccessContent() {
     const txCode = searchParams.get('smp-tx-code') || searchParams.get('tx_code') || searchParams.get('txCode');
     const foreignTxId = searchParams.get('foreign-tx-id') || searchParams.get('foreign_tx_id') || searchParams.get('foreignTxId');
 
-    // Úspěšná platba: tato stránka se v Safari (iOS) otevírá jako nový duplicitní tab.
-    // Předáme dokončení checkoutu původnímu oknu (pendingSave) a tab se pokusíme zavřít.
-    // Prodej uloží POS v původním okně; ten si data „zamkne" smazáním uctarna_payment_data.
+    // Úspěšná platba: Safari otevírá callback vždy v novém tabu svého nejnovějšího
+    // okna a web nemá API, kterým by přepnul fokus zpět na původní okno Účtárny.
+    // Proto se tento nový tab sám stane Účtárnou: uloží si data transakce do
+    // localStorage a přesměruje se rovnou do POS (kde se prodej uloží a zobrazí
+    // potvrzení). Původní POS tab dostane broadcast „takeover" a pokusí se zavřít.
     if (status === 'success') {
+      try {
+        const paymentDataRaw = localStorage.getItem('uctarna_payment_data');
+        if (paymentDataRaw) {
+          const { storeId } = JSON.parse(paymentDataRaw);
+          if (storeId) {
+            localStorage.setItem(
+              'uctarna_finish_checkout',
+              JSON.stringify({ storeId, txCode, foreignTxId, at: Date.now() })
+            );
+            try {
+              const bc = new BroadcastChannel('uctarna_payments');
+              bc.postMessage({ type: 'PAYMENT_SUCCESS', takeover: true });
+            } catch {}
+            try {
+              localStorage.setItem(
+                'uctarna_payment_result',
+                JSON.stringify({ type: 'PAYMENT_SUCCESS', takeover: true, at: Date.now() })
+              );
+            } catch {}
+            // replace: tab si nedrží historii, takže při příští platbě půjde zavřít skriptem
+            window.location.replace(`/store/${storeId}?view=pos`);
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback (chybí payment data, např. oddělené úložiště PWA vs. Safari):
+      // původní chování – notifikace okna s pendingSave a pokus o zavření tabu.
       const payload = { type: 'PAYMENT_SUCCESS', pendingSave: true, txCode, foreignTxId };
 
       // 1) Notifikace původního okna všemi kanály (BroadcastChannel, storage event, opener)

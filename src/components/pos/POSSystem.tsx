@@ -305,6 +305,31 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     return () => window.clearTimeout(timer);
   }, [successPopupCountdown]);
 
+  // Převzetí okna po návratu ze SumUp: návratová stránka se přesměrovala rovnou
+  // sem (nový tab se stal Účtárnou) a nechala v localStorage příznak s daty
+  // transakce. Dokončíme checkout tady – uložíme prodej, vyčistíme košík
+  // a zobrazíme potvrzení.
+  useEffect(() => {
+    if (!user?.uid) return;
+    try {
+      const raw = localStorage.getItem('uctarna_finish_checkout');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data?.storeId !== storeId) return;
+      localStorage.removeItem('uctarna_finish_checkout');
+      // Starší příznak (např. po obnovení tabu za dlouho) už nezpracováváme
+      if (typeof data.at !== 'number' || Date.now() - data.at > 2 * 60 * 1000) return;
+      void finishSumUpCheckout(data.txCode ?? null, data.foreignTxId ?? null).then(() => {
+        void clearCartState();
+        setShowCheckout(false);
+        setDiscount(null);
+        setSuccessPopupCountdown(3);
+      });
+    } catch {
+      /* ignore */
+    }
+  }, [user, storeId, finishSumUpCheckout, clearCartState]);
+
   // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
     const handlePaymentSuccess = () => {
@@ -315,10 +340,21 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       console.log('✅ Úspěšná platba – košík vyčištěn');
     };
 
-    // Návratová stránka posílá pendingSave: prodej ještě není uložen a duplicitní
-    // tab se zavírá – uložení převezme toto (původní) okno.
-    const handleSuccessData = (data: { type?: string; pendingSave?: boolean; txCode?: string | null; foreignTxId?: string | null } | undefined) => {
+    // takeover: checkout dokončuje nový tab, který se stal Účtárnou. Tento
+    // (starý) tab jen uklidí stav a pokusí se zavřít, aby se okna nehromadila.
+    // pendingSave: prodej ještě není uložen a duplicitní tab se zavírá –
+    // uložení převezme toto (původní) okno.
+    const handleSuccessData = (data: { type?: string; takeover?: boolean; pendingSave?: boolean; txCode?: string | null; foreignTxId?: string | null } | undefined) => {
       if (data?.type !== 'PAYMENT_SUCCESS') return;
+      if (data.takeover) {
+        handlePaymentSuccess();
+        try {
+          window.close();
+        } catch {
+          /* prohlížeč zavření nedovolil – tab zůstane funkčním POS */
+        }
+        return;
+      }
       if (data.pendingSave) {
         void finishSumUpCheckout(data.txCode ?? null, data.foreignTxId ?? null).then(
           handlePaymentSuccess
