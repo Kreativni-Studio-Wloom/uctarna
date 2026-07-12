@@ -91,16 +91,22 @@ function aggregateTopProducts(sales: SaleForStats[], since: Date): TopProductEnt
 
 function MarginCell({ price, cost }: { price: number; cost?: number | null }) {
   if (typeof cost !== 'number') {
-    return <span className="text-slate-500">—</span>;
+    return <span className="text-gray-400 dark:text-gray-500">—</span>;
   }
   const margin = price - cost;
   const percent = price > 0 ? (margin / price) * 100 : 0;
   const color =
-    margin > 0 ? 'text-emerald-400' : margin < 0 ? 'text-red-400' : 'text-slate-400';
+    margin > 0
+      ? 'text-green-600 dark:text-green-400'
+      : margin < 0
+      ? 'text-red-600 dark:text-red-400'
+      : 'text-gray-500 dark:text-gray-400';
   return (
-    <span className={color}>
+    <span className={`whitespace-nowrap ${color}`}>
       {formatCZK(margin)}
-      <span className="ml-1 text-xs text-slate-500">({percent.toFixed(0)} %)</span>
+      <span className="ml-1 text-xs text-gray-400 dark:text-gray-500">
+        ({percent.toFixed(0)} %)
+      </span>
     </span>
   );
 }
@@ -113,38 +119,44 @@ interface LeaderboardCardProps {
 }
 
 function LeaderboardCard({ title, icon, entries, loading }: LeaderboardCardProps) {
-  const medalColors = ['text-amber-400', 'text-slate-300', 'text-orange-400'];
+  const medalColors = ['text-amber-500', 'text-gray-400', 'text-orange-500'];
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-purple-400">{icon}</span>
-        <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
+        <span className="text-purple-600 dark:text-purple-400">{icon}</span>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
       </div>
       {loading ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-8 rounded-lg bg-slate-800/60 animate-pulse" />
+            <div key={i} className="h-8 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
           ))}
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-slate-500 py-2">Žádné prodeje v tomto období</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+          Žádné prodeje v tomto období
+        </p>
       ) : (
         <ol className="space-y-1.5">
           {entries.map((entry, index) => (
             <li
               key={entry.productId}
-              className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-800/50 transition-colors"
+              className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <span
                 className={`w-5 text-center text-sm font-bold ${
-                  index < 3 ? medalColors[index] : 'text-slate-500'
+                  index < 3 ? medalColors[index] : 'text-gray-400 dark:text-gray-500'
                 }`}
               >
                 {index + 1}
               </span>
-              <span className="flex-1 truncate text-sm text-slate-200">{entry.name}</span>
-              <span className="text-sm font-semibold text-purple-400">{entry.quantity}×</span>
-              <span className="hidden sm:block w-24 text-right text-xs text-slate-400">
+              <span className="flex-1 truncate text-sm text-gray-900 dark:text-white">
+                {entry.name}
+              </span>
+              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                {entry.quantity}×
+              </span>
+              <span className="hidden sm:block w-24 text-right text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                 {formatCZK(entry.revenue)}
               </span>
             </li>
@@ -186,7 +198,7 @@ function CatalogTable({
   emptyMessage,
 }: CatalogTableProps) {
   const inputClass =
-    'w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent';
+    'w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') onSaveEdit();
@@ -194,18 +206,28 @@ function CatalogTable({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-800 bg-slate-900">
-              <th className="text-left py-3 px-4 font-semibold text-slate-400">Název</th>
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">
+                Název
+              </th>
               {showCategory && (
-                <th className="text-left py-3 px-4 font-semibold text-slate-400">Kategorie</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-600 dark:text-gray-300">
+                  Kategorie
+                </th>
               )}
-              <th className="text-right py-3 px-4 font-semibold text-slate-400">Prodejní cena</th>
-              <th className="text-right py-3 px-4 font-semibold text-slate-400">Nákupní cena</th>
-              <th className="text-right py-3 px-4 font-semibold text-slate-400">Marže</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap min-w-[8.5rem]">
+                Prodejní cena
+              </th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap min-w-[8.5rem]">
+                Nákupní cena
+              </th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-600 dark:text-gray-300 whitespace-nowrap min-w-[10rem]">
+                Marže
+              </th>
               <th className="w-24 py-3 px-4" />
             </tr>
           </thead>
@@ -214,7 +236,7 @@ function CatalogTable({
               <tr>
                 <td
                   colSpan={showCategory ? 6 : 5}
-                  className="py-10 text-center text-slate-500"
+                  className="py-10 text-center text-gray-500 dark:text-gray-400"
                 >
                   {emptyMessage}
                 </td>
@@ -225,9 +247,9 @@ function CatalogTable({
                 return (
                   <tr
                     key={product.id}
-                    className="border-b border-slate-800/60 last:border-b-0 hover:bg-slate-800/40 transition-colors"
+                    className="border-b border-gray-100 dark:border-gray-700/60 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors"
                   >
-                    <td className="py-2.5 px-4 text-slate-100 font-medium">
+                    <td className="py-2.5 px-4 text-gray-900 dark:text-white font-medium">
                       {isEditing ? (
                         <input
                           value={editing.name}
@@ -243,15 +265,15 @@ function CatalogTable({
                     {showCategory && (
                       <td className="py-2.5 px-4">
                         {product.category ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-slate-800 border border-slate-700 text-slate-300">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
                             {product.category}
                           </span>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-gray-400 dark:text-gray-500">—</span>
                         )}
                       </td>
                     )}
-                    <td className="py-2.5 px-4 text-right text-slate-100">
+                    <td className="py-2.5 px-4 text-right text-gray-900 dark:text-white whitespace-nowrap">
                       {isEditing ? (
                         <input
                           type="number"
@@ -260,13 +282,13 @@ function CatalogTable({
                           value={editing.price}
                           onChange={(e) => onEditChange({ price: e.target.value })}
                           onKeyDown={handleKeyDown}
-                          className={`${inputClass} max-w-[7rem] ml-auto text-right`}
+                          className={`${inputClass} w-28 ml-auto text-right`}
                         />
                       ) : (
                         formatCZK(product.price)
                       )}
                     </td>
-                    <td className="py-2.5 px-4 text-right text-slate-300">
+                    <td className="py-2.5 px-4 text-right text-gray-600 dark:text-gray-300 whitespace-nowrap">
                       {isEditing ? (
                         <input
                           type="number"
@@ -276,15 +298,15 @@ function CatalogTable({
                           onChange={(e) => onEditChange({ cost: e.target.value })}
                           onKeyDown={handleKeyDown}
                           placeholder="—"
-                          className={`${inputClass} max-w-[7rem] ml-auto text-right`}
+                          className={`${inputClass} w-28 ml-auto text-right`}
                         />
                       ) : typeof product.cost === 'number' ? (
                         formatCZK(product.cost)
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-gray-400 dark:text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="py-2.5 px-4 text-right">
+                    <td className="py-2.5 px-4 text-right whitespace-nowrap">
                       <MarginCell price={product.price} cost={product.cost} />
                     </td>
                     <td className="py-2.5 px-4">
@@ -294,7 +316,7 @@ function CatalogTable({
                             <button
                               onClick={onSaveEdit}
                               disabled={saving || !editing.name.trim()}
-                              className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 transition-colors"
+                              className="p-1.5 rounded-lg text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-40 transition-colors"
                               title="Uložit"
                             >
                               <Check className="h-4 w-4" />
@@ -302,7 +324,7 @@ function CatalogTable({
                             <button
                               onClick={onCancelEdit}
                               disabled={saving}
-                              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-700/60 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                               title="Zrušit"
                             >
                               <X className="h-4 w-4" />
@@ -311,7 +333,7 @@ function CatalogTable({
                         ) : (
                           <button
                             onClick={() => onStartEdit(product)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+                            className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
                             title="Upravit"
                           >
                             <Pencil className="h-4 w-4" />
@@ -471,34 +493,39 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
   };
 
   const searchInputClass =
-    'w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-shadow';
+    'w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500';
+
+  const selectClass =
+    'px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
 
   return (
-    <div className="bg-[#131722] border border-slate-800 rounded-2xl p-4 sm:p-6">
+    <div className="space-y-6">
       {/* Taby Produkty / Extras */}
-      <div className="flex border-b border-slate-800 mb-6 -mx-4 sm:-mx-6 px-4 sm:px-6">
-        {(
-          [
-            { id: 'products' as TabType, label: 'Produkty', icon: <Package className="h-5 w-5" /> },
-            { id: 'extras' as TabType, label: 'Extras', icon: <Sparkles className="h-5 w-5" /> },
-          ]
-        ).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id);
-              setEditing(null);
-            }}
-            className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === tab.id
-                ? 'border-purple-500 text-purple-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="flex">
+          {(
+            [
+              { id: 'products' as TabType, label: 'Produkty', icon: <Package className="h-5 w-5" /> },
+              { id: 'extras' as TabType, label: 'Extras', icon: <Sparkles className="h-5 w-5" /> },
+            ]
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setEditing(null);
+              }}
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.id
+                  ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/10'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -514,8 +541,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Žebříčky */}
               <section>
                 <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="h-5 w-5 text-purple-400" />
-                  <h2 className="text-base font-semibold text-slate-100">
+                  <Trophy className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                     Nejprodávanější produkty
                   </h2>
                 </div>
@@ -544,7 +571,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Ovládání */}
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   <input
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
@@ -555,7 +582,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 sm:w-56"
+                  className={`${selectClass} sm:w-56`}
                 >
                   <option value="">Všechny kategorie</option>
                   {categories.map((category) => (
@@ -569,7 +596,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Tabulka produktů */}
               {productsLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
                 </div>
               ) : (
                 <>
@@ -590,7 +617,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                         : 'Hledání nevrátilo žádné produkty.'
                     }
                   />
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     {filteredProducts.length} z {mainProducts.length} produktů
                   </p>
                 </>
@@ -600,7 +627,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
             <div className="space-y-6">
               {/* Ovládání extras */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
                 <input
                   value={extrasSearch}
                   onChange={(e) => setExtrasSearch(e.target.value)}
@@ -612,7 +639,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Tabulka extras */}
               {productsLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
                 </div>
               ) : (
                 <>
@@ -633,7 +660,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                         : 'Hledání nevrátilo žádná extras.'
                     }
                   />
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     {filteredExtras.length} z {extras.length} extras
                   </p>
                 </>
