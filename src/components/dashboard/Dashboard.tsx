@@ -337,7 +337,7 @@ export const Dashboard: React.FC = () => {
                       setShowAddStore(true);
                       setShowMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+                    className="w-full px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center text-sm font-medium"
                   >
                     <span className="w-8 flex items-center justify-center flex-shrink-0">
                       <Plus className="w-5 h-5" />
@@ -350,7 +350,7 @@ export const Dashboard: React.FC = () => {
                         setShowDeleteModal(true);
                         setShowMenu(false);
                       }}
-                      className="w-full mt-1 text-left px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors flex items-center text-sm font-medium"
+                      className="w-full mt-1 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors flex items-center justify-center text-sm font-medium"
                     >
                       <span className="w-8 flex items-center justify-center flex-shrink-0">
                         <Trash2 className="w-5 h-5" />
