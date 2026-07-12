@@ -7,9 +7,16 @@ import { X, Package } from 'lucide-react';
 interface AddProductModalProps {
   onClose: () => void;
   onAdd: (name: string, price: number, cost?: number) => void;
+  title?: string;
+  submitLabel?: string;
 }
 
-export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd }) => {
+export const AddProductModal: React.FC<AddProductModalProps> = ({
+  onClose,
+  onAdd,
+  title = 'Nový produkt',
+  submitLabel = 'Vytvořit produkt',
+}) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [cost, setCost] = useState('');
@@ -56,7 +63,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd
               <div className="flex items-center">
                 <Package className="h-6 w-6 text-white mr-3" />
                 <h2 className="text-xl font-semibold text-white">
-                  Nový produkt
+                  {title}
                 </h2>
               </div>
               <button
@@ -143,7 +150,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({ onClose, onAdd
                       Vytváření...
                     </div>
                   ) : (
-                    'Vytvořit produkt'
+                    submitLabel
                   )}
                 </motion.button>
               </div>

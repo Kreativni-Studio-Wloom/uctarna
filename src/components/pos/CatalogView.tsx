@@ -9,6 +9,7 @@ import {
   where,
   onSnapshot,
   doc,
+  addDoc,
   updateDoc,
   serverTimestamp,
   Timestamp,
@@ -22,11 +23,13 @@ import {
   Pencil,
   Check,
   X,
+  Plus,
   Trophy,
   Calendar,
   CalendarDays,
   CalendarRange,
 } from 'lucide-react';
+import { AddProductModal } from './AddProductModal';
 
 interface CatalogViewProps {
   storeId: string;
@@ -369,6 +372,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
 
   const [editing, setEditing] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addModal, setAddModal] = useState<'product' | 'extra' | null>(null);
 
   // Kompletní katalog (produkty i extras v jedné kolekci, extras mají isExtra: true)
   useEffect(() => {
@@ -492,6 +496,25 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
     }
   };
 
+  const handleAdd = async (name: string, price: number, cost?: number) => {
+    if (!user || !storeId || !addModal) return;
+    try {
+      await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'products'), {
+        name,
+        price,
+        cost: typeof cost === 'number' ? cost : addModal === 'extra' ? null : 0,
+        ...(addModal === 'extra' ? { isExtra: true } : {}),
+        isPopular: false,
+        soldCount: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setAddModal(null);
+    } catch (e) {
+      console.error('Nepodařilo se přidat položku do katalogu', e);
+    }
+  };
+
   const searchInputClass =
     'w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500';
 
@@ -591,6 +614,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={() => setAddModal('product')}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nový produkt
+                </button>
               </div>
 
               {/* Tabulka produktů */}
@@ -626,14 +656,23 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
           ) : (
             <div className="space-y-6">
               {/* Ovládání extras */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  value={extrasSearch}
-                  onChange={(e) => setExtrasSearch(e.target.value)}
-                  placeholder="Hledat extra…"
-                  className={searchInputClass}
-                />
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                  <input
+                    value={extrasSearch}
+                    onChange={(e) => setExtrasSearch(e.target.value)}
+                    placeholder="Hledat extra…"
+                    className={searchInputClass}
+                  />
+                </div>
+                <button
+                  onClick={() => setAddModal('extra')}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nové extra
+                </button>
               </div>
 
               {/* Tabulka extras */}
@@ -668,6 +707,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {addModal && (
+          <AddProductModal
+            onClose={() => setAddModal(null)}
+            onAdd={handleAdd}
+            title={addModal === 'extra' ? 'Nové extra' : 'Nový produkt'}
+            submitLabel={addModal === 'extra' ? 'Vytvořit extra' : 'Vytvořit produkt'}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

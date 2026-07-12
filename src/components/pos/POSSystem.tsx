@@ -8,8 +8,7 @@ import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp,
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, ListPlus, Pin, CheckCircle } from 'lucide-react';
-import { AddProductModal } from './AddProductModal';
+import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, CheckCircle } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
 
 const CheckoutModal = dynamic(
@@ -18,10 +17,6 @@ const CheckoutModal = dynamic(
 );
 const ProductEditor = dynamic(
   () => import('./ProductEditor').then((m) => ({ default: m.ProductEditor })),
-  { ssr: false }
-);
-const ExtrasManagerModal = dynamic(
-  () => import('./ExtrasManagerModal').then((m) => ({ default: m.ExtrasManagerModal })),
   { ssr: false }
 );
 const SelectExtrasModal = dynamic(
@@ -72,7 +67,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showAddProduct, setShowAddProduct] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +77,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [isReturnMode, setIsReturnMode] = useState(false);
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
-  const [showExtrasManager, setShowExtrasManager] = useState(false);
   const [showPinnedManager, setShowPinnedManager] = useState(false);
   const pinnedProductIds = storeDoc?.pinnedProductIds ?? [];
   const [pinnedSearchTerm, setPinnedSearchTerm] = useState('');
@@ -845,36 +838,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // Finální částka po slevě
   const finalAmount = totalAmount - discountAmount;
 
-  const handleAddProduct = async (name: string, price: number, cost?: number) => {
-    if (!user) return;
-
-    try {
-      console.log('➕ Adding product:', { name, price, cost, storeId });
-      
-      const newProduct: Omit<Product, 'id'> = {
-        name,
-        price,
-        cost: typeof cost === 'number' ? cost : 0,
-        isPopular: false,
-        soldCount: 0, // Výchozí hodnota pro nové produkty
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const docRef = await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'products'), {
-        ...newProduct,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-
-      console.log('✅ Product added with ID:', docRef.id);
-      setShowAddProduct(false);
-    } catch (error) {
-      console.error('❌ Error adding product:', error);
-      alert('Chyba při vytváření produktu: ' + error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -919,30 +882,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       {showMenu && (
         <div ref={menuDropdownRef} className="absolute top-16 md:top-20 right-2 md:right-4 lg:right-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-40 md:min-w-48 max-w-xs">
           <div className="p-2">
-            <button
-              onClick={() => {
-                setShowAddProduct(true);
-                setShowMenu(false);
-              }}
-              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
-            >
-              <span className="w-8 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-5 h-5 text-blue-500" />
-              </span>
-              <span className="truncate">Nový produkt</span>
-            </button>
-            <button
-              onClick={() => {
-                setShowExtrasManager(true);
-                setShowMenu(false);
-              }}
-              className="w-full text-left px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
-            >
-              <span className="w-8 flex items-center justify-center flex-shrink-0">
-                <ListPlus className="w-5 h-5 text-green-600" />
-              </span>
-              <span className="truncate">Přidat extras</span>
-            </button>
             <button
               onClick={() => {
                 setShowProductEditor(true);
@@ -1429,24 +1368,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       </div>
 
       {/* Modals */}
-      <AnimatePresence>
-        {showAddProduct && (
-          <AddProductModal
-            onClose={() => setShowAddProduct(false)}
-            onAdd={handleAddProduct}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showExtrasManager && (
-          <ExtrasManagerModal
-            storeId={storeId}
-            onClose={() => setShowExtrasManager(false)}
-          />
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {showCheckout && (
           <CheckoutModal
