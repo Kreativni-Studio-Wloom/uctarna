@@ -47,6 +47,8 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
 
   const previewColor = getBrandPreviewColor(hue, shade);
   const palette = hueToPalette(hue, shade);
+  const lightPalette = hueToPalette(hue, 0);
+  const darkPalette = hueToPalette(hue, 100);
 
   const handlePointer = useCallback(
     (clientX: number, clientY: number) => {
@@ -142,7 +144,7 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
             onChange={(e) => onShadeChange(Number(e.target.value))}
             className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gradient-to-r from-gray-200 via-brand-500 to-brand-900 accent-brand-600"
             style={{
-              background: `linear-gradient(to right, hsl(${hue}, 25%, 88%), hsl(${hue}, 55%, 55%), hsl(${hue}, 70%, 25%))`,
+              background: `linear-gradient(to right, rgb(${lightPalette[200]}), rgb(${palette[600]}), rgb(${darkPalette[700]}))`,
             }}
           />
           <div className="flex justify-between mt-1 text-[10px] text-gray-500 dark:text-gray-400">
@@ -152,13 +154,17 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
         </div>
 
         <div className="flex gap-2">
-          {([200, 500, 700] as const).map((level) => (
+          {([
+            { level: 200 as const, label: 'Světlý' },
+            { level: 600 as const, label: 'Hlavní' },
+            { level: 700 as const, label: 'Tmavý' },
+          ]).map(({ level, label }) => (
             <div key={level} className="flex-1 text-center">
               <div
                 className="h-8 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm"
                 style={{ backgroundColor: `rgb(${palette[level]})` }}
               />
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block">{level}</span>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 block">{label}</span>
             </div>
           ))}
         </div>

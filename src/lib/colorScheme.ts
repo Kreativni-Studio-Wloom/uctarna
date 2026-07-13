@@ -348,21 +348,44 @@ export function getHueFromLegacyColorScheme(id: ColorSchemeId): number {
 /** Generuje celou brand paletu z libovolného odstínu na kole (0–360°) a intenzity (0–100). */
 export function hueToPalette(hue: number, shadeLevel = DEFAULT_BRAND_SHADE): ColorPalette {
   const t = shadeLevel / 100;
-  const saturation = Math.min(82, Math.max(38, 52 + t * 30));
-  const lightnessShift = (DEFAULT_BRAND_SHADE - shadeLevel) * 0.22;
 
-  return {
-    50: hslToRgbString(hue, saturation * 0.35, Math.min(98, 97 + lightnessShift * 0.15)),
-    100: hslToRgbString(hue, saturation * 0.45, Math.min(96, 94 + lightnessShift * 0.12)),
-    200: hslToRgbString(hue, saturation * 0.55, Math.min(92, 88 + lightnessShift * 0.1)),
-    300: hslToRgbString(hue, saturation * 0.7, Math.min(84, 78 + lightnessShift * 0.08)),
-    400: hslToRgbString(hue, saturation * 0.85, Math.min(72, 65 + lightnessShift * 0.06)),
-    500: hslToRgbString(hue, saturation, Math.min(58, 52 + lightnessShift * 0.04)),
-    600: hslToRgbString(hue, saturation, Math.max(32, 45 - lightnessShift * 0.04)),
-    700: hslToRgbString(hue, saturation * 0.95, Math.max(26, 38 - lightnessShift * 0.05)),
-    800: hslToRgbString(hue, saturation * 0.9, Math.max(20, 30 - lightnessShift * 0.06)),
-    900: hslToRgbString(hue, saturation * 0.85, Math.max(14, 22 - lightnessShift * 0.07)),
+  // Primární tón 600: světlý pastel (0) → sytá tmavá (100)
+  const light600 = 64 - t * 38;
+  const sat600 = 42 + t * 40;
+
+  const lightOffsets: Record<ColorShade, number> = {
+    50: 46,
+    100: 40,
+    200: 32,
+    300: 22,
+    400: 12,
+    500: 6,
+    600: 0,
+    700: -8,
+    800: -16,
+    900: -24,
   };
+
+  const satMultipliers: Record<ColorShade, number> = {
+    50: 0.28,
+    100: 0.38,
+    200: 0.48,
+    300: 0.62,
+    400: 0.78,
+    500: 0.9,
+    600: 1,
+    700: 0.98,
+    800: 0.95,
+    900: 0.9,
+  };
+
+  const palette = {} as ColorPalette;
+  for (const level of SHADES) {
+    const s = Math.min(92, Math.max(18, sat600 * satMultipliers[level]));
+    const l = Math.min(98, Math.max(6, light600 + lightOffsets[level]));
+    palette[level] = hslToRgbString(hue, s, l);
+  }
+  return palette;
 }
 
 export function resolveBrandColor(store: {
