@@ -977,11 +977,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               Košík ({cart.reduce((sum, item) => sum + Math.abs(item.quantity), 0)})
             </h3>
             {isReturnMode && (
-              <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-2 md:px-3 py-1 rounded-lg text-xs md:text-sm font-medium flex items-center">
+              <div className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 pl-2 md:pl-3 pr-1 py-1 rounded-lg text-xs md:text-sm font-medium flex items-center">
                 <svg className="h-3 w-3 md:h-4 md:w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                 </svg>
                 <span className="truncate">Režim vratky</span>
+                <button
+                  onClick={() => setIsReturnMode(false)}
+                  className="ml-1 w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-md hover:bg-red-200 dark:hover:bg-red-900/40 transition-colors flex-shrink-0"
+                  title="Zrušit režim vratky"
+                >
+                  <X className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                </button>
               </div>
             )}
           </div>
