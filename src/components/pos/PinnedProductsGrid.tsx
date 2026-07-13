@@ -227,53 +227,23 @@ export const PinnedProductsGrid: React.FC<PinnedProductsGridProps> = ({
         {orderedProducts.map((product, index) => {
           const isHighlighted = highlightedProductId === product.id;
           const isDragSource = drag?.productId === product.id;
-          return (
-            <motion.button
-              key={product.id}
-              layout
-              ref={(el) => {
-                if (el) itemRefs.current.set(product.id, el);
-                else itemRefs.current.delete(product.id);
-              }}
-              type="button"
-              onClick={() => {
-                if (suppressClickRef.current) {
-                  suppressClickRef.current = false;
-                  return;
-                }
-                if (reorderMode) return;
-                onProductClick(product);
-              }}
-              onPointerDown={(e) => handlePointerDown(e, product)}
-              onPointerMove={handlePointerMove}
-              onPointerUp={cancelLongPress}
-              onPointerCancel={cancelLongPress}
-              onPointerLeave={cancelLongPress}
-              onContextMenu={(e) => e.preventDefault()}
-              animate={
-                reorderMode && !isDragSource
-                  ? { rotate: [-1, 1, -1] }
-                  : { rotate: 0 }
-              }
-              transition={
-                reorderMode && !isDragSource
-                  ? {
-                      rotate: {
-                        repeat: Infinity,
-                        duration: 0.3,
-                        ease: 'easeInOut',
-                        delay: (index % 3) * 0.08,
-                      },
-                    }
-                  : { duration: 0.15 }
-              }
-              style={reorderMode ? { touchAction: 'none' } : undefined}
-              className={`bg-white dark:bg-gray-800 p-4 rounded-lg border text-left select-none [-webkit-touch-callout:none] ${
-                isDragSource
-                  ? 'border-dashed border-brand-400 dark:border-brand-500 opacity-40'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
-              } ${reorderMode ? 'cursor-grab' : ''} ${pickButtonClass(isHighlighted)}`}
-            >
+          const sharedClassName = `bg-white dark:bg-gray-800 p-4 rounded-lg border text-left select-none [-webkit-touch-callout:none] ${
+            isDragSource
+              ? 'border-dashed border-brand-400 dark:border-brand-500 opacity-40'
+              : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
+          } ${reorderMode ? 'cursor-grab' : ''} ${pickButtonClass(isHighlighted)}`;
+
+          const handleClick = () => {
+            if (suppressClickRef.current) {
+              suppressClickRef.current = false;
+              return;
+            }
+            if (reorderMode) return;
+            onProductClick(product);
+          };
+
+          const cardContent = (
+            <>
               {isHighlighted && !reorderMode && renderBadge(product.id)}
               <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                 {product.name}
@@ -281,7 +251,55 @@ export const PinnedProductsGrid: React.FC<PinnedProductsGridProps> = ({
               <p className="text-lg font-bold text-brand-600 dark:text-brand-400">
                 {product.price} Kč
               </p>
-            </motion.button>
+            </>
+          );
+
+          const sharedProps = {
+            type: 'button' as const,
+            onClick: handleClick,
+            onPointerDown: (e: React.PointerEvent) => handlePointerDown(e, product),
+            onPointerMove: handlePointerMove,
+            onPointerUp: cancelLongPress,
+            onPointerCancel: cancelLongPress,
+            onPointerLeave: cancelLongPress,
+            onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+            ref: (el: HTMLButtonElement | null) => {
+              if (el) itemRefs.current.set(product.id, el);
+              else itemRefs.current.delete(product.id);
+            },
+          };
+
+          if (reorderMode) {
+            return (
+              <motion.button
+                key={product.id}
+                layout
+                {...sharedProps}
+                style={{ touchAction: 'none' }}
+                animate={isDragSource ? { rotate: 0 } : { rotate: [-1, 1, -1] }}
+                transition={
+                  isDragSource
+                    ? { duration: 0.15 }
+                    : {
+                        rotate: {
+                          repeat: Infinity,
+                          duration: 0.3,
+                          ease: 'easeInOut',
+                          delay: (index % 3) * 0.08,
+                        },
+                      }
+                }
+                className={sharedClassName}
+              >
+                {cardContent}
+              </motion.button>
+            );
+          }
+
+          return (
+            <button key={product.id} {...sharedProps} className={sharedClassName}>
+              {cardContent}
+            </button>
           );
         })}
       </div>
