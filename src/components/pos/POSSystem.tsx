@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase } from '@/types';
 import { fetchSumUpTipAmount } from '@/lib/sumup';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, CheckCircle, X } from 'lucide-react';
+import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
 
 const CheckoutModal = dynamic(
@@ -851,6 +851,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     }
   };
 
+  const movePinnedProduct = (productId: string, direction: -1 | 1) => {
+    const orderedIds = pinnedProducts.map((p) => p.id);
+    const from = orderedIds.indexOf(productId);
+    const to = from + direction;
+    if (from === -1 || to < 0 || to >= orderedIds.length) return;
+    [orderedIds[from], orderedIds[to]] = [orderedIds[to], orderedIds[from]];
+    void reorderPinnedProducts(orderedIds);
+  };
+
   const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
   // Výpočet slevy
@@ -1405,58 +1414,144 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               initial={{ opacity: 0, scale: 0.95, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 12 }}
-              className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl"
+              className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <div className="flex items-center">
-                  <Pin className="w-5 h-5 text-indigo-500 mr-2" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Připnuté položky</h3>
-                </div>
-                <button
-                  onClick={() => { setShowPinnedManager(false); setPinnedSearchTerm(''); }}
-                  className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center leading-none text-gray-600 dark:text-gray-300"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="relative">
-                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={pinnedSearchTerm}
-                    onChange={(e) => setPinnedSearchTerm(e.target.value)}
-                    placeholder="Hledat položku..."
-                    className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  />
-                </div>
-              </div>
-              <div className="p-4 max-h-[52vh] overflow-y-auto space-y-2">
-                {filteredPinnedManagerProducts.map((product) => {
-                    const isPinned = pinnedProductIds.includes(product.id);
-                    return (
-                      <button
-                        key={product.id}
-                        onClick={() => togglePinnedProduct(product.id)}
-                        className={`w-full px-4 py-3 rounded-lg border text-left transition-colors ${
-                          isPinned
-                            ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300'
-                            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium break-words">{product.name}</span>
-                          <span className="text-sm whitespace-nowrap">{product.price} Kč</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                {filteredPinnedManagerProducts.length === 0 && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center">
-                    Žádné položky pro hledaný výraz.
+              {/* Header ve stylu ostatních modálů */}
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <Pin className="h-6 w-6 text-white mr-3" />
+                    <div>
+                      <h2 className="text-xl font-semibold text-white">Připnuté položky</h2>
+                      <p className="text-xs text-purple-100">
+                        {pinnedProducts.length === 0
+                          ? 'Zatím nic nepřipnuto'
+                          : `Připnuto: ${pinnedProducts.length}`}
+                      </p>
+                    </div>
                   </div>
-                )}
+                  <button
+                    onClick={() => { setShowPinnedManager(false); setPinnedSearchTerm(''); }}
+                    className="w-8 h-8 flex items-center justify-center text-white hover:text-gray-200 transition-colors rounded-lg hover:bg-white hover:bg-opacity-20"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1">
+                {/* Připnuté – v pořadí z mřížky, s řazením a odepnutím */}
+                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                    Připnuté v mřížce
+                  </h3>
+                  {pinnedProducts.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 py-3 text-center">
+                      Vyhledejte produkt níže a připněte ho tlačítkem +
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {pinnedProducts.map((product, index) => (
+                        <motion.div
+                          key={product.id}
+                          layout
+                          transition={{ duration: 0.15 }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/15"
+                        >
+                          <span className="w-5 text-center text-xs font-semibold text-purple-400 dark:text-purple-500 flex-shrink-0">
+                            {index + 1}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <span className="block font-medium text-sm text-gray-900 dark:text-white truncate">
+                              {product.name}
+                            </span>
+                            <span className="text-xs text-purple-600 dark:text-purple-400">
+                              {product.price} Kč
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            <button
+                              onClick={() => movePinnedProduct(product.id, -1)}
+                              disabled={index === 0}
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-30 transition-colors"
+                              title="Posunout výš"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => movePinnedProduct(product.id, 1)}
+                              disabled={index === pinnedProducts.length - 1}
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-30 transition-colors"
+                              title="Posunout níž"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => togglePinnedProduct(product.id)}
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Odepnout"
+                            >
+                              <PinOff className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                  {pinnedProducts.length > 1 && (
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2">
+                      Tip: pořadí změníte i dlouhým podržením karty přímo v mřížce.
+                    </p>
+                  )}
+                </div>
+
+                {/* Přidání dalších produktů */}
+                <div className="p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                    Přidat produkt
+                  </h3>
+                  <div className="relative mb-3">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={pinnedSearchTerm}
+                      onChange={(e) => setPinnedSearchTerm(e.target.value)}
+                      placeholder="Hledat produkt…"
+                      className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    {filteredPinnedManagerProducts
+                      .filter((product) => !pinnedProductIds.includes(product.id))
+                      .map((product) => (
+                        <button
+                          key={product.id}
+                          onClick={() => togglePinnedProduct(product.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 text-left transition-colors group"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <span className="block font-medium text-sm text-gray-900 dark:text-white truncate">
+                              {product.name}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {product.price} Kč
+                            </span>
+                          </div>
+                          <span className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 transition-colors flex-shrink-0">
+                            <Plus className="h-4 w-4" />
+                          </span>
+                        </button>
+                      ))}
+                    {filteredPinnedManagerProducts.filter((p) => !pinnedProductIds.includes(p.id)).length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+                        {pinnedSearchTerm.trim()
+                          ? 'Žádné produkty pro hledaný výraz.'
+                          : 'Všechny produkty už jsou připnuté.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             </motion.div>
           </motion.div>
