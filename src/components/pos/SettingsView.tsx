@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME } from '@/lib/colorScheme';
+import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, isLightColorScheme } from '@/lib/colorScheme';
 import { ColorSchemeId } from '@/types';
 
 interface SettingsViewProps {
@@ -188,15 +188,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
           {COLOR_SCHEMES.map((scheme) => {
             const isSelected = colorScheme === scheme.id;
+            const isLight = isLightColorScheme(scheme.id);
             return (
               <button
                 key={scheme.id}
                 type="button"
                 onClick={() => setColorScheme(scheme.id)}
-                className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
+                className={`relative flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
                   isSelected
                     ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                     : 'border-gray-200 dark:border-gray-600 hover:border-brand-300 dark:hover:border-brand-600'
@@ -204,16 +205,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 title={scheme.label}
               >
                 <div
-                  className={`w-10 h-10 rounded-full shadow-brand-lg flex items-center justify-center ${
-                    scheme.id === 'white' ? 'border-2 border-gray-300 dark:border-gray-500' : ''
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-brand-lg flex items-center justify-center ${
+                    isLight ? 'border-2 border-gray-300 dark:border-gray-500' : ''
                   }`}
                   style={{ backgroundColor: scheme.themeColor }}
                 >
                   {isSelected && (
-                    <Check className={`h-5 w-5 ${scheme.id === 'white' ? 'text-gray-700' : 'text-white'}`} />
+                    <Check className={`h-4 w-4 sm:h-5 sm:w-5 ${isLight ? 'text-gray-700' : 'text-white'}`} />
                   )}
                 </div>
-                <span className={`text-xs font-medium text-center leading-tight ${
+                <span className={`text-[10px] sm:text-xs font-medium text-center leading-tight ${
                   isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-gray-600 dark:text-gray-400'
                 }`}>
                   {scheme.label}

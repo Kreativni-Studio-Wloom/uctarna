@@ -11,23 +11,9 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
 }
 
-export type ColorSchemeId =
-  | 'purple'
-  | 'violet'
-  | 'fuchsia'
-  | 'pink'
-  | 'rose'
-  | 'red'
-  | 'orange'
-  | 'amber'
-  | 'green'
-  | 'emerald'
-  | 'teal'
-  | 'cyan'
-  | 'sky'
-  | 'blue'
-  | 'indigo'
-  | 'white';
+import type { ColorSchemeId } from '@/lib/colorScheme';
+
+export type { ColorSchemeId };
 
 export interface Store {
   id: string;
