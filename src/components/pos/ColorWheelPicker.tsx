@@ -11,16 +11,30 @@ interface ColorWheelPickerProps {
 }
 
 const WHEEL_SIZE = 148;
-const THUMB_RADIUS = 38;
+const THUMB_RADIUS_PCT = 38; // % poloměru kola (0 = střed, 50 = okraj)
+const WHEEL_SAT = 90;
+const WHEEL_LIGHT = 55;
 
-function pickHueFromPointer(clientX: number, clientY: number, rect: DOMRect): number {
+/** Hue 0 = červená nahoře, po směru hodinových ručiček (shodné s CSS conic-gradient). */
+function hueFromPointer(clientX: number, clientY: number, rect: DOMRect): number {
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
   const dx = clientX - cx;
   const dy = clientY - cy;
-  const degrees = (Math.atan2(dy, dx) * 180) / Math.PI;
-  return Math.round((degrees + 90 + 360) % 360);
+  const radians = Math.atan2(dx, -dy);
+  return Math.round(((radians * 180) / Math.PI + 360) % 360);
 }
+
+function hueToThumbPosition(hue: number): { x: number; y: number } {
+  const radians = (hue * Math.PI) / 180;
+  return {
+    x: 50 + Math.sin(radians) * THUMB_RADIUS_PCT,
+    y: 50 - Math.cos(radians) * THUMB_RADIUS_PCT,
+  };
+}
+
+const WHEEL_GRADIENT =
+  'conic-gradient(hsl(0,90%,55%), hsl(30,90%,55%), hsl(60,90%,55%), hsl(90,90%,55%), hsl(120,90%,55%), hsl(150,90%,55%), hsl(180,90%,55%), hsl(210,90%,55%), hsl(240,90%,55%), hsl(270,90%,55%), hsl(300,90%,55%), hsl(330,90%,55%), hsl(360,90%,55%))';
 
 export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
   hue,
@@ -38,7 +52,7 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
     (clientX: number, clientY: number) => {
       const rect = wheelRef.current?.getBoundingClientRect();
       if (!rect) return;
-      onHueChange(pickHueFromPointer(clientX, clientY, rect));
+      onHueChange(hueFromPointer(clientX, clientY, rect));
     },
     [onHueChange]
   );
@@ -59,9 +73,8 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
     wheelRef.current?.releasePointerCapture(e.pointerId);
   };
 
-  const thumbAngle = ((hue - 90) * Math.PI) / 180;
-  const thumbX = 50 + Math.cos(thumbAngle) * (THUMB_RADIUS / (WHEEL_SIZE / 2)) * 50;
-  const thumbY = 50 + Math.sin(thumbAngle) * (THUMB_RADIUS / (WHEEL_SIZE / 2)) * 50;
+  const thumb = hueToThumbPosition(hue);
+  const thumbColor = `hsl(${hue}, ${WHEEL_SAT}%, ${WHEEL_LIGHT}%)`;
 
   return (
     <div className="flex flex-col sm:flex-row items-center gap-5 sm:gap-8">
@@ -89,10 +102,7 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
             }
           }}
           className="absolute inset-0 rounded-full cursor-pointer touch-none shadow-md"
-          style={{
-            background:
-              'conic-gradient(from -90deg, hsl(0,90%,55%), hsl(30,90%,55%), hsl(60,90%,55%), hsl(90,90%,55%), hsl(120,90%,55%), hsl(150,90%,55%), hsl(180,90%,55%), hsl(210,90%,55%), hsl(240,90%,55%), hsl(270,90%,55%), hsl(300,90%,55%), hsl(330,90%,55%), hsl(360,90%,55%))',
-          }}
+          style={{ background: WHEEL_GRADIENT }}
         />
         {/* Vnitřní kruh — náhled */}
         <div
@@ -106,10 +116,10 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
         <div
           className="absolute w-5 h-5 rounded-full border-2 border-white shadow-md pointer-events-none"
           style={{
-            left: `${thumbX}%`,
-            top: `${thumbY}%`,
+            left: `${thumb.x}%`,
+            top: `${thumb.y}%`,
             transform: 'translate(-50%, -50%)',
-            backgroundColor: `hsl(${hue}, 80%, 50%)`,
+            backgroundColor: thumbColor,
           }}
         />
       </div>
