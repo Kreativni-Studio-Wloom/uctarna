@@ -58,14 +58,12 @@ const formatCZK = (value: number) =>
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-const startOfWeekMonday = (d: Date) => {
+/** Posledních N kalendářních dní včetně dneška (N=7 → dnes + 6 předchozích dní). */
+const startOfLastNDays = (d: Date, days: number) => {
   const day = startOfDay(d);
-  const dow = (day.getDay() + 6) % 7; // pondělí = 0
-  day.setDate(day.getDate() - dow);
+  day.setDate(day.getDate() - (days - 1));
   return day;
 };
-
-const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
 
 function aggregateTopProducts(sales: SaleForStats[], since: Date): TopProductEntry[] {
   const map = new Map<string, TopProductEntry>();
@@ -419,14 +417,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
     return unsubscribe;
   }, [user, storeId]);
 
-  // Prodeje pro žebříčky – od začátku měsíce nebo týdne (co nastalo dřív)
+  // Prodeje pro žebříčky – posledních 30 dní (pokrývá i 7denní okno)
   useEffect(() => {
     if (!user || !storeId) return;
     setSalesLoading(true);
     const now = new Date();
-    const since = new Date(
-      Math.min(startOfMonth(now).getTime(), startOfWeekMonday(now).getTime())
-    );
+    const since = startOfLastNDays(now, 30);
     const salesQuery = query(
       collection(db, 'users', user.uid, 'stores', storeId, 'sales'),
       where('createdAt', '>=', Timestamp.fromDate(since))
@@ -476,8 +472,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
     const now = new Date();
     return {
       day: aggregateTopProducts(sales, startOfDay(now)),
-      week: aggregateTopProducts(sales, startOfWeekMonday(now)),
-      month: aggregateTopProducts(sales, startOfMonth(now)),
+      last7Days: aggregateTopProducts(sales, startOfLastNDays(now, 7)),
+      last30Days: aggregateTopProducts(sales, startOfLastNDays(now, 30)),
     };
   }, [sales]);
 
@@ -606,15 +602,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                     loading={salesLoading}
                   />
                   <LeaderboardCard
-                    title="Top Tento Týden"
+                    title="Top Posledních 7 dní"
                     icon={<CalendarDays className="h-4 w-4" />}
-                    entries={leaderboards.week}
+                    entries={leaderboards.last7Days}
                     loading={salesLoading}
                   />
                   <LeaderboardCard
-                    title="Top Tento Měsíc"
+                    title="Top Posledních 30 dní"
                     icon={<CalendarRange className="h-4 w-4" />}
-                    entries={leaderboards.month}
+                    entries={leaderboards.last30Days}
                     loading={salesLoading}
                   />
                 </div>
