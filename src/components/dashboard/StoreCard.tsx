@@ -5,6 +5,7 @@ import { Store } from '@/types';
 import { motion } from 'framer-motion';
 import { Store as StoreIcon, UtensilsCrossed, ArrowRight, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getSchemeGradientStyle, getSchemeRgb } from '@/lib/colorScheme';
 // use pointer events instead of custom touch hook
 
 interface StoreCardProps {
@@ -75,7 +76,10 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
 
       <div className="p-6">
         <div className="flex items-center mb-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg flex items-center justify-center mr-4">
+          <div
+            className="w-12 h-12 rounded-lg flex items-center justify-center mr-4"
+            style={getSchemeGradientStyle(store.colorScheme)}
+          >
             {store.type === 'bistro' ? (
               <UtensilsCrossed className="h-6 w-6 text-white" />
             ) : (
@@ -95,7 +99,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
 
       </div>
 
-      <div className="mx-3 mb-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 rounded-lg px-4 py-3">
+      <div className="mx-3 mb-3 bg-gradient-to-r from-brand-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 rounded-lg px-4 py-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Klikněte pro otevření
@@ -104,7 +108,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
             animate={{ x: [0, 4, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           >
-            <ArrowRight className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <ArrowRight className="h-4 w-4" style={{ color: `rgb(${getSchemeRgb(store.colorScheme, 600)})` }} />
           </motion.div>
         </div>
       </div>

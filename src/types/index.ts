@@ -11,6 +11,23 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
 }
 
+export type ColorSchemeId =
+  | 'purple'
+  | 'violet'
+  | 'fuchsia'
+  | 'pink'
+  | 'rose'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'green'
+  | 'emerald'
+  | 'teal'
+  | 'cyan'
+  | 'sky'
+  | 'blue'
+  | 'indigo';
+
 export interface Store {
   id: string;
   name: string;
@@ -29,6 +46,8 @@ export interface Store {
   /** Zapnuté zadávání spropitného v checkoutu (přičte se k úhradě, uloží se na doklad). */
   tipsEnabled?: boolean;
   iban?: string; // IBAN pro platby QR kódem (SPAYD)
+  /** Barevné schéma designu prodejny (fialová je výchozí). */
+  colorScheme?: ColorSchemeId;
 }
 
 export interface Product {

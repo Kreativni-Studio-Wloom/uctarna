@@ -127,7 +127,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
         <div className="p-5 space-y-6">
           <div className="space-y-3">
             <div className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300">
-              <UserIcon className="w-4 h-4 mr-2 text-purple-600 dark:text-purple-400" />
+              <UserIcon className="w-4 h-4 mr-2 text-brand-600 dark:text-brand-400" />
               Změna jména
             </div>
             <input
@@ -135,17 +135,17 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder="Vaše jméno"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
             {nameError && <p className="text-sm text-red-600 dark:text-red-400">{nameError}</p>}
             {nameMessage && <p className="text-sm text-green-600 dark:text-green-400">{nameMessage}</p>}
             <button
               onClick={saveDisplayName}
               disabled={savingName}
-              className="w-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-3 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center disabled:opacity-50"
+              className="w-full bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 py-2 px-3 rounded-lg font-medium hover:bg-brand-100 dark:hover:bg-brand-900/40 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors flex items-center justify-center disabled:opacity-50"
             >
               {savingName ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 dark:border-purple-400"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-600 dark:border-brand-400"></div>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
@@ -165,21 +165,21 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({ onClose })
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="Aktuální heslo"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Nové heslo"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Potvrzení nového hesla"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
             {passwordError && <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>}
             {passwordMessage && <p className="text-sm text-green-600 dark:text-green-400">{passwordMessage}</p>}

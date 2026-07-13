@@ -5,6 +5,18 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Výchozí brand paleta (fialová) */
+  --brand-50: 250 245 255;
+  --brand-100: 243 232 255;
+  --brand-200: 233 213 255;
+  --brand-300: 216 180 254;
+  --brand-400: 192 132 252;
+  --brand-500: 168 85 247;
+  --brand-600: 147 51 234;
+  --brand-700: 126 34 206;
+  --brand-800: 107 33 168;
+  --brand-900: 88 28 135;
+  --brand-theme-color: #7c3aed;
 }
 
 @theme inline {
@@ -158,6 +170,12 @@ button, [role="button"], .clickable {
 
   .glass-panel {
     @apply bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-xl shadow-lg border border-gray-200/60 dark:border-gray-700/60;
+  }
+
+  .shadow-brand-lg {
+    box-shadow:
+      0 10px 15px -3px rgb(var(--brand-600) / 0.25),
+      0 4px 6px -4px rgb(var(--brand-600) / 0.2);
   }
 }
 

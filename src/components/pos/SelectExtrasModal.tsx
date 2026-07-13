@@ -83,7 +83,7 @@ export const SelectExtrasModal: React.FC<SelectExtrasModalProps> = ({ storeId, o
         >
           <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
-              <ListPlus className="h-6 w-6 text-purple-600 mr-3" />
+              <ListPlus className="h-6 w-6 text-brand-600 mr-3" />
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Vybrat extras</h2>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
@@ -107,11 +107,11 @@ export const SelectExtrasModal: React.FC<SelectExtrasModalProps> = ({ storeId, o
                     key={e.id}
                     onClick={() => toggle(e.id)}
                     className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      active ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                      active ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20' : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
                     }`}
                   >
                     <div className="font-medium text-gray-900 dark:text-white">{e.name}</div>
-                    <div className="text-purple-600 dark:text-purple-400 font-semibold">{e.price} Kč</div>
+                    <div className="text-brand-600 dark:text-brand-400 font-semibold">{e.price} Kč</div>
                   </button>
                 );
               })}
@@ -121,7 +121,7 @@ export const SelectExtrasModal: React.FC<SelectExtrasModalProps> = ({ storeId, o
             </div>
 
             <div className="pt-4 text-right">
-              <button onClick={confirm} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50" disabled={selected.size === 0}>
+              <button onClick={confirm} className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50" disabled={selected.size === 0}>
                 Přidat vybrané
               </button>
             </div>

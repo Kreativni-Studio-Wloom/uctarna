@@ -388,7 +388,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <CreditCard className="h-6 w-6 text-white mr-3" />
@@ -445,7 +445,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         value={tipInput}
                         onChange={(e) => setTipInput(e.target.value)}
                         placeholder="0"
-                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
                   </>
@@ -571,8 +571,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {paymentMethod === 'qr' && hasIban && !isRefund && (
               <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm">
                 <div className="flex items-center mb-4">
-                  <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-3">
-                    <QrCode className="h-4 w-4 text-purple-700 dark:text-purple-300" />
+                  <div className="w-8 h-8 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-3">
+                    <QrCode className="h-4 w-4 text-brand-700 dark:text-brand-300" />
                   </div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Platba QR kódem
@@ -589,7 +589,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     whileTap={{ scale: 0.98 }}
                     onClick={handlePayment}
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     Dokončit prodej
                   </motion.button>
@@ -614,7 +614,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="Zadejte jméno zákazníka"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
               </div>
             )}
@@ -639,13 +639,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   disabled={!canUseCard}
                   className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
                     paymentMethod === 'card'
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                       : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                   } ${
                     !canUseCard ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  <CreditCard className="h-5 w-5 mr-2 text-purple-600" />
+                  <CreditCard className="h-5 w-5 mr-2 text-brand-600" />
                   <span className="font-medium text-gray-900 dark:text-white">Karta</span>
                   {!canUseCard && (
                     <span className="text-xs text-gray-500 ml-1">(nedostupná)</span>
@@ -656,7 +656,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onClick={() => setPaymentMethod('cash')}
                   className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
                     paymentMethod === 'cash'
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                       : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                   }`}
                 >
@@ -688,11 +688,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         onClick={() => { setPayInEUR(false); setPaymentMethod('qr'); }}
                         className={`p-4 rounded-lg border-2 transition-all duration-200 flex items-center justify-center ${
                           paymentMethod === 'qr'
-                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                            ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                         }`}
                       >
-                        <QrCode className="h-5 w-5 mr-2 text-purple-600" />
+                        <QrCode className="h-5 w-5 mr-2 text-brand-600" />
                         <span className="font-medium text-gray-900 dark:text-white">QR kód</span>
                       </button>
                     )}
@@ -757,7 +757,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     value={manualSumUpCode}
                     onChange={(e) => setManualSumUpCode(e.target.value)}
                     placeholder="Kód transakce (nepovinné)"
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
               )}
@@ -791,7 +791,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 whileTap={{ scale: 0.98 }}
                 onClick={handlePayment}
                 disabled={loading || (paymentMethod === 'card' && !canProceedWithCard)}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">

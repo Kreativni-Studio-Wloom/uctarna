@@ -144,7 +144,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-800 rounded-xl p-8 max-w-md w-full mx-4">
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
           </div>
           <p className="text-center mt-4 text-gray-600 dark:text-gray-400">Načítání produktů...</p>
         </div>
@@ -163,7 +163,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center">
-            <Package className="h-6 w-6 text-purple-600 mr-3" />
+            <Package className="h-6 w-6 text-brand-600 mr-3" />
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Editor produktů
             </h2>
@@ -227,7 +227,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                               type="text"
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                               placeholder="Název produktu"
                             />
                           </div>
@@ -239,7 +239,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                               type="number"
                               value={editPrice}
                               onChange={(e) => setEditPrice(Number(e.target.value))}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                               placeholder="0"
                               min="0"
                               step="0.01"
@@ -253,7 +253,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                               type="number"
                               value={editCost || ''}
                               onChange={(e) => setEditCost(e.target.value ? Number(e.target.value) : undefined)}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                               placeholder="0"
                               min="0"
                               step="0.01"
@@ -288,7 +288,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                             <h3 className="font-medium text-gray-900 dark:text-white text-lg">
                               {product.name}
                             </h3>
-                            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                            <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">
                               {product.price} Kč
                             </p>
                             {product.cost !== undefined && (
@@ -309,7 +309,7 @@ export const ProductEditor: React.FC<ProductEditorProps> = ({ storeId, onClose }
                           <div className="flex space-x-2">
                             <button
                               onPointerUp={() => startEditing(product)}
-                              className="flex-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-3 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center touch-target"
+                              className="flex-1 bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 py-2 px-3 rounded-lg font-medium hover:bg-brand-100 dark:hover:bg-brand-900/40 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors flex items-center justify-center touch-target"
                             >
                               <Edit className="h-4 w-4 mr-2" />
                               Upravit

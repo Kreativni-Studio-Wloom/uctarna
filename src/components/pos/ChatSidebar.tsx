@@ -81,7 +81,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
         <button
           type="button"
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 text-sm font-medium transition-colors"
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white px-4 py-3 text-sm font-medium transition-colors"
         >
           <MessageSquarePlus className="h-4 w-4" />
           Nový chat
@@ -120,7 +120,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                     onClick={() => onSelectChat(chat.id)}
                     className={`w-full text-left rounded-xl px-3 py-3 transition-colors ${
                       isActive
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-700/60 text-gray-700 dark:text-gray-200'
                     }`}
                   >

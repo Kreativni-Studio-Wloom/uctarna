@@ -4,9 +4,11 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME } from '@/lib/colorScheme';
+import { ColorSchemeId } from '@/types';
 
 interface SettingsViewProps {
   storeId: string;
@@ -23,6 +25,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const [companyName, setCompanyName] = useState<string>('');
   const [ico, setIco] = useState<string>('');
   const [companyAddress, setCompanyAddress] = useState<string>('');
+  const [colorScheme, setColorScheme] = useState<ColorSchemeId>(DEFAULT_COLOR_SCHEME);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -45,7 +48,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
     setCompanyName(typeof storeDoc.companyName === 'string' ? storeDoc.companyName : '');
     setIco(typeof storeDoc.ico === 'string' ? storeDoc.ico : '');
     setCompanyAddress(typeof storeDoc.companyAddress === 'string' ? storeDoc.companyAddress : '');
+    if (storeDoc.colorScheme) {
+      setColorScheme(storeDoc.colorScheme);
+    } else {
+      setColorScheme(DEFAULT_COLOR_SCHEME);
+    }
   }, [storeDoc]);
+
+  // Okamžitý náhled vybrané barvy před uložením
+  useEffect(() => {
+    applyColorScheme(colorScheme);
+  }, [colorScheme]);
+
+  // Po opuštění nastavení bez uložení vrátit uloženou barvu prodejny
+  useEffect(() => {
+    return () => {
+      applyColorScheme(storeDoc?.colorScheme ?? DEFAULT_COLOR_SCHEME);
+    };
+  }, [storeDoc?.colorScheme]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -64,6 +84,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         companyName: companyName.trim(),
         ico: ico.trim(),
         companyAddress: companyAddress.trim(),
+        colorScheme,
         updatedAt: serverTimestamp(),
       });
       setSaved(true);
@@ -90,7 +111,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           whileTap={{ scale: 0.95 }}
           onClick={handleSave}
           disabled={saving || !storeName.trim()}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
+          className="bg-brand-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
         >
           {saving ? (
             <>
@@ -118,8 +139,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
       >
         <div className="flex items-start mb-4">
-          <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-            <StoreIcon className="h-6 w-6 text-purple-600" />
+          <div className="w-12 h-12 shrink-0 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-4">
+            <StoreIcon className="h-6 w-6 text-brand-600" />
           </div>
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -141,8 +162,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             value={storeName}
             onChange={(e) => setStoreName(e.target.value)}
             placeholder="Např. Hlavní prodejna"
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
           />
+        </div>
+      </motion.div>
+
+      {/* Color Scheme */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+      >
+        <div className="flex items-start mb-4">
+          <div className="w-12 h-12 shrink-0 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-4">
+            <Palette className="h-6 w-6 text-brand-600" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Barevné schéma
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Změní barvu designových prvků v celé prodejně — tlačítka, ikony, texty a stíny
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+          {COLOR_SCHEMES.map((scheme) => {
+            const isSelected = colorScheme === scheme.id;
+            return (
+              <button
+                key={scheme.id}
+                type="button"
+                onClick={() => setColorScheme(scheme.id)}
+                className={`relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 ${
+                  isSelected
+                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
+                    : 'border-gray-200 dark:border-gray-600 hover:border-brand-300 dark:hover:border-brand-600'
+                }`}
+                title={scheme.label}
+              >
+                <div
+                  className="w-10 h-10 rounded-full shadow-brand-lg flex items-center justify-center"
+                  style={{ backgroundColor: scheme.themeColor }}
+                >
+                  {isSelected && <Check className="h-5 w-5 text-white" />}
+                </div>
+                <span className={`text-xs font-medium text-center leading-tight ${
+                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {scheme.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
@@ -180,7 +254,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 min="0"
                 value={eurRate}
                 onChange={(e) => setEurRate(parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 placeholder="25.00"
               />
             </div>
@@ -218,8 +292,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
             className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
           >
             <div className="flex items-start mb-4">
-              <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-                <CreditCard className="h-6 w-6 text-purple-600" />
+              <div className="w-12 h-12 shrink-0 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-4">
+                <CreditCard className="h-6 w-6 text-brand-600" />
               </div>
               <div className="min-w-0">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -252,15 +326,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                     aria-label="Přepnout přesměrování na SumUp"
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
                 </label>
               </div>
 
-              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                <div className="text-sm text-purple-700 dark:text-purple-300 mb-2">
+              <div className="p-4 bg-brand-50 dark:bg-brand-900/20 rounded-lg">
+                <div className="text-sm text-brand-700 dark:text-brand-300 mb-2">
                   Jak to funguje:
                 </div>
-                <div className="text-xs text-purple-600 dark:text-purple-400 space-y-1">
+                <div className="text-xs text-brand-600 dark:text-brand-400 space-y-1">
                   {redirectToSumUp ? (
                     <>
                       <div>• Kliknutím na "Zaplatit kartou" se otevře SumUp app</div>
@@ -318,7 +392,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                   aria-label="Zapnout spropitné v pokladně"
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-purple-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
               </label>
             </div>
           </motion.div>
@@ -357,7 +431,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 value={iban}
                 onChange={(e) => setIban(e.target.value)}
                 placeholder="CZ6508000000192000145399"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
               />
             </div>
           </motion.div>
@@ -371,8 +445,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
         >
           <div className="flex items-start mb-4">
-            <div className="w-12 h-12 shrink-0 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-4">
-              <Settings className="h-6 w-6 text-purple-600" />
+            <div className="w-12 h-12 shrink-0 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-4">
+              <Settings className="h-6 w-6 text-brand-600" />
             </div>
             <div className="min-w-0">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -395,7 +469,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Např. Jan Novák"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
               />
             </div>
 
@@ -409,7 +483,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 value={ico}
                 onChange={(e) => setIco(e.target.value)}
                 placeholder="Např. 12345678"
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
               />
             </div>
 
@@ -423,7 +497,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 onChange={(e) => setCompanyAddress(e.target.value)}
                 placeholder="Např. Hlavní 123, 110 00 Praha"
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 resize-y"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200 resize-y"
               />
             </div>
           </div>

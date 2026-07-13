@@ -545,7 +545,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -592,7 +592,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             onClick={() => handlePeriodChange('day')}
             className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
               selectedPeriod === 'day'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
@@ -602,7 +602,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             onClick={() => handlePeriodChange('month')}
             className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
               selectedPeriod === 'month'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
@@ -612,7 +612,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             onClick={() => handlePeriodChange('custom')}
             className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
               selectedPeriod === 'custom'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
@@ -622,7 +622,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             onClick={() => handlePeriodChange('total')}
             className={`px-3 py-2 sm:px-4 rounded-lg font-medium transition-colors text-sm sm:text-base ${
               selectedPeriod === 'total'
-                ? 'bg-purple-600 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
@@ -837,8 +837,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
         >
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mr-3">
-              <Euro className="h-5 w-5 text-purple-600" />
+            <div className="w-10 h-10 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Euro className="h-5 w-5 text-brand-600" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">

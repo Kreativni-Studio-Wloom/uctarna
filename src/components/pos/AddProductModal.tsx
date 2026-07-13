@@ -58,7 +58,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Package className="h-6 w-6 text-white mr-3" />
@@ -88,7 +88,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="Zadejte název produktu"
                   autoFocus
                 />
@@ -106,7 +106,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="0.00"
                 />
               </div>
@@ -122,7 +122,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   min="0"
                   value={cost}
                   onChange={(e) => setCost(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="0.00"
                 />
               </div>
@@ -142,7 +142,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={loading || !name.trim() || !price.trim()}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center">

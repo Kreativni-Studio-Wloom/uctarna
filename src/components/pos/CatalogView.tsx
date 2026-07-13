@@ -129,7 +129,7 @@ function LeaderboardCard({ title, icon, entries, loading }: LeaderboardCardProps
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-purple-600 dark:text-purple-400">{icon}</span>
+        <span className="text-brand-600 dark:text-brand-400">{icon}</span>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
       </div>
       {loading ? (
@@ -159,7 +159,7 @@ function LeaderboardCard({ title, icon, entries, loading }: LeaderboardCardProps
               <span className="flex-1 truncate text-sm text-gray-900 dark:text-white">
                 {entry.name}
               </span>
-              <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+              <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">
                 {entry.quantity}×
               </span>
               <span className="hidden sm:block w-24 text-right text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -206,7 +206,7 @@ function CatalogTable({
   emptyMessage,
 }: CatalogTableProps) {
   const inputClass =
-    'w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
+    'w-full px-2 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') onSaveEdit();
@@ -273,7 +273,7 @@ function CatalogTable({
                     {showCategory && (
                       <td className="py-2.5 px-4">
                         {product.category ? (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300">
                             {product.category}
                           </span>
                         ) : (
@@ -342,7 +342,7 @@ function CatalogTable({
                           <>
                             <button
                               onClick={() => onStartEdit(product)}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
                               title="Upravit"
                             >
                               <Pencil className="h-4 w-4" />
@@ -545,10 +545,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
   };
 
   const searchInputClass =
-    'w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500';
+    'w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500';
 
   const selectClass =
-    'px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
+    'px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white';
 
   return (
     <div className="space-y-6">
@@ -569,7 +569,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               }}
               className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/10'
+                  ? 'border-brand-500 text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-900/10'
                   : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
@@ -593,7 +593,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Žebříčky */}
               <section>
                 <div className="flex items-center gap-2 mb-3">
-                  <Trophy className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <Trophy className="h-5 w-5 text-brand-600 dark:text-brand-400" />
                   <h2 className="text-base font-semibold text-gray-900 dark:text-white">
                     Nejprodávanější produkty
                   </h2>
@@ -645,7 +645,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                 </select>
                 <button
                   onClick={() => setAddModal('product')}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Plus className="h-4 w-4" />
                   Nový produkt
@@ -655,7 +655,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Tabulka produktů */}
               {productsLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
                 </div>
               ) : (
                 <>
@@ -698,7 +698,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                 </div>
                 <button
                   onClick={() => setAddModal('extra')}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Plus className="h-4 w-4" />
                   Nové extra
@@ -708,7 +708,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
               {/* Tabulka extras */}
               {productsLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
                 </div>
               ) : (
                 <>

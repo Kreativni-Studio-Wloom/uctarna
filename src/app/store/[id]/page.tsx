@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginRequiredModal } from '@/components/auth/LoginRequiredModal';
 import { StoreProvider } from '@/contexts/StoreContext';
+import { BrandColorProvider } from '@/components/BrandColorProvider';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
@@ -14,7 +15,7 @@ import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settin
 
 const ViewLoading = () => (
   <div className="flex items-center justify-center py-12">
-    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600" />
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600" />
   </div>
 );
 
@@ -93,7 +94,7 @@ export default function StorePage() {
   if (authLoading || (user && storeLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -164,7 +165,8 @@ export default function StorePage() {
 
   return (
     <StoreProvider store={store}>
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+      <BrandColorProvider colorScheme={store.colorScheme}>
+      <div className="min-h-screen bg-gradient-to-br from-brand-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
         <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -176,9 +178,9 @@ export default function StorePage() {
                   <ArrowLeft className="h-5 w-5 text-gray-600 dark:text-gray-300" />
                 </button>
                 {store.type === 'bistro' ? (
-                  <UtensilsCrossed className="h-8 w-8 text-purple-600 mr-3" />
+                  <UtensilsCrossed className="h-8 w-8 text-brand-600 mr-3" />
                 ) : (
-                  <StoreIcon className="h-8 w-8 text-purple-600 mr-3" />
+                  <StoreIcon className="h-8 w-8 text-brand-600 mr-3" />
                 )}
                 <div>
                   <h1 className="text-xl font-bold text-gray-900 dark:text-white">{store.name}</h1>
@@ -198,7 +200,7 @@ export default function StorePage() {
                   onClick={() => setCurrentView(view)}
                   className={`flex-1 min-h-[56px] flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 px-1 md:px-3 py-2 md:py-4 text-sm font-medium border-b-2 transition-colors ${
                     currentView === view
-                      ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                      ? 'border-brand-500 text-brand-600 dark:text-brand-400'
                       : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
@@ -224,6 +226,7 @@ export default function StorePage() {
           </AnimatePresence>
         </main>
       </div>
+      </BrandColorProvider>
     </StoreProvider>
   );
 }

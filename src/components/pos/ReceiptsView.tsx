@@ -181,7 +181,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       case 'cash':
         return 'text-green-600 dark:text-green-400';
       case 'card':
-        return 'text-purple-600 dark:text-purple-400'; // Zahrnuje i SumUp platby
+        return 'text-brand-600 dark:text-brand-400'; // Zahrnuje i SumUp platby
       case 'qr':
         return 'text-blue-600 dark:text-blue-400';
       default:
@@ -288,7 +288,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   if (pageLoading && !isSearchMode && pageSales.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -313,13 +313,13 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Hledat podle ID nebo čísla dokladu"
-          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
       </div>
 
       {searchLoading && isSearchMode ? (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600 mr-3"></div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 mr-3"></div>
           <span className="text-gray-600 dark:text-gray-400">Prohledávám všechny doklady…</span>
         </div>
       ) : displaySales.length === 0 ? (
@@ -351,7 +351,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
-                    <Receipt className="h-5 w-5 text-purple-600 mr-2" />
+                    <Receipt className="h-5 w-5 text-brand-600 mr-2" />
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {sale.documentId || `#${sale.id.slice(-8)}`}
                     </span>
@@ -422,7 +422,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                   </button>
                   <button
                     onClick={() => setSelectedSale(sale)}
-                    className="flex-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 py-2 px-4 rounded-lg font-medium hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors flex items-center justify-center"
+                    className="flex-1 bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 py-2 px-4 rounded-lg font-medium hover:bg-brand-100 dark:hover:bg-brand-900/40 transition-colors flex items-center justify-center"
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     Detail
@@ -487,7 +487,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden select-text"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+              <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">
                     Detail dokladu

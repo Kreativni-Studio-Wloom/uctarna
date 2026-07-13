@@ -164,7 +164,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ onClose, onImp
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <Upload className="h-6 w-6 text-white mr-3" />
@@ -230,7 +230,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ onClose, onImp
                       key={product.name}
                       className={`p-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
                         selectedProducts.has(product.name)
-                          ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                          ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
                       }`}
                       onClick={() => handleProductToggle(product.name)}
@@ -246,7 +246,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ onClose, onImp
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ml-2 ${
                           selectedProducts.has(product.name)
-                            ? 'border-purple-500 bg-purple-500'
+                            ? 'border-brand-500 bg-brand-500'
                             : 'border-gray-300 dark:border-gray-500'
                         }`}>
                           {selectedProducts.has(product.name) && (
@@ -274,7 +274,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({ onClose, onImp
                     whileTap={{ scale: 0.98 }}
                     onClick={handleImport}
                     disabled={loading || selectedCount === 0}
-                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
                     {loading ? (
                       <>

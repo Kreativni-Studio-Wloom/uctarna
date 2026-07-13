@@ -11,7 +11,7 @@ const Dashboard = dynamic(
   {
     loading: () => (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-10 w-10 text-purple-600 animate-spin" />
+        <Loader2 className="h-10 w-10 text-brand-600 animate-spin" />
       </div>
     ),
   }
@@ -22,13 +22,13 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
-          <Loader2 className="h-12 w-12 text-purple-600 animate-spin mx-auto mb-4" />
+          <Loader2 className="h-12 w-12 text-brand-600 animate-spin mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">
             Načítání Účtárny...
           </h2>
@@ -39,7 +39,7 @@ export default function Home() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 p-4">
         <LoginForm onSuccess={() => {}} />
       </div>
     );

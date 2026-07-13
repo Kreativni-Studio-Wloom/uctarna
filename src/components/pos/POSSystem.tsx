@@ -34,7 +34,7 @@ const CART_ADD_HIGHLIGHT_MS = 500;
 const productPickButtonClass = (isHighlighted: boolean) =>
   `relative overflow-visible ring-2 ring-inset touch-target transition-colors duration-200 ${
     isHighlighted
-      ? 'ring-purple-500 bg-purple-50 dark:bg-purple-900/10'
+      ? 'ring-brand-500 bg-brand-50 dark:bg-brand-900/10'
       : 'ring-transparent'
   }`;
 
@@ -49,7 +49,7 @@ const ProductAddedBadge: React.FC<{ count: number; positionClassName?: string }>
     initial={{ opacity: 0, scale: 0.8 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.15, ease: 'easeOut' }}
-    className={`pointer-events-none absolute z-10 rounded-md bg-purple-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-tight text-white shadow-sm ring-1 ring-purple-400/30 dark:bg-purple-500 dark:ring-purple-300/20 ${positionClassName}`}
+    className={`pointer-events-none absolute z-10 rounded-md bg-brand-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-tight text-white shadow-sm ring-1 ring-brand-400/30 dark:bg-brand-500 dark:ring-brand-300/20 ${positionClassName}`}
     aria-hidden
   >
     {count}×
@@ -872,7 +872,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -1044,7 +1044,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         {!isReturnMode && (
                           <button
                             onClick={() => item.itemId && openSelectExtrasForItem(item.itemId)}
-                            className="h-7 px-2.5 rounded-md text-xs leading-none bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/40 inline-flex items-center justify-center whitespace-nowrap flex-shrink-0"
+                            className="h-7 px-2.5 rounded-md text-xs leading-none bg-brand-100 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 hover:bg-brand-200 dark:hover:bg-brand-900/40 inline-flex items-center justify-center whitespace-nowrap flex-shrink-0"
                           >
                             Extra
                           </button>
@@ -1151,7 +1151,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCheckout(true)}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2.5 md:py-3 px-3 md:px-4 lg:px-6 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 shadow-lg flex items-center justify-center text-xs md:text-sm lg:text-base"
+            className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-2.5 md:py-3 px-3 md:px-4 lg:px-6 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200 shadow-brand-lg flex items-center justify-center text-xs md:text-sm lg:text-base"
           >
             <CreditCard className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 mr-2 flex-shrink-0" />
             <span className="truncate">
@@ -1171,7 +1171,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => setShowAllProducts(true)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
             
             {/* Moderní popup s produkty */}
@@ -1218,19 +1218,19 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             type="button"
                             onPointerDown={keepSearchKeyboardOpen}
                             onClick={() => addToCart(product)}
-                            className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
+                            className={`w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-brand-300 dark:hover:border-brand-600 hover:bg-brand-50 dark:hover:bg-brand-900/10 text-left group ${productPickButtonClass(isHighlighted)}`}
                         >
                           {isHighlighted && addedHighlight && (
                             <ProductAddedBadge count={addedHighlight.count} positionClassName="top-1.5 left-1.5" />
                           )}
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-gray-900 dark:text-white text-sm truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                              <h4 className="font-medium text-gray-900 dark:text-white text-sm truncate group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
                                 {product.name}
                               </h4>
                             </div>
                             <div className="ml-3 flex-shrink-0">
-                              <span className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                              <span className="text-lg font-bold text-brand-600 dark:text-brand-400">
                                 {product.price} Kč
                               </span>
                             </div>
@@ -1355,7 +1355,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       key={product.id}
                       type="button"
                       onClick={() => addToCart(product)}
-                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 text-left ${productPickButtonClass(isHighlighted)}`}
+                      className={`bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 text-left ${productPickButtonClass(isHighlighted)}`}
                     >
                       {isHighlighted && addedHighlight && (
                         <ProductAddedBadge count={addedHighlight.count} />
@@ -1363,7 +1363,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                         {product.name}
                       </h4>
-                      <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+                      <p className="text-lg font-bold text-brand-600 dark:text-brand-400">
                         {product.price} Kč
                       </p>
                     </motion.button>
@@ -1425,13 +1425,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header ve stylu ostatních modálů */}
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex-shrink-0">
+              <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Pin className="h-6 w-6 text-white mr-3" />
                     <div>
                       <h2 className="text-xl font-semibold text-white">Připnuté položky</h2>
-                      <p className="text-xs text-purple-100">
+                      <p className="text-xs text-brand-100">
                         {pinnedProducts.length === 0
                           ? 'Zatím nic nepřipnuto'
                           : `Připnuto: ${pinnedProducts.length}`}
@@ -1464,16 +1464,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                           key={product.id}
                           layout
                           transition={{ duration: 0.15 }}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/15"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-200 dark:border-brand-800 bg-brand-50 dark:bg-brand-900/15"
                         >
-                          <span className="w-5 text-center text-xs font-semibold text-purple-400 dark:text-purple-500 flex-shrink-0">
+                          <span className="w-5 text-center text-xs font-semibold text-brand-400 dark:text-brand-500 flex-shrink-0">
                             {index + 1}
                           </span>
                           <div className="flex-1 min-w-0">
                             <span className="block font-medium text-sm text-gray-900 dark:text-white truncate">
                               {product.name}
                             </span>
-                            <span className="text-xs text-purple-600 dark:text-purple-400">
+                            <span className="text-xs text-brand-600 dark:text-brand-400">
                               {product.price} Kč
                             </span>
                           </div>
@@ -1481,7 +1481,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             <button
                               onClick={() => movePinnedProduct(product.id, -1)}
                               disabled={index === 0}
-                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-30 transition-colors"
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 disabled:opacity-30 transition-colors"
                               title="Posunout výš"
                             >
                               <ChevronUp className="h-4 w-4" />
@@ -1489,7 +1489,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                             <button
                               onClick={() => movePinnedProduct(product.id, 1)}
                               disabled={index === pinnedProducts.length - 1}
-                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-30 transition-colors"
+                              className="w-7 h-7 flex items-center justify-center rounded-md text-gray-500 dark:text-gray-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 disabled:opacity-30 transition-colors"
                               title="Posunout níž"
                             >
                               <ChevronDown className="h-4 w-4" />
@@ -1525,7 +1525,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                       value={pinnedSearchTerm}
                       onChange={(e) => setPinnedSearchTerm(e.target.value)}
                       placeholder="Hledat produkt…"
-                      className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
@@ -1535,7 +1535,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                         <button
                           key={product.id}
                           onClick={() => togglePinnedProduct(product.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600 hover:bg-purple-50/50 dark:hover:bg-purple-900/10 text-left transition-colors group"
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600 hover:bg-brand-50/50 dark:hover:bg-brand-900/10 text-left transition-colors group"
                         >
                           <div className="flex-1 min-w-0">
                             <span className="block font-medium text-sm text-gray-900 dark:text-white truncate">
@@ -1545,7 +1545,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                               {product.price} Kč
                             </span>
                           </div>
-                          <span className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 transition-colors flex-shrink-0">
+                          <span className="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 group-hover:text-brand-600 dark:group-hover:text-brand-400 group-hover:bg-brand-100 dark:group-hover:bg-brand-900/30 transition-colors flex-shrink-0">
                             <Plus className="h-4 w-4" />
                           </span>
                         </button>

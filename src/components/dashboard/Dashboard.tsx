@@ -267,19 +267,19 @@ export const Dashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-brand-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-14 sm:h-16">
             <div className="flex items-center">
-              <StoreIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 mr-2 sm:mr-3" />
+              <StoreIcon className="h-6 w-6 sm:h-8 sm:w-8 text-brand-600 mr-2 sm:mr-3" />
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
                 Účtárna
               </h1>
@@ -337,7 +337,7 @@ export const Dashboard: React.FC = () => {
                       setShowAddStore(true);
                       setShowMenu(false);
                     }}
-                    className="w-full px-3 py-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors flex items-center justify-center text-sm font-medium"
+                    className="w-full px-3 py-2.5 rounded-lg bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/40 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors flex items-center justify-center text-sm font-medium"
                   >
                     <span className="w-8 flex items-center justify-center flex-shrink-0">
                       <Plus className="w-5 h-5" />
@@ -380,7 +380,7 @@ export const Dashboard: React.FC = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowAddStore(true)}
-                className="bg-purple-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors text-sm sm:text-base"
+                className="bg-brand-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors text-sm sm:text-base"
               >
                 <span className="hidden sm:inline">Vytvořit první prodejnu</span>
                 <span className="sm:hidden">Vytvořit prodejnu</span>
@@ -452,7 +452,7 @@ export const Dashboard: React.FC = () => {
                 </p>
                 <button
                   onClick={handleSelectAll}
-                  className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium"
+                  className="text-sm text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 font-medium"
                 >
                   {selectedStores.length === stores.length ? 'Odznačit vše' : 'Označit vše'}
                 </button>

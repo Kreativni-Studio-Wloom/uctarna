@@ -44,7 +44,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <StoreIcon className="h-6 w-6 text-white mr-3" />
@@ -74,7 +74,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="Zadejte název prodejny"
                   autoFocus
                 />
@@ -90,7 +90,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                     onClick={() => setType('prodejna')}
                     className={`px-4 py-3 rounded-lg border transition-colors ${
                       type === 'prodejna'
-                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                        ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300'
                         : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
@@ -101,7 +101,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                     onClick={() => setType('bistro')}
                     className={`px-4 py-3 rounded-lg border transition-colors ${
                       type === 'bistro'
-                        ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300'
+                        ? 'border-brand-600 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300'
                         : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                   >
@@ -125,7 +125,7 @@ export const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onAdd }) 
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={loading || !storeName.trim()}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  className="flex-1 bg-gradient-to-r from-brand-600 to-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   {loading ? (
                     <div className="flex items-center justify-center">

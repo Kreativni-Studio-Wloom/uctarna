@@ -122,7 +122,7 @@ export const ExtrasManagerModal: React.FC<ExtrasManagerModalProps> = ({ storeId,
         >
           <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center">
-              <Package className="h-6 w-6 text-purple-600 mr-3" />
+              <Package className="h-6 w-6 text-brand-600 mr-3" />
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Správa extras</h2>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
@@ -156,7 +156,7 @@ export const ExtrasManagerModal: React.FC<ExtrasManagerModalProps> = ({ storeId,
                 />
               </div>
               <div className="mt-3 text-right">
-                <button onClick={handleAdd} className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <button onClick={handleAdd} className="inline-flex items-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700">
                   <Plus className="h-4 w-4 mr-2" /> Přidat extra
                 </button>
               </div>

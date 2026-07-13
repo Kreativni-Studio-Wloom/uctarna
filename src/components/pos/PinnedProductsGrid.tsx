@@ -209,7 +209,7 @@ export const PinnedProductsGrid: React.FC<PinnedProductsGridProps> = ({
         {reorderMode && (
           <button
             onClick={exitReorderMode}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium transition-colors"
           >
             <Check className="h-4 w-4" />
             Hotovo
@@ -270,15 +270,15 @@ export const PinnedProductsGrid: React.FC<PinnedProductsGridProps> = ({
               style={reorderMode ? { touchAction: 'none' } : undefined}
               className={`bg-white dark:bg-gray-800 p-4 rounded-lg border text-left select-none [-webkit-touch-callout:none] ${
                 isDragSource
-                  ? 'border-dashed border-purple-400 dark:border-purple-500 opacity-40'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-600'
+                  ? 'border-dashed border-brand-400 dark:border-brand-500 opacity-40'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'
               } ${reorderMode ? 'cursor-grab' : ''} ${pickButtonClass(isHighlighted)}`}
             >
               {isHighlighted && !reorderMode && renderBadge(product.id)}
               <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                 {product.name}
               </h4>
-              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-lg font-bold text-brand-600 dark:text-brand-400">
                 {product.price} Kč
               </p>
             </motion.button>
@@ -300,11 +300,11 @@ export const PinnedProductsGrid: React.FC<PinnedProductsGridProps> = ({
               height: drag.height,
             }}
           >
-            <div className="h-full bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-purple-500 shadow-2xl text-left">
+            <div className="h-full bg-white dark:bg-gray-800 p-4 rounded-lg border-2 border-brand-500 shadow-2xl text-left">
               <h4 className="font-medium text-gray-900 dark:text-white text-sm mb-2">
                 {draggedProduct.name}
               </h4>
-              <p className="text-lg font-bold text-purple-600 dark:text-purple-400">
+              <p className="text-lg font-bold text-brand-600 dark:text-brand-400">
                 {draggedProduct.price} Kč
               </p>
             </div>

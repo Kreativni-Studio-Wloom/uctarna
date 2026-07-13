@@ -119,8 +119,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-4">
-              <Sparkles className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+            <div className="w-16 h-16 rounded-2xl bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center mb-4">
+              <Sparkles className="h-8 w-8 text-brand-600 dark:text-brand-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               Vítejte v AI asistentovi
@@ -145,15 +145,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({
                 className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}
               >
                 {!isUser && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center mt-1">
-                    <Bot className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center mt-1">
+                    <Bot className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                   </div>
                 )}
 
                 <div
                   className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 select-text ${
                     isUser
-                      ? 'bg-purple-600 text-white rounded-br-md'
+                      ? 'bg-brand-600 text-white rounded-br-md'
                       : 'bg-gray-100 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 rounded-bl-md'
                   }`}
                 >
@@ -208,7 +208,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({
                 </div>
 
                 {isUser && (
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center mt-1">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center mt-1">
                     <User className="h-4 w-4 text-white" />
                   </div>
                 )}
@@ -219,8 +219,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({
 
         {isLoading && messages[messages.length - 1]?.role === 'user' && (
           <div className="flex gap-3 justify-start">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-900/40 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-brand-600 dark:text-brand-400" />
             </div>
             <div className="bg-gray-100 dark:bg-gray-700/80 rounded-2xl rounded-bl-md px-4 py-3">
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -252,12 +252,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({
             placeholder="Napište zprávu..."
             rows={1}
             disabled={isLoading}
-            className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-60 select-text min-h-[48px] max-h-32"
+            className="flex-1 resize-none rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-3 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-60 select-text min-h-[48px] max-h-32"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="flex-shrink-0 w-12 h-12 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white flex items-center justify-center transition-colors"
+            className="flex-shrink-0 w-12 h-12 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 text-white flex items-center justify-center transition-colors"
             aria-label="Odeslat zprávu"
           >
             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
@@ -314,7 +314,7 @@ export const AICopilotView: React.FC<AICopilotViewProps> = ({ storeId, storeName
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-          <Sparkles className="h-7 w-7 text-purple-600" />
+          <Sparkles className="h-7 w-7 text-brand-600" />
           AI Chat
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
