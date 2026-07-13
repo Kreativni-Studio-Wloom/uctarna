@@ -470,12 +470,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Zaplaceno - pouze při platbě hotovostí */}
             {paymentMethod === 'cash' && (
-              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700 shadow-sm">
+              <div className="mb-6 p-4 bg-gradient-to-r from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-800/20 rounded-xl border border-brand-200 dark:border-brand-700 shadow-sm">
                 <div className="flex items-center mb-4">
-                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center mr-3">
-                    <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div className="w-8 h-8 bg-brand-100 dark:bg-brand-800 rounded-lg flex items-center justify-center mr-3">
+                    <DollarSign className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                   </div>
-                  <h4 className="text-lg font-semibold text-blue-700 dark:text-blue-300">
+                  <h4 className="text-lg font-semibold text-brand-700 dark:text-brand-300">
                     Zaplaceno
                   </h4>
                 </div>
@@ -493,7 +493,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         setPaidAmount(digitsOnly ? parseInt(digitsOnly, 10) : 0);
                       }}
                       placeholder="0"
-                      className="w-full px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-4 py-3 border border-brand-300 dark:border-brand-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                   
@@ -502,7 +502,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <select
                       value={payInEUR ? 'EUR' : paidCurrency}
                       disabled={true}
-                      className="px-4 py-3 border border-blue-300 dark:border-blue-600 rounded-xl bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 font-medium cursor-not-allowed appearance-none pr-4 opacity-50"
+                      className="px-4 py-3 border border-brand-300 dark:border-brand-600 rounded-xl bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400 font-medium cursor-not-allowed appearance-none pr-4 opacity-50"
                     >
                       <option value="CZK">🇨🇿 Kč</option>
                       <option value="EUR">🇪🇺 €</option>
@@ -512,9 +512,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 {/* Výpočet částky k vrácení */}
                 {paidAmount > 0 && (
-                  <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-blue-200 dark:border-blue-600 shadow-sm">
+                  <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-brand-200 dark:border-brand-600 shadow-sm">
                     <div className="flex justify-between items-center text-sm mb-3">
-                      <span className="text-blue-700 dark:text-blue-300 font-medium">Zaplaceno:</span>
+                      <span className="text-brand-700 dark:text-brand-300 font-medium">Zaplaceno:</span>
                       <span className="font-semibold text-gray-900 dark:text-white">
                         {payInEUR ? 
                           `${paidAmount.toFixed(2)} €` : 
