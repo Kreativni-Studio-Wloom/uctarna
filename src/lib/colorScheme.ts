@@ -170,8 +170,9 @@ export function getSchemeRgb(id: ColorSchemeId | undefined | null, shade: ColorS
 export function getSchemeGradientStyle(
   id: ColorSchemeId | undefined | null,
   fromShade: ColorShade = 500,
-  toRgb = '59 130 246'
+  toShade: ColorShade = 700
 ): { background: string } {
   const from = getSchemeRgb(id, fromShade);
-  return { background: `linear-gradient(to bottom right, rgb(${from}), rgb(${toRgb}))` };
+  const to = getSchemeRgb(id, toShade);
+  return { background: `linear-gradient(to bottom right, rgb(${from}), rgb(${to}))` };
 }

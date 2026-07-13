@@ -1151,7 +1151,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setShowCheckout(true)}
-            className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-2.5 md:py-3 px-3 md:px-4 lg:px-6 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200 shadow-brand-lg flex items-center justify-center text-xs md:text-sm lg:text-base"
+            className="w-full bg-gradient-to-r from-brand-500 to-brand-700 text-white py-2.5 md:py-3 px-3 md:px-4 lg:px-6 rounded-lg font-medium hover:from-brand-600 hover:to-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-all duration-200 shadow-brand-lg flex items-center justify-center text-xs md:text-sm lg:text-base"
           >
             <CreditCard className="h-3 w-3 md:h-4 md:w-4 lg:h-5 lg:w-5 mr-2 flex-shrink-0" />
             <span className="truncate">
@@ -1425,7 +1425,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header ve stylu ostatních modálů */}
-              <div className="bg-gradient-to-r from-brand-600 to-blue-600 px-6 py-4 flex-shrink-0">
+              <div className="bg-gradient-to-r from-brand-500 to-brand-700 px-6 py-4 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <Pin className="h-6 w-6 text-white mr-3" />

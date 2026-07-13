@@ -133,7 +133,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSuccess }) => {
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-brand-600 to-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:from-brand-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-brand-lg"
+            className="w-full bg-gradient-to-r from-brand-500 to-brand-700 text-white py-3 px-6 rounded-lg font-medium hover:from-brand-600 hover:to-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-brand-lg"
           >
             {loading ? (
               <div className="flex items-center justify-center">

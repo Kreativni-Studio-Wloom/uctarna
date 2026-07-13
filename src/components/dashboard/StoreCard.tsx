@@ -99,7 +99,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
 
       </div>
 
-      <div className="mx-3 mb-3 bg-gradient-to-r from-brand-50 to-blue-50 dark:from-gray-700 dark:to-gray-600 rounded-lg px-4 py-3">
+      <div className="mx-3 mb-3 bg-gradient-to-r from-brand-50 to-brand-100 dark:from-gray-700 dark:to-gray-600 rounded-lg px-4 py-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Klikněte pro otevření
