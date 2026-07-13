@@ -5,7 +5,7 @@ import { Store } from '@/types';
 import { motion } from 'framer-motion';
 import { Store as StoreIcon, UtensilsCrossed, ArrowRight, Copy } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { getSchemeGradientStyle, getSchemeRgb } from '@/lib/colorScheme';
+import { getBrandGradientStyle, getBrandRgb, resolveBrandColor } from '@/lib/colorScheme';
 // use pointer events instead of custom touch hook
 
 interface StoreCardProps {
@@ -15,6 +15,7 @@ interface StoreCardProps {
 
 export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
   const router = useRouter();
+  const brand = resolveBrandColor(store);
   const [showDuplicateButton, setShowDuplicateButton] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
 
@@ -78,7 +79,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
         <div className="flex items-center mb-4">
           <div
             className="w-12 h-12 rounded-lg flex items-center justify-center mr-4"
-            style={getSchemeGradientStyle(store.colorScheme)}
+            style={getBrandGradientStyle(brand.hue, brand.shade)}
           >
             {store.type === 'bistro' ? (
               <UtensilsCrossed className="h-6 w-6 text-white" />
@@ -108,7 +109,7 @@ export const StoreCard: React.FC<StoreCardProps> = ({ store, onDuplicate }) => {
             animate={{ x: [0, 4, 0] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           >
-            <ArrowRight className="h-4 w-4" style={{ color: `rgb(${getSchemeRgb(store.colorScheme, 600)})` }} />
+            <ArrowRight className="h-4 w-4" style={{ color: `rgb(${getBrandRgb(brand.hue, 600, brand.shade)})` }} />
           </motion.div>
         </div>
       </div>

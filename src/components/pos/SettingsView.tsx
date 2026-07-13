@@ -7,8 +7,8 @@ import { motion } from 'framer-motion';
 import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, getSchemePreviewStyle, isLightColorScheme } from '@/lib/colorScheme';
-import { ColorSchemeId } from '@/types';
+import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBrandColor } from '@/lib/colorScheme';
+import { ColorWheelPicker } from '@/components/pos/ColorWheelPicker';
 
 interface SettingsViewProps {
   storeId: string;
@@ -25,7 +25,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const [companyName, setCompanyName] = useState<string>('');
   const [ico, setIco] = useState<string>('');
   const [companyAddress, setCompanyAddress] = useState<string>('');
-  const [colorScheme, setColorScheme] = useState<ColorSchemeId>(DEFAULT_COLOR_SCHEME);
+  const [brandHue, setBrandHue] = useState(DEFAULT_BRAND_HUE);
+  const [brandShade, setBrandShade] = useState(DEFAULT_BRAND_SHADE);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -48,24 +49,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
     setCompanyName(typeof storeDoc.companyName === 'string' ? storeDoc.companyName : '');
     setIco(typeof storeDoc.ico === 'string' ? storeDoc.ico : '');
     setCompanyAddress(typeof storeDoc.companyAddress === 'string' ? storeDoc.companyAddress : '');
-    if (storeDoc.colorScheme) {
-      setColorScheme(storeDoc.colorScheme);
-    } else {
-      setColorScheme(DEFAULT_COLOR_SCHEME);
-    }
+    const brand = resolveBrandColor(storeDoc);
+    setBrandHue(brand.hue);
+    setBrandShade(brand.shade);
   }, [storeDoc]);
 
   // Okamžitý náhled vybrané barvy před uložením
   useEffect(() => {
-    applyColorScheme(colorScheme);
-  }, [colorScheme]);
+    applyStoreBrandColor({ brandHue, brandShade });
+  }, [brandHue, brandShade]);
 
   // Po opuštění nastavení bez uložení vrátit uloženou barvu prodejny
   useEffect(() => {
     return () => {
-      applyColorScheme(storeDoc?.colorScheme ?? DEFAULT_COLOR_SCHEME);
+      if (storeDoc) applyStoreBrandColor(storeDoc);
     };
-  }, [storeDoc?.colorScheme]);
+  }, [storeDoc]);
 
   const handleSave = async () => {
     if (!user) return;
@@ -84,7 +83,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         companyName: companyName.trim(),
         ico: ico.trim(),
         companyAddress: companyAddress.trim(),
-        colorScheme,
+        brandHue,
+        brandShade,
         updatedAt: serverTimestamp(),
       });
       setSaved(true);
@@ -183,46 +183,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               Barevné schéma
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Změní barvu designových prvků v celé prodejně — tlačítka, ikony, texty a stíny
+              Vyberte barvu na kole a upravte odstín posuvníkem
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
-          {COLOR_SCHEMES.map((scheme) => {
-            const isSelected = colorScheme === scheme.id;
-            const isLight = isLightColorScheme(scheme.id);
-            return (
-              <button
-                key={scheme.id}
-                type="button"
-                onClick={() => setColorScheme(scheme.id)}
-                className={`relative flex flex-col items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-xl border-2 transition-all duration-200 ${
-                  isSelected
-                    ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
-                    : 'border-gray-200 dark:border-gray-600 hover:border-brand-300 dark:hover:border-brand-600'
-                }`}
-                title={scheme.label}
-              >
-                <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
-                    isLight ? 'border-2 border-gray-300 dark:border-gray-500' : ''
-                  }`}
-                  style={getSchemePreviewStyle(scheme)}
-                >
-                  {isSelected && (
-                    <Check className={`h-4 w-4 sm:h-5 sm:w-5 ${isLight ? 'text-gray-700' : 'text-white'}`} />
-                  )}
-                </div>
-                <span className={`text-[10px] sm:text-xs font-medium text-center leading-tight ${
-                  isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-gray-600 dark:text-gray-400'
-                }`}>
-                  {scheme.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <ColorWheelPicker
+          hue={brandHue}
+          shade={brandShade}
+          onHueChange={setBrandHue}
+          onShadeChange={setBrandShade}
+        />
       </motion.div>
 
       {/* Settings Cards */}

@@ -258,21 +258,157 @@ export function getColorScheme(id?: ColorSchemeId | null): ColorScheme {
 }
 
 export function applyColorScheme(id?: ColorSchemeId | null): void {
-  if (typeof document === 'undefined') return;
+  if (typeof id === 'string' && isValidColorScheme(id)) {
+    applyBrandColor(getHueFromLegacyColorScheme(id), DEFAULT_BRAND_SHADE);
+    return;
+  }
+  applyBrandColor(DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE);
+}
 
-  const scheme = getColorScheme(id);
-  const root = document.documentElement;
+export const DEFAULT_BRAND_HUE = 270;
+export const DEFAULT_BRAND_SHADE = 50;
 
-  for (const shade of SHADES) {
-    root.style.setProperty(`--brand-${shade}`, scheme.shades[shade]);
+export interface BrandColorConfig {
+  hue: number;
+  shade: number;
+}
+
+function clampShade(value?: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_BRAND_SHADE;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+function normalizeHue(value: number): number {
+  return ((Math.round(value) % 360) + 360) % 360;
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const sat = s / 100;
+  const light = l / 100;
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = light - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (h < 60) {
+    r = c; g = x;
+  } else if (h < 120) {
+    r = x; g = c;
+  } else if (h < 180) {
+    g = c; b = x;
+  } else if (h < 240) {
+    g = x; b = c;
+  } else if (h < 300) {
+    r = x; b = c;
+  } else {
+    r = c; b = x;
   }
 
-  root.style.setProperty('--brand-theme-color', scheme.themeColor);
+  return [
+    Math.round((r + m) * 255),
+    Math.round((g + m) * 255),
+    Math.round((b + m) * 255),
+  ];
+}
+
+function hslToRgbString(h: number, s: number, l: number): string {
+  const [r, g, b] = hslToRgb(h, s, l);
+  return `${r} ${g} ${b}`;
+}
+
+function hexToHue(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return DEFAULT_BRAND_HUE;
+  const d = max - min;
+  let h = 0;
+  switch (max) {
+    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+    case g: h = ((b - r) / d + 2) / 6; break;
+    default: h = ((r - g) / d + 4) / 6; break;
+  }
+  return Math.round(h * 360);
+}
+
+function rgbStringToHex(rgb: string): string {
+  const [r, g, b] = rgb.split(' ').map(Number);
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+export function getHueFromLegacyColorScheme(id: ColorSchemeId): number {
+  if (id === 'white') return 0;
+  return hexToHue(THEME_COLORS[id]);
+}
+
+/** Generuje celou brand paletu z libovolného odstínu na kole (0–360°) a intenzity (0–100). */
+export function hueToPalette(hue: number, shadeLevel = DEFAULT_BRAND_SHADE): ColorPalette {
+  const t = shadeLevel / 100;
+  const saturation = Math.min(82, Math.max(38, 52 + t * 30));
+  const lightnessShift = (DEFAULT_BRAND_SHADE - shadeLevel) * 0.22;
+
+  return {
+    50: hslToRgbString(hue, saturation * 0.35, Math.min(98, 97 + lightnessShift * 0.15)),
+    100: hslToRgbString(hue, saturation * 0.45, Math.min(96, 94 + lightnessShift * 0.12)),
+    200: hslToRgbString(hue, saturation * 0.55, Math.min(92, 88 + lightnessShift * 0.1)),
+    300: hslToRgbString(hue, saturation * 0.7, Math.min(84, 78 + lightnessShift * 0.08)),
+    400: hslToRgbString(hue, saturation * 0.85, Math.min(72, 65 + lightnessShift * 0.06)),
+    500: hslToRgbString(hue, saturation, Math.min(58, 52 + lightnessShift * 0.04)),
+    600: hslToRgbString(hue, saturation, Math.max(32, 45 - lightnessShift * 0.04)),
+    700: hslToRgbString(hue, saturation * 0.95, Math.max(26, 38 - lightnessShift * 0.05)),
+    800: hslToRgbString(hue, saturation * 0.9, Math.max(20, 30 - lightnessShift * 0.06)),
+    900: hslToRgbString(hue, saturation * 0.85, Math.max(14, 22 - lightnessShift * 0.07)),
+  };
+}
+
+export function resolveBrandColor(store: {
+  brandHue?: number;
+  brandShade?: number;
+  colorScheme?: ColorSchemeId | null;
+}): BrandColorConfig {
+  if (typeof store.brandHue === 'number' && Number.isFinite(store.brandHue)) {
+    return { hue: normalizeHue(store.brandHue), shade: clampShade(store.brandShade) };
+  }
+  if (store.colorScheme && isValidColorScheme(store.colorScheme)) {
+    return { hue: getHueFromLegacyColorScheme(store.colorScheme), shade: DEFAULT_BRAND_SHADE };
+  }
+  return { hue: DEFAULT_BRAND_HUE, shade: DEFAULT_BRAND_SHADE };
+}
+
+export function getBrandPreviewColor(hue: number, shade = DEFAULT_BRAND_SHADE): string {
+  return rgbStringToHex(hueToPalette(hue, shade)[600]);
+}
+
+export function applyBrandColor(hue: number, shade = DEFAULT_BRAND_SHADE): void {
+  if (typeof document === 'undefined') return;
+
+  const palette = hueToPalette(hue, shade);
+  const root = document.documentElement;
+  const themeColor = rgbStringToHex(palette[600]);
+
+  for (const level of SHADES) {
+    root.style.setProperty(`--brand-${level}`, palette[level]);
+  }
+
+  root.style.setProperty('--brand-theme-color', themeColor);
 
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute('content', scheme.themeColor);
+    meta.setAttribute('content', themeColor);
   }
+}
+
+export function applyStoreBrandColor(store: {
+  brandHue?: number;
+  brandShade?: number;
+  colorScheme?: ColorSchemeId | null;
+}): void {
+  const { hue, shade } = resolveBrandColor(store);
+  applyBrandColor(hue, shade);
 }
 
 /** Pro per-store prvky mimo globální CSS vars (např. karty na dashboardu) */
@@ -294,12 +430,11 @@ export function getSchemePreviewStyle(scheme: ColorScheme): { backgroundColor: s
   };
 }
 
-export function getSchemeGradientStyle(
-  id: ColorSchemeId | undefined | null,
-  fromShade: ColorShade = 500,
-  toShade: ColorShade = 700
-): { background: string } {
-  const from = getSchemeRgb(id, fromShade);
-  const to = getSchemeRgb(id, toShade);
-  return { background: `linear-gradient(to bottom right, rgb(${from}), rgb(${to}))` };
+export function getBrandGradientStyle(hue: number, shade = DEFAULT_BRAND_SHADE): { background: string } {
+  const palette = hueToPalette(hue, shade);
+  return { background: `linear-gradient(to bottom right, rgb(${palette[500]}), rgb(${palette[700]}))` };
+}
+
+export function getBrandRgb(hue: number, shade: ColorShade, shadeLevel = DEFAULT_BRAND_SHADE): string {
+  return hueToPalette(hue, shadeLevel)[shade];
 }

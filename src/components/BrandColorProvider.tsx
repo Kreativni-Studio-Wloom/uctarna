@@ -1,20 +1,21 @@
 'use client';
 
 import { useEffect } from 'react';
-import { applyColorScheme, ColorSchemeId, DEFAULT_COLOR_SCHEME } from '@/lib/colorScheme';
+import { applyBrandColor, applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE } from '@/lib/colorScheme';
+import { Store } from '@/types';
 
 interface BrandColorProviderProps {
-  colorScheme?: ColorSchemeId | null;
+  store: Pick<Store, 'brandHue' | 'brandShade' | 'colorScheme'>;
   children: React.ReactNode;
 }
 
-export function BrandColorProvider({ colorScheme, children }: BrandColorProviderProps) {
+export function BrandColorProvider({ store, children }: BrandColorProviderProps) {
   useEffect(() => {
-    applyColorScheme(colorScheme ?? DEFAULT_COLOR_SCHEME);
+    applyStoreBrandColor(store);
     return () => {
-      applyColorScheme(DEFAULT_COLOR_SCHEME);
+      applyBrandColor(DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE);
     };
-  }, [colorScheme]);
+  }, [store.brandHue, store.brandShade, store.colorScheme]);
 
   return <>{children}</>;
 }

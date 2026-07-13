@@ -33,8 +33,12 @@ export interface Store {
   /** Zapnuté zadávání spropitného v checkoutu (přičte se k úhradě, uloží se na doklad). */
   tipsEnabled?: boolean;
   iban?: string; // IBAN pro platby QR kódem (SPAYD)
-  /** Barevné schéma designu prodejny (fialová je výchozí). */
+  /** Barevné schéma designu prodejny — legacy preset ID. */
   colorScheme?: ColorSchemeId;
+  /** Odstín na kole barev (0–360). */
+  brandHue?: number;
+  /** Intenzita odstínu (0 = světlý, 100 = tmavý). */
+  brandShade?: number;
 }
 
 export interface Product {
