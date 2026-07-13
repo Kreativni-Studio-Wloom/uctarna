@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, isLightColorScheme } from '@/lib/colorScheme';
+import { applyColorScheme, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME, getSchemePreviewStyle, isLightColorScheme } from '@/lib/colorScheme';
 import { ColorSchemeId } from '@/types';
 
 interface SettingsViewProps {
@@ -205,10 +205,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 title={scheme.label}
               >
                 <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full shadow-brand-lg flex items-center justify-center ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
                     isLight ? 'border-2 border-gray-300 dark:border-gray-500' : ''
                   }`}
-                  style={{ backgroundColor: scheme.themeColor }}
+                  style={getSchemePreviewStyle(scheme)}
                 >
                   {isSelected && (
                     <Check className={`h-4 w-4 sm:h-5 sm:w-5 ${isLight ? 'text-gray-700' : 'text-white'}`} />

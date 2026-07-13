@@ -281,6 +281,19 @@ export function getSchemeRgb(id: ColorSchemeId | undefined | null, shade: ColorS
   return scheme.shades[shade];
 }
 
+export function getSchemePreviewStyle(scheme: ColorScheme): { backgroundColor: string; boxShadow: string } {
+  if (isLightColorScheme(scheme.id)) {
+    return {
+      backgroundColor: scheme.themeColor,
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+    };
+  }
+  return {
+    backgroundColor: scheme.themeColor,
+    boxShadow: `0 4px 10px -2px ${scheme.themeColor}55, 0 2px 4px -2px ${scheme.themeColor}33`,
+  };
+}
+
 export function getSchemeGradientStyle(
   id: ColorSchemeId | undefined | null,
   fromShade: ColorShade = 500,
