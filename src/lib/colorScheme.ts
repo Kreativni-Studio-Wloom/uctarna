@@ -13,7 +13,8 @@ export type ColorSchemeId =
   | 'cyan'
   | 'sky'
   | 'blue'
-  | 'indigo';
+  | 'indigo'
+  | 'white';
 
 export type ColorShade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
@@ -108,13 +109,18 @@ const PALETTES: Record<ColorSchemeId, ColorPalette> = {
     400: '129 140 248', 500: '99 102 241', 600: '79 70 229', 700: '67 56 202',
     800: '55 48 163', 900: '49 46 129',
   },
+  white: {
+    50: '255 255 255', 100: '250 250 250', 200: '245 245 245', 300: '229 229 229',
+    400: '212 212 212', 500: '163 163 163', 600: '115 115 115', 700: '82 82 82',
+    800: '64 64 64', 900: '38 38 38',
+  },
 };
 
 const THEME_COLORS: Record<ColorSchemeId, string> = {
   purple: '#7c3aed', violet: '#7c3aed', fuchsia: '#c026d3', pink: '#db2777',
   rose: '#e11d48', red: '#dc2626', orange: '#ea580c', amber: '#d97706',
   green: '#16a34a', emerald: '#059669', teal: '#0d9488', cyan: '#0891b2',
-  sky: '#0284c7', blue: '#2563eb', indigo: '#4f46e5',
+  sky: '#0284c7', blue: '#2563eb', indigo: '#4f46e5', white: '#ffffff',
 };
 
 export const COLOR_SCHEMES: ColorScheme[] = (Object.keys(PALETTES) as ColorSchemeId[]).map((id) => ({
@@ -129,7 +135,7 @@ function getSchemeLabel(id: ColorSchemeId): string {
     purple: 'Fialová', violet: 'Violetová', fuchsia: 'Fuchsiová', pink: 'Růžová',
     rose: 'Růžovo-červená', red: 'Červená', orange: 'Oranžová', amber: 'Jantarová',
     green: 'Zelená', emerald: 'Smaragdová', teal: 'Tyrkysová', cyan: 'Azurová',
-    sky: 'Nebeská', blue: 'Modrá', indigo: 'Indigo',
+    sky: 'Nebeská', blue: 'Modrá', indigo: 'Indigo', white: 'Bílá',
   };
   return labels[id];
 }

@@ -204,10 +204,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
                 title={scheme.label}
               >
                 <div
-                  className="w-10 h-10 rounded-full shadow-brand-lg flex items-center justify-center"
+                  className={`w-10 h-10 rounded-full shadow-brand-lg flex items-center justify-center ${
+                    scheme.id === 'white' ? 'border-2 border-gray-300 dark:border-gray-500' : ''
+                  }`}
                   style={{ backgroundColor: scheme.themeColor }}
                 >
-                  {isSelected && <Check className="h-5 w-5 text-white" />}
+                  {isSelected && (
+                    <Check className={`h-5 w-5 ${scheme.id === 'white' ? 'text-gray-700' : 'text-white'}`} />
+                  )}
                 </div>
                 <span className={`text-xs font-medium text-center leading-tight ${
                   isSelected ? 'text-brand-700 dark:text-brand-300' : 'text-gray-600 dark:text-gray-400'

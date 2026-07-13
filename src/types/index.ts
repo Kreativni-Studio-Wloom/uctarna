@@ -26,7 +26,8 @@ export type ColorSchemeId =
   | 'cyan'
   | 'sky'
   | 'blue'
-  | 'indigo';
+  | 'indigo'
+  | 'white';
 
 export interface Store {
   id: string;
