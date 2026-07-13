@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc, deleteDoc, updateDoc, increment, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
@@ -24,6 +24,133 @@ const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
   return docId.includes(q) || vs.includes(q) || id.includes(q);
 };
 
+const formatSaleDate = (date: any) => {
+  if (!date) return 'N/A';
+
+  const dateObj = date instanceof Date ? date : date.toDate();
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(dateObj);
+};
+
+interface DeleteSaleModalProps {
+  sale: Sale;
+  onClose: () => void;
+  onDelete: (sale: Sale) => Promise<void>;
+}
+
+const DeleteSaleModal: React.FC<DeleteSaleModalProps> = ({ sale, onClose, onDelete }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await onDelete(sale);
+      onClose();
+    } catch {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      onClick={() => !isDeleting && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="h-6 w-6 text-white mr-3" />
+              <h3 className="text-xl font-semibold text-white">
+                Smazat doklad
+              </h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white hover:text-gray-200 transition-colors"
+              disabled={isDeleting}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3" />
+              <div className="text-sm text-red-700 dark:text-red-300">
+                <strong>Pozor!</strong> Tato akce je nevratná. Doklad bude trvale smazán z databáze.
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 dark:text-gray-400">Datum:</span>
+                <span className="font-medium text-gray-900 dark:text-white">{formatSaleDate(sale.createdAt)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 dark:text-gray-400">Částka:</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {sale.currency === 'EUR' ?
+                    `${sale.totalAmount.toFixed(2)} €` :
+                    `${sale.totalAmount.toLocaleString('cs-CZ')} Kč`
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600 dark:text-gray-400">Položky:</span>
+                <span className="font-medium text-gray-900 dark:text-white">{sale.items.length}</span>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <button
+                onClick={onClose}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50"
+              >
+                Zrušit
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Mazání
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4" />
+                    Smazat
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const ITEMS_PER_PAGE = 12;
   const { user } = useAuth();
@@ -34,7 +161,6 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToDelete, setSaleToDelete] = useState<Sale | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -137,18 +263,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     };
   }, [user, storeId, isSearchMode, debouncedSearch]);
 
-  const formatDate = (date: any) => {
-    if (!date) return 'N/A';
-    
-    const dateObj = date instanceof Date ? date : date.toDate();
-    return new Intl.DateTimeFormat('cs-CZ', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(dateObj);
-  };
+  const formatDate = formatSaleDate;
 
   const getPaymentIcon = (method: Sale['paymentMethod']) => {
     switch (method) {
@@ -231,17 +346,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
 
-    setDeleting(true);
     try {
-      // Smaž doklad z databáze
       const saleRef = doc(db, 'users', user.uid, 'stores', storeId, 'sales', sale.id);
       await deleteDoc(saleRef);
 
-      // Aktualizuj počet prodaných kusů pro každý produkt (vrátit zpět)
       for (const item of sale.items) {
         const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
         await updateDoc(productRef, {
-          soldCount: increment(-item.quantity), // Odečti prodané množství
+          soldCount: increment(-item.quantity),
         });
       }
 
@@ -249,10 +361,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     } catch (error) {
       console.error('❌ Chyba při mazání dokladu:', error);
       alert('Chyba při mazání dokladu. Zkuste to znovu.');
-    } finally {
-      // deleting se resetuje až po doběhnutí zavírací animace modálu
-      // (onExitComplete), jinak tlačítko během fade-outu přeblikne na „Smazat“
-      setSaleToDelete(null);
+      throw error;
     }
   };
 
@@ -605,99 +714,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
-      <AnimatePresence onExitComplete={() => setDeleting(false)}>
+      <AnimatePresence>
         {saleToDelete && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-            onClick={() => setSaleToDelete(null)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="bg-gradient-to-r from-red-600 to-red-700 px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <AlertTriangle className="h-6 w-6 text-white mr-3" />
-                    <h3 className="text-xl font-semibold text-white">
-                      Smazat doklad
-                    </h3>
-                  </div>
-                  <button
-                    onClick={() => setSaleToDelete(null)}
-                    className="text-white hover:text-gray-200 transition-colors"
-                    disabled={deleting}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
-                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mr-3" />
-                    <div className="text-sm text-red-700 dark:text-red-300">
-                      <strong>Pozor!</strong> Tato akce je nevratná. Doklad bude trvale smazán z databáze.
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Datum:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{formatDate(saleToDelete.createdAt)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Částka:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {saleToDelete.currency === 'EUR' ? 
-                          `${saleToDelete.totalAmount.toFixed(2)} €` : 
-                          `${saleToDelete.totalAmount.toLocaleString('cs-CZ')} Kč`
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600 dark:text-gray-400">Položky:</span>
-                      <span className="font-medium text-gray-900 dark:text-white">{saleToDelete.items.length}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-3 pt-4">
-                    <button
-                      onClick={() => setSaleToDelete(null)}
-                      disabled={deleting}
-                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50"
-                    >
-                      Zrušit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSale(saleToDelete)}
-                      disabled={deleting}
-                      className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
-                    >
-                      {deleting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white mr-2 flex-shrink-0"></div>
-                          Mazání…
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Smazat
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
+          <DeleteSaleModal
+            key={saleToDelete.id}
+            sale={saleToDelete}
+            onClose={() => setSaleToDelete(null)}
+            onDelete={handleDeleteSale}
+          />
         )}
       </AnimatePresence>
     </div>
