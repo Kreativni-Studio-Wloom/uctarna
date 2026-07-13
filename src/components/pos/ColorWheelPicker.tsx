@@ -156,7 +156,7 @@ export const ColorWheelPicker: React.FC<ColorWheelPickerProps> = ({
         <div className="flex gap-2">
           {([
             { level: 200 as const, label: 'Světlý' },
-            { level: 600 as const, label: 'Hlavní' },
+            { level: 600 as const, label: 'Standardní' },
             { level: 700 as const, label: 'Tmavý' },
           ]).map(({ level, label }) => (
             <div key={level} className="flex-1 text-center">
