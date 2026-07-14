@@ -20,7 +20,7 @@ export const LoginRequiredModal: React.FC<LoginRequiredModalProps> = ({ redirect
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-50 to-brand-100 dark:from-gray-900 dark:to-gray-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gradient-to-br dark:from-gray-900 dark:to-gray-800 p-4">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
