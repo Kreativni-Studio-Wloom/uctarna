@@ -141,7 +141,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       bc = new BroadcastChannel('uctarna_payments');
       bc.onmessage = (ev) => {
         if (ev?.data?.type === 'PAYMENT_SUCCESS') {
-          // Zavři modal a dej vědět rodiči
+          // Uložení prodeje (vč. spropitného z terminálu) řeší POSSystem přes pendingSave.
+          if (ev?.data?.pendingSave) return;
           onSuccess();
         }
       };
@@ -151,6 +152,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         try {
           const data = JSON.parse(e.newValue);
           if (data?.type === 'PAYMENT_SUCCESS') {
+            if (data?.pendingSave) return;
             onSuccess();
           }
         } catch {}

@@ -252,6 +252,8 @@ export async function POST(request: NextRequest) {
           sentToSumUp: Number.isFinite(sentToSumUp) ? sentToSumUp : null,
           terminalTip: terminalTip > 0 ? terminalTip : null,
           terminalTipSource: terminalLookup.source,
+          terminalTipDebug: terminalLookup.debugError ?? null,
+          sumUpAuthSource: terminalLookup.authSource ?? null,
         }
       };
 
@@ -298,6 +300,7 @@ export async function POST(request: NextRequest) {
         terminalTip: terminalTip > 0 ? terminalTip : null,
         tipAmount,
         totalAmount: saleTotalAmount,
+        terminalTipDebug: terminalLookup.debugError ?? null,
       });
 
     } else {
@@ -361,23 +364,30 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  console.log('🚀 SumUp callback GET endpoint byl zavolán');
-  console.log('🚀 Request URL:', request.url);
-  console.log('🚀 Request timestamp:', new Date().toISOString());
-  console.log('🚀 User-Agent:', request.headers.get('user-agent'));
-  
   const url = new URL(request.url);
   const params = Object.fromEntries(url.searchParams.entries());
-  
-  console.log('📥 GET parametry:', JSON.stringify(params, null, 2));
-  
-  // Uložíme i GET parametry do Firebase
+
+  // SumUp někdy volá callback jako GET s query parametry – přesměruj na /payment/success,
+  // kde proběhne standardní tok uložení prodeje (POST sumup-callback).
+  const status = params['smp-status'] || params.status;
+  const txCode = params['smp-tx-code'] || params.tx_code || params.txCode;
+  if (status === 'success' || status === 'failed' || status === 'invalidstate') {
+    const target = new URL(`${url.origin}/payment/${status === 'success' ? 'success' : 'fail'}`);
+    for (const [key, value] of url.searchParams.entries()) {
+      target.searchParams.set(key, value);
+    }
+    return NextResponse.redirect(target);
+  }
+
+  console.log('📥 SumUp callback GET (bez smp parametrů):', JSON.stringify(params));
+
   await saveSumUpResponseToFirebase(params, request);
-  
+
   return NextResponse.json({
     success: true,
-    message: 'GET callback received',
-    params: params,
-    timestamp: new Date().toISOString()
+    message:
+      'Toto je debug endpoint. Prodej se ukládá přes POST z aplikace po návratu na /payment/success. Pro diagnostiku SumUp API použij /api/sumup/debug',
+    params,
+    timestamp: new Date().toISOString(),
   });
 }
