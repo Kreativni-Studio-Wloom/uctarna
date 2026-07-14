@@ -206,23 +206,29 @@ export class SumUpService {
 export const sumUpService = new SumUpService(process.env.NEXT_PUBLIC_SUMUP_AFFILIATE_KEY || '');
 
 /**
- * Načte spropitné zadané v SumUp aplikaci/terminálu pro danou transakci
- * přes naši API routu /api/sumup/transaction (ta volá SumUp REST API).
- *
- * Nikdy nevyhazuje chybu – při jakémkoli selhání (chybějící txCode, timeout,
- * chyba SumUp API) vrací 0, aby se doklad vždy uložil.
+ * Načte spropitné z terminálu přes /api/sumup/transaction (volá SumUp REST API na serveru).
+ * Preferujte nechat doplnění tipu přímo v /api/sumup-callback – tento helper je záložní.
  */
 export async function fetchSumUpTipAmount(
   txCode: string | null | undefined,
-  timeoutMs = 12000
+  options?: { foreignTxId?: string | null; sentAmount?: number; timeoutMs?: number }
 ): Promise<number> {
-  if (!txCode || typeof window === 'undefined') return 0;
+  if (!txCode && !options?.foreignTxId) return 0;
+  if (typeof window === 'undefined') return 0;
+
+  const params = new URLSearchParams();
+  if (txCode) params.set('txCode', txCode);
+  if (options?.foreignTxId) params.set('foreignTxId', options.foreignTxId);
+  if (typeof options?.sentAmount === 'number') {
+    params.set('sentAmount', String(options.sentAmount));
+  }
+
+  const timeoutMs = options?.timeoutMs ?? 15000;
 
   try {
-    const response = await fetch(
-      `/api/sumup/transaction?txCode=${encodeURIComponent(txCode)}`,
-      { signal: AbortSignal.timeout(timeoutMs) }
-    );
+    const response = await fetch(`/api/sumup/transaction?${params}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
     if (!response.ok) {
       console.warn('⚠️ Spropitné ze SumUp se nepodařilo načíst:', response.status);
       return 0;

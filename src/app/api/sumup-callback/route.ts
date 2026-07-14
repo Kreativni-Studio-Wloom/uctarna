@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { SumUpCallbackParams } from '@/lib/sumup';
+import { fetchSumUpTerminalTip } from '@/lib/sumup-server';
 
 // Funkce pro ukládání všech SumUp odpovědí do Firebase
 async function saveSumUpResponseToFirebase(body: any, request: NextRequest) {
@@ -104,8 +104,10 @@ export async function POST(request: NextRequest) {
     const finalAmount = body.finalAmount || body['final_amount'] || amount;
     const customerName = body.customerName || body['customer_name'];
     const tipAmountRaw = body.tipAmount ?? body['tip_amount'];
-    const tipAmount =
-      typeof tipAmountRaw === 'number' && tipAmountRaw > 0 ? tipAmountRaw : null;
+    const appTipAmount =
+      typeof tipAmountRaw === 'number' && tipAmountRaw > 0 ? tipAmountRaw : 0;
+    const sentToSumUp =
+      typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''));
 
     // Rozšířené logování pro debugging
     console.log('📊 Extrahované parametry:', {
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
       foreignTxId: foreignTxId,
       documentId: documentId,
       amount: amount,
+      sentToSumUp,
       currency: currency,
       storeId: storeId,
       userId: userId,
@@ -121,7 +124,8 @@ export async function POST(request: NextRequest) {
       discount: discount,
       discountAmount: discountAmount,
       finalAmount: finalAmount,
-      customerName: customerName
+      customerName: customerName,
+      appTipAmount,
     });
 
     // Validace povinných parametrů - více flexibilní pro různé typy plateb
@@ -192,11 +196,39 @@ export async function POST(request: NextRequest) {
     // Kontrola, zda je platba úspěšná
     if (status === 'success') {
       console.log('💳 Zpracovávám úspěšnou platbu...');
+
+      // Spropitné z terminálu načteme server-side ze SumUp REST API (tip_amount
+      // nebo rozdíl mezi zaplacenou a poslanou částkou). Při chybě API = 0 Kč.
+      const terminalLookup = await fetchSumUpTerminalTip(
+        txCode,
+        documentId || foreignTxId,
+        Number.isFinite(sentToSumUp) ? sentToSumUp : undefined
+      );
+      const terminalTip = terminalLookup.tipAmount;
+      const combinedTip = appTipAmount + terminalTip;
+      const tipAmount = combinedTip > 0 ? combinedTip : null;
+      const saleTotalAmount = (Number.isFinite(sentToSumUp) ? sentToSumUp : amount || 0) + terminalTip;
+      const baseFinal =
+        typeof finalAmount === 'number'
+          ? finalAmount
+          : Number.isFinite(sentToSumUp)
+            ? sentToSumUp
+            : amount || 0;
+      const saleFinalAmount = baseFinal + terminalTip;
+
+      console.log('💰 Spropitné:', {
+        appTipAmount,
+        terminalTip,
+        combinedTip,
+        sentToSumUp,
+        saleTotalAmount,
+        terminalSource: terminalLookup.source,
+      });
       
       // Vytvoř prodej v Firestore
       const sale = {
         items: cartItems,
-        totalAmount: amount || 0,
+        totalAmount: saleTotalAmount,
         paymentMethod: 'card',
         documentId: documentId || foreignTxId, // Použij documentId nebo fallback na foreignTxId
         createdAt: serverTimestamp(),
@@ -209,14 +241,17 @@ export async function POST(request: NextRequest) {
         // Sleva
         discount: discount || null,
         discountAmount: discountAmount || 0,
-        finalAmount: finalAmount || amount || 0,
+        finalAmount: saleFinalAmount,
         tipAmount,
         sumUpData: {
           foreignTxId,
           sumUpTxCode: txCode,
           status: 'success',
           callbackReceived: true,
-          callbackTimestamp: new Date()
+          callbackTimestamp: new Date(),
+          sentToSumUp: Number.isFinite(sentToSumUp) ? sentToSumUp : null,
+          terminalTip: terminalTip > 0 ? terminalTip : null,
+          terminalTipSource: terminalLookup.source,
         }
       };
 
@@ -260,6 +295,9 @@ export async function POST(request: NextRequest) {
         message: 'Prodej byl úspěšně uložen',
         inventoryUpdated,
         inventoryFailed,
+        terminalTip: terminalTip > 0 ? terminalTip : null,
+        tipAmount,
+        totalAmount: saleTotalAmount,
       });
 
     } else {
