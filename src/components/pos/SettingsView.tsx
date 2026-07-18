@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBrandColor } from '@/lib/colorScheme';
 import { ColorWheelPicker } from '@/components/pos/ColorWheelPicker';
+import { DuplicateSalesCleaner } from '@/components/pos/DuplicateSalesCleaner';
 
 interface SettingsViewProps {
   storeId: string;
@@ -512,6 +513,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         </div>
 
       </motion.div>
+
+      <DuplicateSalesCleaner storeId={storeId} />
     </div>
   );
 };
