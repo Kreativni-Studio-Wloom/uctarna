@@ -49,12 +49,15 @@ function formatDateTime(ms: number): string {
   }).format(new Date(ms));
 }
 
-// Klíč pro rozpoznání duplicit: stejné číslo dokladu (documentId),
-// případně stejný SumUp kód transakce. Prázdný klíč = nezahrnovat.
-function dedupKey(sale: SaleRecord): string | null {
-  if (sale.documentId && sale.documentId.trim()) return `doc:${sale.documentId.trim()}`;
-  if (sale.sumUpTxCode && sale.sumUpTxCode.trim()) return `smp:${sale.sumUpTxCode.trim()}`;
-  return null;
+// Klíče pro rozpoznání duplicit: doklad se považuje za duplicitní, pokud sdílí
+// stejné číslo dokladu (documentId) NEBO stejný SumUp kód transakce.
+// Vracíme všechny dostupné klíče – seskupení pak spojí i případy, kdy se shoduje
+// jen jeden z nich (přechodně).
+function recordKeys(sale: SaleRecord): string[] {
+  const keys: string[] = [];
+  if (sale.documentId && sale.documentId.trim()) keys.push(`doc:${sale.documentId.trim()}`);
+  if (sale.sumUpTxCode && sale.sumUpTxCode.trim()) keys.push(`smp:${sale.sumUpTxCode.trim()}`);
+  return keys;
 }
 
 // Z každé skupiny necháme jeden doklad: přednost má ten se spropitným
@@ -139,20 +142,57 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
         };
       });
 
-      const byKey = new Map<string, SaleRecord[]>();
-      for (const rec of records) {
-        const key = dedupKey(rec);
-        if (!key) continue;
-        const arr = byKey.get(key) ?? [];
+      // Union-find: spojíme doklady, které sdílejí kterýkoli klíč (documentId nebo
+      // SumUp kód). Tím zachytíme i případy, kdy se shoduje jen jeden z nich.
+      const parent = new Map<number, number>();
+      const find = (x: number): number => {
+        let root = x;
+        while (parent.get(root) !== root) root = parent.get(root)!;
+        // komprese cesty
+        let cur = x;
+        while (parent.get(cur) !== root) {
+          const next = parent.get(cur)!;
+          parent.set(cur, root);
+          cur = next;
+        }
+        return root;
+      };
+      const union = (a: number, b: number) => {
+        const ra = find(a);
+        const rb = find(b);
+        if (ra !== rb) parent.set(ra, rb);
+      };
+
+      records.forEach((_, i) => parent.set(i, i));
+
+      const keyToFirstIndex = new Map<string, number>();
+      records.forEach((rec, i) => {
+        for (const key of recordKeys(rec)) {
+          const existing = keyToFirstIndex.get(key);
+          if (existing === undefined) {
+            keyToFirstIndex.set(key, i);
+          } else {
+            union(existing, i);
+          }
+        }
+      });
+
+      const byRoot = new Map<number, SaleRecord[]>();
+      records.forEach((rec, i) => {
+        // Doklad bez jakéhokoli klíče nelze porovnat – přeskočíme.
+        if (recordKeys(rec).length === 0) return;
+        const root = find(i);
+        const arr = byRoot.get(root) ?? [];
         arr.push(rec);
-        byKey.set(key, arr);
-      }
+        byRoot.set(root, arr);
+      });
 
       const dupGroups: DuplicateGroup[] = [];
-      for (const [key, recs] of byKey.entries()) {
+      for (const [root, recs] of byRoot.entries()) {
         if (recs.length < 2) continue;
         const keep = pickKeeper(recs);
         const remove = recs.filter((r) => r.id !== keep.id);
+        const key = keep.documentId || keep.sumUpTxCode || `group:${root}`;
         dupGroups.push({ key, keep, remove });
       }
 
