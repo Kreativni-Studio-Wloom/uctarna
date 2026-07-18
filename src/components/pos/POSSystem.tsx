@@ -708,6 +708,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
               productId: product.id,
               productName: product.name,
               price: product.price,
+              cost: typeof product.cost === 'number' ? product.cost : null,
               quantity: -1,
               parentItemId: null,
             },
@@ -739,6 +740,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             productId: product.id,
             productName: product.name,
             price: product.price,
+            cost: typeof product.cost === 'number' ? product.cost : null,
             quantity: 1,
             parentItemId: null,
           },
@@ -802,6 +804,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             productId: p.id,
             productName: p.name,
             price: p.price,
+            cost: typeof p.cost === 'number' ? p.cost : null,
             quantity: 1,
             parentItemId: extrasParentItemId,
           });

@@ -62,6 +62,8 @@ export interface CartItem {
   productName: string;
   price: number;
   quantity: number;
+  // Nákupní cena zafixovaná v okamžiku prodeje (pozdější změny v katalogu ji neovlivní)
+  cost?: number | null;
   // Pokud je položka extra, odkazuje na itemId hlavní položky
   parentItemId?: string | null;
 }

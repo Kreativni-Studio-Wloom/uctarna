@@ -1460,9 +1460,10 @@ async function computeClosureFromSales(
     if (sale.paymentMethod === 'card') cardSales += amount;
     if (sale.paymentMethod === 'qr') qrSales += amount;
 
-    for (const item of (sale.items ?? []) as Array<{ productId?: string; quantity?: number }>) {
+    for (const item of (sale.items ?? []) as Array<{ productId?: string; quantity?: number; cost?: number | null }>) {
       const product = item.productId ? productMap.get(item.productId) : undefined;
-      const cost = product?.cost;
+      // Přednostně použij nákupní cenu zafixovanou v prodeji, jinak aktuální katalog.
+      const cost = typeof item.cost === 'number' ? item.cost : product?.cost;
       if (typeof cost === 'number') {
         totalCosts += cost * (item.quantity ?? 0);
       }
@@ -1728,10 +1729,12 @@ function computeClosureTotals(
       eurRate,
     });
 
-    for (const item of (sale.items ?? []) as Array<{ productId?: string; quantity?: number }>) {
+    for (const item of (sale.items ?? []) as Array<{ productId?: string; quantity?: number; cost?: number | null }>) {
       const product = item.productId ? productMap.get(item.productId) : undefined;
-      if (product && typeof product.cost === 'number') {
-        totalCosts += product.cost * (item.quantity ?? 0);
+      // Přednostně nákupní cena zafixovaná v prodeji, jinak aktuální katalog.
+      const cost = typeof item.cost === 'number' ? item.cost : product?.cost;
+      if (typeof cost === 'number') {
+        totalCosts += cost * (item.quantity ?? 0);
       }
     }
   }
@@ -1901,6 +1904,7 @@ async function executeSendClosure(
         productName: string;
         quantity: number;
         price: number;
+        cost?: number | null;
       }>;
       paymentMethod: string;
     }>,

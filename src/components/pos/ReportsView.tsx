@@ -272,10 +272,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
     filteredSales.forEach(sale => {
       sale.items?.forEach(item => {
+        // Přednostně použij nákupní cenu zafixovanou v okamžiku prodeje;
+        // u starších prodejů (bez item.cost) padni zpět na aktuální cenu z katalogu.
+        const lockedCost = typeof item.cost === 'number' ? item.cost : undefined;
         const product = productMap.get(item.productId);
-        if (product && product.cost !== undefined) {
-          const itemCost = product.cost * item.quantity;
-          totalCosts += itemCost;
+        const unitCost = lockedCost !== undefined ? lockedCost : product?.cost;
+        if (unitCost !== undefined) {
+          totalCosts += unitCost * item.quantity;
         }
       });
     });
@@ -321,7 +324,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           sale.items?.forEach((item) => {
             const key = item.productId || item.productName;
             const product = productMap.get(item.productId);
-            const unitCost = product?.cost || 0;
+            const unitCost = typeof item.cost === 'number' ? item.cost : product?.cost || 0;
             const revenue = item.price * item.quantity;
             const costs = unitCost * item.quantity;
             const profit = revenue - costs;

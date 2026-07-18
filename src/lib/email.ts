@@ -36,6 +36,7 @@ type SaleItemForEmail = {
   productName: string;
   quantity: number;
   price: number;
+  cost?: number | null;
 };
 
 type SaleForEmail = {
@@ -73,7 +74,8 @@ export function buildEmailReportData(
 
   sales.forEach((sale) => {
     sale.items?.forEach((item) => {
-      const itemCost = productMap.get(item.productId)?.cost || 0;
+      // Přednostně zafixovaná nákupní cena z prodeje, jinak fallback na aktuální katalog.
+      const itemCost = typeof item.cost === 'number' ? item.cost : productMap.get(item.productId)?.cost || 0;
       const totalPrice = item.quantity * item.price;
       const totalProfit = (item.price - itemCost) * item.quantity;
       const existing = summaryMap.get(item.productName);
