@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Copy, AlertTriangle, Check, Trash2, Search } from 'lucide-react';
+import { Copy, AlertTriangle, Check, Trash2, Search, ClipboardCopy } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
@@ -38,6 +38,17 @@ function toMillis(createdAt: unknown): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function formatDateTime(ms: number): string {
+  if (!ms) return 'neznámé datum';
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(ms));
+}
+
 // Klíč pro rozpoznání duplicit: stejné číslo dokladu (documentId),
 // případně stejný SumUp kód transakce. Prázdný klíč = nezahrnovat.
 function dedupKey(sale: SaleRecord): string | null {
@@ -65,8 +76,40 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const totalToRemove = groups.reduce((sum, g) => sum + g.remove.length, 0);
+
+  const buildReportText = (): string => {
+    const lines: string[] = [];
+    lines.push(
+      `Duplicitní doklady – ${groups.length} skupin, ke smazání ${totalToRemove} dokladů`
+    );
+    lines.push('');
+    for (const g of groups) {
+      const label = g.keep.documentId || g.keep.sumUpTxCode || g.key;
+      const amount = typeof g.keep.totalAmount === 'number' ? `${g.keep.totalAmount} Kč` : '—';
+      lines.push(`${label} · ${amount} · celkem ${g.remove.length + 1}×`);
+      lines.push(`  NECHAT: ${formatDateTime(g.keep.createdAtMs)} (id ${g.keep.id})`);
+      for (const r of g.remove) {
+        lines.push(`  SMAZAT: ${formatDateTime(r.createdAtMs)} (id ${r.id})`);
+      }
+      lines.push('');
+    }
+    return lines.join('\n').trim();
+  };
+
+  const handleCopy = async () => {
+    try {
+      const text = buildReportText();
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('❌ Kopírování selhalo:', e);
+      setError('Kopírování do schránky se nezdařilo.');
+    }
+  };
 
   const handleScan = async () => {
     if (!user) return;
@@ -188,18 +231,33 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
         </button>
 
         {scanned && totalToRemove > 0 && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="inline-flex items-center px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors text-sm font-medium"
-          >
-            {deleting ? (
-              <span className="w-4 h-4 mr-2 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-            ) : (
-              <Trash2 className="w-4 h-4 mr-2" />
-            )}
-            {deleting ? 'Mažu…' : `Smazat duplicity (${totalToRemove})`}
-          </button>
+          <>
+            <button
+              onClick={handleCopy}
+              disabled={deleting}
+              className="inline-flex items-center px-4 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-60 transition-colors text-sm font-medium"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 mr-2 text-green-600" />
+              ) : (
+                <ClipboardCopy className="w-4 h-4 mr-2" />
+              )}
+              {copied ? 'Zkopírováno' : 'Kopírovat výsledek'}
+            </button>
+
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="inline-flex items-center px-4 py-2.5 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 transition-colors text-sm font-medium"
+            >
+              {deleting ? (
+                <span className="w-4 h-4 mr-2 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              {deleting ? 'Mažu…' : `Smazat duplicity (${totalToRemove})`}
+            </button>
+          </>
         )}
       </div>
 
@@ -229,21 +287,35 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
           <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">
             Nalezeno <strong>{groups.length}</strong> platebních skupin s duplicitou, ke smazání <strong>{totalToRemove}</strong> dokladů (z každé skupiny zůstane jeden):
           </div>
-          <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+          <div className="max-h-80 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
             {groups.map((g) => (
-              <div key={g.key} className="px-3 py-2 text-sm flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-mono text-gray-900 dark:text-white truncate">
-                    {g.keep.documentId || g.keep.sumUpTxCode || g.key}
+              <div key={g.key} className="px-3 py-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-mono text-gray-900 dark:text-white truncate">
+                      {g.keep.documentId || g.keep.sumUpTxCode || g.key}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {typeof g.keep.totalAmount === 'number' ? `${g.keep.totalAmount} Kč` : ''}
+                      {' · '}celkem {g.remove.length + 1}× → nechat 1, smazat {g.remove.length}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {typeof g.keep.totalAmount === 'number' ? `${g.keep.totalAmount} Kč` : ''}
-                    {' · '}celkem {g.remove.length + 1}× → nechat 1, smazat {g.remove.length}
-                  </div>
+                  <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                    −{g.remove.length}
+                  </span>
                 </div>
-                <span className="shrink-0 text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-                  −{g.remove.length}
-                </span>
+                <div className="mt-1.5 space-y-0.5 text-xs">
+                  <div className="flex items-center gap-1.5 text-green-700 dark:text-green-400">
+                    <span className="shrink-0 font-medium">Nechat:</span>
+                    <span>{formatDateTime(g.keep.createdAtMs)}</span>
+                  </div>
+                  {g.remove.map((r) => (
+                    <div key={r.id} className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 line-through">
+                      <span className="shrink-0 font-medium no-underline">Smazat:</span>
+                      <span>{formatDateTime(r.createdAtMs)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
