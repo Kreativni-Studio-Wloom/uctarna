@@ -9,6 +9,7 @@ import { StoreProvider } from '@/contexts/StoreContext';
 import { BrandColorProvider } from '@/components/BrandColorProvider';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { backfillSaleCosts } from '@/lib/migrateSaleCosts';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Store as StoreIcon, ShoppingCart, Receipt, BarChart3, Settings, UtensilsCrossed, Sparkles, BookOpen } from 'lucide-react';
@@ -90,6 +91,13 @@ export default function StorePage() {
     const v = urlParams.get('view') as ViewType | null;
     if (v) setCurrentView(v);
   }, []);
+
+  // Jednorázově zafixuj nákupní ceny u historických prodejů, aby změna nákupky
+  // v katalogu neovlivňovala zisk dříve prodaných produktů.
+  useEffect(() => {
+    if (!user || !storeId) return;
+    void backfillSaleCosts(user.uid, storeId);
+  }, [user, storeId]);
 
   if (authLoading || (user && storeLoading)) {
     return (
