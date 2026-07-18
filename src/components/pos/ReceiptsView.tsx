@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Download, X } from 'lucide-react';
 import { Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc, deleteDoc, updateDoc, increment, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc, deleteDoc, updateDoc, increment, where, Timestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { generateReceiptPdfBlob } from '@/lib/pdfGenerator';
+import { generateReceiptPdfBlob, generateDailySalesReportPdfBlob } from '@/lib/pdfGenerator';
 import { useStore } from '@/contexts/StoreContext';
+import { format, startOfDay, endOfDay } from 'date-fns';
+import { cs } from 'date-fns/locale';
 
 interface ReceiptsViewProps {
   storeId: string;
@@ -166,9 +168,14 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [generatingPdfForSaleId, setGeneratingPdfForSaleId] = useState<string | null>(null);
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const [daySales, setDaySales] = useState<Sale[]>([]);
+  const [dayLoading, setDayLoading] = useState(false);
+  const [generatingDayPdf, setGeneratingDayPdf] = useState(false);
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
 
   const isSearchMode = debouncedSearch.length > 0;
+  const isDayMode = !isSearchMode && filterDate !== null;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -183,7 +190,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
 
   // Běžný režim: načítat vždy jen jednu stránku (12 dokladů).
   useEffect(() => {
-    if (!user || !storeId || isSearchMode) return;
+    if (!user || !storeId || isSearchMode || isDayMode) return;
 
     setPageLoading(true);
     const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
@@ -225,7 +232,45 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     });
 
     return unsubscribe;
-  }, [user, storeId, currentPage, isSearchMode]);
+  }, [user, storeId, currentPage, isSearchMode, isDayMode]);
+
+  // Režim výběru dne: načíst všechny doklady za vybraný den (realtime).
+  useEffect(() => {
+    if (!user || !storeId || !filterDate || isSearchMode) {
+      setDaySales([]);
+      setDayLoading(false);
+      return;
+    }
+
+    setDayLoading(true);
+    const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
+    const q = query(
+      salesRef,
+      where('createdAt', '>=', Timestamp.fromDate(startOfDay(filterDate))),
+      where('createdAt', '<=', Timestamp.fromDate(endOfDay(filterDate))),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setDaySales(
+          snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as Sale[]
+        );
+        setDayLoading(false);
+      },
+      (error) => {
+        console.error('❌ Chyba při načítání dokladů za den:', error);
+        setDaySales([]);
+        setDayLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [user, storeId, filterDate, isSearchMode]);
 
   // Režim vyhledávání: jednorázově načíst historii (getDocs), ne realtime listener na celou kolekci.
   useEffect(() => {
@@ -314,11 +359,15 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
       )
-    : pageSales;
+    : isDayMode
+      ? daySales
+      : pageSales;
 
   const canGoNext = isSearchMode
     ? currentPage < searchTotalPages
-    : hasNextPage;
+    : isDayMode
+      ? false
+      : hasNextPage;
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
@@ -339,9 +388,11 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
-  const showPagination = isSearchMode
-    ? searchResults.length > ITEMS_PER_PAGE
-    : currentPage > 1 || hasNextPage;
+  const showPagination = isDayMode
+    ? false
+    : isSearchMode
+      ? searchResults.length > ITEMS_PER_PAGE
+      : currentPage > 1 || hasNextPage;
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
@@ -394,6 +445,40 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
+  const handleDownloadDayReport = async () => {
+    if (!filterDate || generatingDayPdf) return;
+    if (daySales.length === 0) {
+      alert('Za vybraný den nejsou žádné doklady ke stažení.');
+      return;
+    }
+    setGeneratingDayPdf(true);
+    try {
+      const pdfBlob = await generateDailySalesReportPdfBlob(
+        daySales,
+        {
+          companyName: storeDoc?.companyName,
+          ico: storeDoc?.ico,
+          companyAddress: storeDoc?.companyAddress,
+        },
+        filterDate
+      );
+
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `doklady-${format(filterDate, 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      console.error('❌ Chyba při generování seznamu dokladů:', error);
+      alert('Nepodařilo se vygenerovat PDF se seznamem dokladů. Zkuste to prosím znovu.');
+    } finally {
+      setGeneratingDayPdf(false);
+    }
+  };
+
   if (pageLoading && !isSearchMode && pageSales.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -413,7 +498,11 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
             ? searchLoading
               ? 'Načítám doklady pro vyhledávání…'
               : `${searchResults.length} nalezených dokladů`
-            : `Strana ${currentPage}${displaySales.length > 0 ? ` · ${displaySales.length} dokladů` : ''}`}
+            : isDayMode
+              ? dayLoading
+                ? 'Načítám doklady za den…'
+                : `${daySales.length} dokladů za den`
+              : `Strana ${currentPage}${displaySales.length > 0 ? ` · ${displaySales.length} dokladů` : ''}`}
         </div>
       </div>
 
@@ -426,10 +515,68 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         />
       </div>
 
-      {searchLoading && isSearchMode ? (
+      {/* Filtr podle dne + stažení souhrnného PDF */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Doklady za den
+              </label>
+              <input
+                type="date"
+                value={filterDate ? format(filterDate, 'yyyy-MM-dd') : ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFilterDate(value ? new Date(`${value}T00:00:00`) : null);
+                  setCurrentPage(1);
+                }}
+                disabled={isSearchMode}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            {isDayMode && (
+              <button
+                onClick={() => setFilterDate(null)}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Zrušit filtr
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={handleDownloadDayReport}
+            disabled={!isDayMode || dayLoading || generatingDayPdf || daySales.length === 0}
+            className="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {generatingDayPdf ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generuji PDF…
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Stáhnout seznam dokladů (PDF)
+              </>
+            )}
+          </button>
+        </div>
+        {isDayMode && (
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {format(filterDate as Date, 'EEEE, d. MMMM yyyy', { locale: cs })}
+          </p>
+        )}
+      </div>
+
+      {(searchLoading && isSearchMode) || (dayLoading && isDayMode) ? (
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 mr-3"></div>
-          <span className="text-gray-600 dark:text-gray-400">Prohledávám všechny doklady…</span>
+          <span className="text-gray-600 dark:text-gray-400">
+            {isDayMode ? 'Načítám doklady za vybraný den…' : 'Prohledávám všechny doklady…'}
+          </span>
         </div>
       ) : displaySales.length === 0 ? (
         <div className="text-center py-12">
@@ -437,14 +584,18 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
             {isSearchMode
               ? 'Nenalezeny žádné doklady'
-              : pageSales.length === 0
-                ? 'Zatím nejsou žádné doklady'
-                : 'Nenalezeny žádné doklady'}
+              : isDayMode
+                ? 'Za vybraný den nejsou žádné doklady'
+                : pageSales.length === 0
+                  ? 'Zatím nejsou žádné doklady'
+                  : 'Nenalezeny žádné doklady'}
           </h3>
           <p className="text-gray-600 dark:text-gray-400">
             {isSearchMode
               ? 'Zkuste upravit hledaný výraz'
-              : 'Po prvním prodeji se zde zobrazí doklady'}
+              : isDayMode
+                ? 'Zvolte jiný den nebo zrušte filtr'
+                : 'Po prvním prodeji se zde zobrazí doklady'}
           </p>
         </div>
       ) : (

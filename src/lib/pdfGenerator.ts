@@ -263,3 +263,332 @@ export const generateReceiptPdfBlob = async (
 
   return doc.output('blob');
 };
+
+// ----------------------------------------------------------------------------
+// Souhrnný PDF report: seznam všech dokladů za vybraný den (formát A4)
+// ----------------------------------------------------------------------------
+
+const A4_MARGIN = 15;
+
+const formatReportDate = (date: Date) =>
+  new Intl.DateTimeFormat('cs-CZ', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+
+const formatReportTime = (date: Date) =>
+  new Intl.DateTimeFormat('cs-CZ', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+
+const czkEquivalent = (sale: Sale): number => {
+  if (sale.currency === 'EUR') {
+    return sale.originalAmountCZK ?? sale.totalAmount * (sale.eurRate ?? 0);
+  }
+  return sale.totalAmount;
+};
+
+export const generateDailySalesReportPdfBlob = async (
+  sales: Sale[],
+  store: ReceiptStoreData,
+  reportDate: Date
+): Promise<Blob> => {
+  const { default: jsPDF } = await import('jspdf');
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+    compress: true,
+  });
+  doc.setFont('helvetica', 'normal');
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - A4_MARGIN * 2;
+  const leftX = A4_MARGIN;
+  const rightX = pageWidth - A4_MARGIN;
+
+  // Rozložení sloupců pro položky dokladu
+  const PRICE_COL = 32;
+  const QTY_COL = 16;
+  const COL_GAP = 3;
+  const nameColWidth = contentWidth - PRICE_COL - QTY_COL - COL_GAP * 2;
+  const qtyRightX = leftX + nameColWidth + COL_GAP + QTY_COL;
+
+  let y = A4_MARGIN;
+
+  const ensureSpace = (needed: number) => {
+    if (y + needed > pageHeight - A4_MARGIN) {
+      doc.addPage();
+      y = A4_MARGIN;
+    }
+  };
+
+  const divider = (padding = 2) => {
+    y += padding;
+    doc.setDrawColor(180);
+    doc.setLineWidth(0.2);
+    doc.line(leftX, y, rightX, y);
+    y += padding;
+  };
+
+  // ---- Hlavička s údaji o firmě ----
+  const companyName = removeDiacritics(trimOrEmpty(store.companyName)) || 'Prodejna';
+  const companyAddress = removeDiacritics(trimOrEmpty(store.companyAddress));
+  const ico = removeDiacritics(trimOrEmpty(store.ico));
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(companyName, leftX, y);
+  y += 7;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  if (companyAddress) {
+    doc.text(companyAddress, leftX, y);
+    y += 4.5;
+  }
+  const identLine = [ico ? `IC: ${ico}` : '', 'Neplatce DPH'].filter(Boolean).join('   |   ');
+  if (identLine) {
+    doc.text(identLine, leftX, y);
+    y += 4.5;
+  }
+
+  // ---- Titulek reportu ----
+  y += 3;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('Seznam dokladu za den', leftX, y);
+  y += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.text(removeDiacritics(formatReportDate(reportDate)), leftX, y);
+  y += 4;
+  doc.setFontSize(8.5);
+  doc.setTextColor(120);
+  doc.text(
+    removeDiacritics(`Vygenerovano: ${formatReportDate(new Date())} ${formatReportTime(new Date())}`),
+    leftX,
+    y
+  );
+  doc.setTextColor(0);
+  y += 3;
+
+  divider(3);
+
+  // ---- Souhrn ----
+  const sorted = [...sales].sort(
+    (a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime()
+  );
+
+  const totalCount = sorted.length;
+  let czkTotal = 0;
+  let eurTotal = 0;
+  let cashCzk = 0;
+  let cardCzk = 0;
+  let qrCzk = 0;
+  let tipTotalCzk = 0;
+  let discountTotalCzk = 0;
+  let refundCount = 0;
+
+  sorted.forEach((sale) => {
+    const czk = czkEquivalent(sale);
+    if (sale.currency === 'EUR') eurTotal += sale.totalAmount;
+    czkTotal += czk;
+    if (sale.paymentMethod === 'cash') cashCzk += czk;
+    else if (sale.paymentMethod === 'card') cardCzk += czk;
+    else if (sale.paymentMethod === 'qr') qrCzk += czk;
+    if (typeof sale.tipAmount === 'number' && sale.tipAmount > 0) {
+      tipTotalCzk += sale.currency === 'EUR' ? sale.tipAmount * (sale.eurRate ?? 0) : sale.tipAmount;
+    }
+    if (typeof sale.discountAmount === 'number') discountTotalCzk += sale.discountAmount;
+    if (sale.isRefund) refundCount += 1;
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Souhrn', leftX, y);
+  y += 5;
+
+  const summaryRow = (label: string, value: string, bold = false) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(bold ? 10.5 : 9.5);
+    doc.text(removeDiacritics(label), leftX, y);
+    doc.text(removeDiacritics(value), rightX, y, { align: 'right' });
+    y += bold ? 5.5 : 4.8;
+  };
+
+  summaryRow('Pocet dokladu', String(totalCount));
+  if (refundCount > 0) summaryRow('z toho vratky', String(refundCount));
+  summaryRow('Hotovost', formatCZKAmount(cashCzk));
+  summaryRow('Karta', formatCZKAmount(cardCzk));
+  summaryRow('QR platba', formatCZKAmount(qrCzk));
+  if (discountTotalCzk > 0) summaryRow('Slevy celkem', `-${formatCZKAmount(discountTotalCzk)}`);
+  if (tipTotalCzk > 0) summaryRow('Spropitne celkem', formatCZKAmount(tipTotalCzk));
+  if (eurTotal !== 0) summaryRow('Trzby v EUR', `${eurTotal.toFixed(2)} EUR`);
+  summaryRow('Trzba celkem', formatCZKAmount(czkTotal), true);
+
+  divider(3);
+
+  // ---- Detailní seznam dokladů ----
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  ensureSpace(10);
+  doc.text('Doklady', leftX, y);
+  y += 6;
+
+  if (sorted.length === 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text('Za tento den nejsou zadne doklady.', leftX, y);
+    y += 6;
+  }
+
+  sorted.forEach((sale, index) => {
+    const createdAt = toDate(sale.createdAt);
+
+    // Odhad výšky bloku dokladu, aby se nezalomil uprostřed
+    const estimatedRows = sale.items.reduce((sum, item) => {
+      const lines = doc.splitTextToSize(
+        removeDiacritics(item.productName || 'Polozka'),
+        nameColWidth
+      ).length;
+      return sum + Math.max(1, lines);
+    }, 0);
+    const estimatedBlockHeight = 16 + estimatedRows * 4.4 + 14;
+    ensureSpace(Math.min(estimatedBlockHeight, pageHeight - A4_MARGIN * 2));
+
+    // Záhlaví dokladu: číslo + datum/čas
+    doc.setFillColor(243, 244, 246);
+    doc.rect(leftX, y - 4, contentWidth, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text(
+      removeDiacritics(`${index + 1}. Doklad c. ${sale.documentId || sale.id}`),
+      leftX + 1.5,
+      y
+    );
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(
+      removeDiacritics(
+        `${new Intl.DateTimeFormat('cs-CZ', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }).format(createdAt)} ${formatReportTime(createdAt)}`
+      ),
+      rightX - 1.5,
+      y,
+      { align: 'right' }
+    );
+    y += 6;
+
+    // Meta řádek: platba, měna, zákazník, vratka
+    const metaParts: string[] = [normalizePaymentMethod(sale.paymentMethod)];
+    if (sale.currency === 'EUR') metaParts.push('EUR');
+    if (sale.customerName) metaParts.push(`Jmeno: ${sale.customerName}`);
+    if (sale.isRefund) metaParts.push('VRATKA');
+    if (sale.paymentMethod === 'card' && sale.sumUpData?.sumUpTxCode) {
+      metaParts.push(`SumUp: ${sale.sumUpData.sumUpTxCode}`);
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(90);
+    const metaLines = doc.splitTextToSize(
+      removeDiacritics(metaParts.join('  •  ')),
+      contentWidth
+    );
+    metaLines.forEach((line: string) => {
+      doc.text(line, leftX, y);
+      y += 4;
+    });
+    doc.setTextColor(0);
+
+    // Hlavička sloupců položek
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.2);
+    doc.text('Polozka', leftX, y);
+    doc.text('Ks', qtyRightX, y, { align: 'right' });
+    doc.text('Cena', rightX, y, { align: 'right' });
+    y += 4;
+
+    // Položky
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.6);
+    sale.items.forEach((item) => {
+      const rowPrice = item.price * item.quantity;
+      const wrapped = doc.splitTextToSize(
+        removeDiacritics(item.productName || 'Polozka'),
+        nameColWidth
+      );
+      ensureSpace(wrapped.length * 4.4 + 4);
+      wrapped.forEach((line: string, i: number) => {
+        doc.text(line, leftX, y);
+        if (i === 0) {
+          doc.text(String(item.quantity), qtyRightX, y, { align: 'right' });
+          doc.text(removeDiacritics(formatCZKAmount(rowPrice)), rightX, y, { align: 'right' });
+        }
+        y += 4.2;
+      });
+    });
+
+    // Sleva / spropitné / celkem
+    y += 1;
+    if (typeof sale.discountAmount === 'number' && sale.discountAmount > 0) {
+      const discountLabel =
+        sale.discount?.type === 'percentage' ? `Sleva ${sale.discount.value}%` : 'Sleva';
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.6);
+      doc.text(removeDiacritics(discountLabel), leftX, y);
+      doc.text(`-${removeDiacritics(formatCZKAmount(sale.discountAmount))}`, rightX, y, {
+        align: 'right',
+      });
+      y += 4.2;
+    }
+    if (typeof sale.tipAmount === 'number' && sale.tipAmount > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.6);
+      doc.text('Spropitne', leftX, y);
+      doc.text(
+        removeDiacritics(
+          sale.currency === 'EUR' ? `${sale.tipAmount.toFixed(2)} EUR` : formatCZKAmount(sale.tipAmount)
+        ),
+        rightX,
+        y,
+        { align: 'right' }
+      );
+      y += 4.2;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.text('Celkem', leftX, y);
+    let totalText = formatAmount(sale.totalAmount, sale.currency);
+    if (sale.currency === 'EUR' && sale.originalAmountCZK) {
+      totalText += ` (${formatCZKAmount(sale.originalAmountCZK)})`;
+    }
+    doc.text(removeDiacritics(totalText), rightX, y, { align: 'right' });
+    y += 4.5;
+
+    divider(2.5);
+  });
+
+  // ---- Číslování stránek ----
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i += 1) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(130);
+    doc.text(`Strana ${i} / ${pageCount}`, rightX, pageHeight - 8, { align: 'right' });
+    doc.text(removeDiacritics(companyName), leftX, pageHeight - 8);
+    doc.setTextColor(0);
+  }
+
+  return doc.output('blob');
+};
