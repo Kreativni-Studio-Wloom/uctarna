@@ -7,7 +7,7 @@ import {
   type UIMessage,
 } from 'ai';
 import { z } from 'zod';
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { endOfDay, format, isValid, parseISO, startOfDay } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import nodemailer from 'nodemailer';
@@ -20,7 +20,7 @@ const anthropic = createAnthropic({
 });
 
 const SYSTEM_PROMPT =
-  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves. You can manage pinned items in the POS menu using the togglePinnedItem tool. Always confirm the action with the user. Always call togglePinnedItem first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can manage extras using the addExtra tool. Always confirm details before saving. Always call addExtra first with confirmed=false to show a summary and ask for confirmation. Only call addExtra with confirmed=true after the user explicitly approves. You are now an administrator of the system. You can update configuration parameters like exchange rates, billing details, and payment settings via the updateSettings tool. ALWAYS confirm significant changes like IBAN or company details with the user. Always call updateSettings first with confirmed=false, then call again with confirmed=true only after explicit user approval.';
+  'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves. You can manage pinned items in the POS menu using the togglePinnedItem tool. Always confirm the action with the user. Always call togglePinnedItem first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can manage extras using the addExtra tool. Always confirm details before saving. Always call addExtra first with confirmed=false to show a summary and ask for confirmation. Only call addExtra with confirmed=true after the user explicitly approves. You are now an administrator of the system. You can update configuration parameters like exchange rates, billing details, and payment settings via the updateSettings tool. ALWAYS confirm significant changes like IBAN or company details with the user. Always call updateSettings first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can distinguish transactions by payment method: every invoice has a paymentMethod of cash (hotovost), card (karta), or qr. Use the paymentMethod filter of getInvoices to list only cash or card transactions when the user asks (for example "kolik dokladů bylo placeno kartou"). Card payments processed through SumUp also include a sumUpTxCode (SumUp transaction code) and sumUpStatus; report the SumUp code when the user asks about it. You can permanently delete an invoice using the deleteInvoice tool. Deleting an invoice also decreases the sold counts of the products on that document and cannot be undone. Always identify the correct invoice first (using getInvoices or getInvoiceByDetails), then call deleteInvoice with confirmed=false to show the invoice details and ask for explicit confirmation. Only call deleteInvoice with confirmed=true after the user clearly approves the deletion. Never delete an invoice without explicit user confirmation.';
 
 const STORE_TIMEZONE = 'Europe/Prague';
 
@@ -88,6 +88,8 @@ type InvoiceSummary = {
   currency: string;
   itemCount: number;
   isRefund: boolean;
+  sumUpTxCode: string | null;
+  sumUpStatus: string | null;
 };
 
 type InvoiceDetail = {
@@ -104,6 +106,8 @@ type InvoiceDetail = {
   paymentMethod: string;
   currency: string;
   finalAmount: number | null;
+  sumUpTxCode: string | null;
+  sumUpStatus: string | null;
 };
 
 type InvoiceByDetailsResult = {
@@ -1085,20 +1089,40 @@ async function fetchProductsCatalog(userId: string, storeId: string): Promise<Ca
     .sort((a, b) => a.name.localeCompare(b.name, 'cs'));
 }
 
+function extractSumUpInfo(data: FirebaseFirestore.DocumentData): {
+  sumUpTxCode: string | null;
+  sumUpStatus: string | null;
+} {
+  const sumUpData = data.sumUpData as
+    | { sumUpTxCode?: string; status?: string }
+    | undefined;
+
+  return {
+    sumUpTxCode: sumUpData?.sumUpTxCode ?? null,
+    sumUpStatus: sumUpData?.status ?? null,
+  };
+}
+
 async function fetchInvoices(
   userId: string,
   storeId: string,
-  limit: number
+  limit: number,
+  paymentMethod?: string
 ): Promise<InvoiceSummary[]> {
+  // Když filtrujeme podle způsobu platby, načteme širší okno a filtrujeme v paměti,
+  // abychom se vyhnuli nutnosti kompozitního indexu (paymentMethod + createdAt).
+  const fetchLimit = paymentMethod ? Math.max(limit * 10, 200) : limit;
+
   const salesSnapshot = await storeRef(userId, storeId)
     .collection('sales')
     .orderBy('createdAt', 'desc')
-    .limit(limit)
+    .limit(fetchLimit)
     .get();
 
-  return salesSnapshot.docs.map((saleDoc) => {
+  const invoices = salesSnapshot.docs.map((saleDoc) => {
     const data = saleDoc.data();
     const items = (data.items ?? []) as unknown[];
+    const { sumUpTxCode, sumUpStatus } = extractSumUpInfo(data);
 
     return {
       id: saleDoc.id,
@@ -1110,8 +1134,16 @@ async function fetchInvoices(
       currency: (data.currency as string) ?? 'CZK',
       itemCount: items.length,
       isRefund: Boolean(data.isRefund),
+      sumUpTxCode,
+      sumUpStatus,
     };
   });
+
+  const filtered = paymentMethod
+    ? invoices.filter((invoice) => invoice.paymentMethod === paymentMethod)
+    : invoices;
+
+  return filtered.slice(0, limit);
 }
 
 function mapSaleDocToInvoiceDetail(
@@ -1132,6 +1164,8 @@ function mapSaleDocToInvoiceDetail(
     price: item.price ?? 0,
   }));
 
+  const { sumUpTxCode, sumUpStatus } = extractSumUpInfo(data);
+
   return {
     invoiceId: (data.documentId as string | undefined) ?? saleDoc.id,
     id: saleDoc.id,
@@ -1141,6 +1175,8 @@ function mapSaleDocToInvoiceDetail(
     paymentMethod: (data.paymentMethod as string) ?? 'unknown',
     currency: (data.currency as string) ?? 'CZK',
     finalAmount: (data.finalAmount as number | undefined) ?? null,
+    sumUpTxCode,
+    sumUpStatus,
   };
 }
 
@@ -1150,10 +1186,18 @@ function buildInvoiceSearchSummary(invoices: InvoiceDetail[]): string {
   }
 
   const list = invoices
-    .map(
-      (invoice) =>
-        `ID: ${invoice.invoiceId}, Time: ${invoice.createdAt}, Total: ${invoice.totalAmount} ${invoice.currency}`
-    )
+    .map((invoice) => {
+      const parts = [
+        `ID: ${invoice.invoiceId}`,
+        `Time: ${invoice.createdAt}`,
+        `Total: ${invoice.totalAmount} ${invoice.currency}`,
+        `Payment: ${invoice.paymentMethod}`,
+      ];
+      if (invoice.sumUpTxCode) {
+        parts.push(`SumUp code: ${invoice.sumUpTxCode}`);
+      }
+      return parts.join(', ');
+    })
     .join('; ');
 
   const label = invoices.length === 1 ? 'invoice' : 'invoices';
@@ -1238,6 +1282,105 @@ async function fetchInvoiceByDetails(
     summary: buildInvoiceSearchSummary(invoices),
     count: invoices.length,
     invoices,
+  };
+}
+
+type DeleteInvoiceParams = {
+  invoiceId: string;
+  confirmed?: boolean;
+};
+
+async function findSaleDocRef(
+  userId: string,
+  storeId: string,
+  invoiceId: string
+): Promise<FirebaseFirestore.DocumentSnapshot | null> {
+  const salesCollection = storeRef(userId, storeId).collection('sales');
+
+  // Nejprve zkusíme přímo Firestore document ID.
+  const directDoc = await salesCollection.doc(invoiceId).get();
+  if (directDoc.exists) {
+    return directDoc;
+  }
+
+  // Jinak hledáme podle documentId (10místné ID dokladu).
+  const byDocumentId = await salesCollection.where('documentId', '==', invoiceId).limit(1).get();
+  if (!byDocumentId.empty) {
+    return byDocumentId.docs[0];
+  }
+
+  return null;
+}
+
+async function executeDeleteInvoice(userId: string, storeId: string, params: DeleteInvoiceParams) {
+  const invoiceId = params.invoiceId?.trim();
+  if (!invoiceId) {
+    return {
+      deleted: false,
+      requiresConfirmation: false,
+      error: 'invoiceId is required.',
+      message: 'invoiceId is required.',
+    };
+  }
+
+  const saleDoc = await findSaleDocRef(userId, storeId, invoiceId);
+  if (!saleDoc) {
+    return {
+      deleted: false,
+      requiresConfirmation: false,
+      error: `Invoice "${invoiceId}" was not found.`,
+      message: `Invoice "${invoiceId}" was not found.`,
+    };
+  }
+
+  const data = saleDoc.data()!;
+  const items = (data.items ?? []) as Array<{ productId?: string; productName?: string; quantity?: number }>;
+  const { sumUpTxCode } = extractSumUpInfo(data);
+
+  const invoiceInfo = {
+    id: saleDoc.id,
+    documentId: (data.documentId as string | undefined) ?? null,
+    createdAt: toIsoDate(data.createdAt) ?? 'Unknown time',
+    totalAmount: (data.totalAmount as number) ?? 0,
+    finalAmount: (data.finalAmount as number | undefined) ?? null,
+    currency: (data.currency as string) ?? 'CZK',
+    paymentMethod: (data.paymentMethod as string) ?? 'unknown',
+    itemCount: items.length,
+    isRefund: Boolean(data.isRefund),
+    sumUpTxCode,
+  };
+
+  if (!params.confirmed) {
+    const amount = invoiceInfo.finalAmount ?? invoiceInfo.totalAmount;
+    return {
+      deleted: false,
+      requiresConfirmation: true,
+      invoice: invoiceInfo,
+      message: `I am about to permanently delete invoice ${invoiceInfo.documentId ?? invoiceInfo.id} (${invoiceInfo.createdAt}, ${amount} ${invoiceInfo.currency}, payment: ${invoiceInfo.paymentMethod}). This will also decrease the sold counts of the products on this document. This action cannot be undone. Do you confirm I should proceed?`,
+    };
+  }
+
+  const productsCollection = storeRef(userId, storeId).collection('products');
+  const batch = adminDb.batch();
+
+  batch.delete(saleDoc.ref);
+
+  for (const item of items) {
+    if (!item.productId || typeof item.quantity !== 'number' || item.quantity === 0) continue;
+    batch.set(
+      productsCollection.doc(item.productId),
+      { soldCount: FieldValue.increment(-item.quantity) },
+      { merge: true }
+    );
+  }
+
+  await batch.commit();
+
+  return {
+    deleted: true,
+    requiresConfirmation: false,
+    invoice: invoiceInfo,
+    message: `Invoice ${invoiceInfo.documentId ?? invoiceInfo.id} was deleted successfully and product sold counts were adjusted.`,
   };
 }
 
@@ -1884,7 +2027,7 @@ export async function POST(req: Request) {
         }),
         getInvoices: tool({
           description:
-            'Returns recent invoices (sales documents) for the current store, ordered from newest to oldest.',
+            'Returns recent invoices (sales documents) for the current store, ordered from newest to oldest. Each invoice includes the paymentMethod (cash, card, qr) and, for card payments processed via SumUp, the sumUpTxCode and sumUpStatus. Use the optional paymentMethod filter to list only cash, card, or qr transactions.',
           inputSchema: z.object({
             limit: z
               .number()
@@ -1893,15 +2036,19 @@ export async function POST(req: Request) {
               .max(100)
               .default(10)
               .describe('Number of recent invoices to return'),
+            paymentMethod: z
+              .enum(['cash', 'card', 'qr'])
+              .optional()
+              .describe('Optional filter: only return invoices paid by cash, card, or qr.'),
           }),
-          execute: async ({ limit }) => {
+          execute: async ({ limit, paymentMethod }) => {
             if (!context.storeId || !context.userId) {
               return { error: missingContextError(), invoices: [] as InvoiceSummary[] };
             }
 
             try {
-              const invoices = await fetchInvoices(context.userId, context.storeId, limit);
-              return { invoices, count: invoices.length };
+              const invoices = await fetchInvoices(context.userId, context.storeId, limit, paymentMethod);
+              return { invoices, count: invoices.length, paymentMethod: paymentMethod ?? null };
             } catch (error) {
               console.error('❌ getInvoices tool error:', error);
               return { error: 'Failed to load invoices from Firebase.', invoices: [] as InvoiceSummary[] };
@@ -2191,6 +2338,40 @@ export async function POST(req: Request) {
                 updated: false,
                 error: 'Failed to update settings.',
                 message: 'Failed to update settings.',
+              };
+            }
+          },
+        }),
+        deleteInvoice: tool({
+          description:
+            'Permanently delete an invoice (sales document) and decrease the sold counts of its products. This is a destructive, irreversible action. Always call first with confirmed=false to show the invoice details and ask for user confirmation. Call again with confirmed=true only after the user explicitly approves the deletion. Use getInvoices or getInvoiceByDetails first to obtain the correct invoiceId.',
+          inputSchema: z.object({
+            invoiceId: z
+              .string()
+              .describe(
+                'The invoice to delete. Accepts either the Firestore document id (field "id") or the 10-digit documentId returned by getInvoices/getInvoiceByDetails.'
+              ),
+            confirmed: z
+              .boolean()
+              .default(false)
+              .describe('Must be false for preview. Set true only after the user explicitly confirms the deletion.'),
+          }),
+          execute: async ({ invoiceId, confirmed }) => {
+            if (!context.storeId || !context.userId) {
+              return { error: missingContextError(), deleted: false };
+            }
+
+            try {
+              return await executeDeleteInvoice(context.userId, context.storeId, {
+                invoiceId,
+                confirmed,
+              });
+            } catch (error) {
+              console.error('❌ deleteInvoice tool error:', error);
+              return {
+                deleted: false,
+                error: 'Failed to delete invoice.',
+                message: 'Failed to delete invoice.',
               };
             }
           },
