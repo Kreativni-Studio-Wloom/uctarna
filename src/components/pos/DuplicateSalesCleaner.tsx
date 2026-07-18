@@ -49,15 +49,13 @@ function formatDateTime(ms: number): string {
   }).format(new Date(ms));
 }
 
-// Klíče pro rozpoznání duplicit: doklad se považuje za duplicitní, pokud sdílí
-// stejné číslo dokladu (documentId) NEBO stejný SumUp kód transakce.
-// Vracíme všechny dostupné klíče – seskupení pak spojí i případy, kdy se shoduje
-// jen jeden z nich (přechodně).
-function recordKeys(sale: SaleRecord): string[] {
-  const keys: string[] = [];
-  if (sale.documentId && sale.documentId.trim()) keys.push(`doc:${sale.documentId.trim()}`);
-  if (sale.sumUpTxCode && sale.sumUpTxCode.trim()) keys.push(`smp:${sale.sumUpTxCode.trim()}`);
-  return keys;
+// SumUp kód se u dvou různých plateb může (kvůli chování SumUp aplikace) omylem
+// shodovat. Proto podle SumUp kódu slučujeme jen doklady, které mají navíc stejnou
+// částku a vznikly blízko u sebe – dvě různé platby pár minut od sebe se nespojí.
+const CODE_MATCH_WINDOW_MS = 60_000;
+
+function hasAnyKey(sale: SaleRecord): boolean {
+  return !!(sale.documentId && sale.documentId.trim()) || !!(sale.sumUpTxCode && sale.sumUpTxCode.trim());
 }
 
 // Z každé skupiny necháme jeden doklad: přednost má ten se spropitným
@@ -165,22 +163,44 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
 
       records.forEach((_, i) => parent.set(i, i));
 
-      const keyToFirstIndex = new Map<string, number>();
+      // 1) Číslo dokladu (documentId) – spolehlivá značka skutečné duplicity
+      //    (oba zápisy téže platby čtou stejný documentId). Slučujeme vždy.
+      const docKeyFirst = new Map<string, number>();
       records.forEach((rec, i) => {
-        for (const key of recordKeys(rec)) {
-          const existing = keyToFirstIndex.get(key);
-          if (existing === undefined) {
-            keyToFirstIndex.set(key, i);
-          } else {
-            union(existing, i);
+        const d = rec.documentId?.trim();
+        if (!d) return;
+        const key = `doc:${d}`;
+        const existing = docKeyFirst.get(key);
+        if (existing === undefined) docKeyFirst.set(key, i);
+        else union(existing, i);
+      });
+
+      // 2) SumUp kód – slučujeme jen při shodné částce a blízkém čase,
+      //    aby se dvě různé platby se stejným kódem (pár minut od sebe) nespojily.
+      const codeToIndices = new Map<string, number[]>();
+      records.forEach((rec, i) => {
+        const c = rec.sumUpTxCode?.trim();
+        if (!c) return;
+        const arr = codeToIndices.get(c) ?? [];
+        arr.push(i);
+        codeToIndices.set(c, arr);
+      });
+      for (const idxs of codeToIndices.values()) {
+        for (let a = 0; a < idxs.length; a++) {
+          for (let b = a + 1; b < idxs.length; b++) {
+            const ra = records[idxs[a]];
+            const rb = records[idxs[b]];
+            const sameAmount = (ra.totalAmount ?? null) === (rb.totalAmount ?? null);
+            const closeInTime = Math.abs(ra.createdAtMs - rb.createdAtMs) <= CODE_MATCH_WINDOW_MS;
+            if (sameAmount && closeInTime) union(idxs[a], idxs[b]);
           }
         }
-      });
+      }
 
       const byRoot = new Map<number, SaleRecord[]>();
       records.forEach((rec, i) => {
-        // Doklad bez jakéhokoli klíče nelze porovnat – přeskočíme.
-        if (recordKeys(rec).length === 0) return;
+        // Doklad bez jakéhokoli identifikátoru nelze porovnat – přeskočíme.
+        if (!hasAnyKey(rec)) return;
         const root = find(i);
         const arr = byRoot.get(root) ?? [];
         arr.push(rec);
@@ -251,7 +271,7 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
             Duplicitní doklady
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Najde doklady, které vznikly vícekrát ke stejné platbě (stejné číslo dokladu / SumUp kód), a nechá z každé skupiny jen jeden. Opraví tím nafouknutou tržbu.
+            Najde doklady, které vznikly vícekrát ke stejné platbě, a nechá z každé skupiny jen jeden. Spojuje podle stejného čísla dokladu; podle SumUp kódu jen při shodné částce a blízkém čase, aby se dvě různé platby se stejným kódem omylem nesloučily. Opraví tím nafouknutou tržbu.
           </p>
         </div>
       </div>
