@@ -9,6 +9,7 @@ interface AddProductModalProps {
   onAdd: (name: string, price: number, cost?: number) => void;
   title?: string;
   submitLabel?: string;
+  costRequired?: boolean;
 }
 
 export const AddProductModal: React.FC<AddProductModalProps> = ({
@@ -16,6 +17,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   onAdd,
   title = 'Nový produkt',
   submitLabel = 'Vytvořit produkt',
+  costRequired = false,
 }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -28,6 +30,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
     const priceNumber = parseFloat(price);
     if (isNaN(priceNumber) || priceNumber <= 0) return;
+
+    if (costRequired && !cost.trim()) return;
 
     const costNumber = cost.trim() ? parseFloat(cost) : 0;
     if (isNaN(costNumber) || costNumber < 0) return;
@@ -113,7 +117,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
               <div>
                 <label htmlFor="productCost" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Náklady (Kč) <span className="text-gray-500 text-sm">(nepovinné)</span>
+                  Náklady (Kč){!costRequired && <span className="text-gray-500 text-sm"> (nepovinné)</span>}
                 </label>
                 <input
                   id="productCost"
@@ -122,6 +126,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   min="0"
                   value={cost}
                   onChange={(e) => setCost(e.target.value)}
+                  required={costRequired}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-all duration-200"
                   placeholder="0.00"
                 />
@@ -141,7 +146,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
-                  disabled={loading || !name.trim() || !price.trim()}
+                  disabled={loading || !name.trim() || !price.trim() || (costRequired && !cost.trim())}
                   className="flex-1 bg-gradient-to-r from-brand-500 to-brand-700 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-600 hover:to-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                 >
                   {loading ? (

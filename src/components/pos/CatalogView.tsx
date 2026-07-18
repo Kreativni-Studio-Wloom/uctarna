@@ -743,6 +743,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
             onAdd={handleAdd}
             title={addModal === 'extra' ? 'Nové extra' : 'Nový produkt'}
             submitLabel={addModal === 'extra' ? 'Vytvořit extra' : 'Vytvořit produkt'}
+            costRequired={addModal === 'product'}
           />
         )}
       </AnimatePresence>
