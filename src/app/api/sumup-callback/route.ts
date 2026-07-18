@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, updateDoc, increment, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { fetchSumUpTerminalTip } from '@/lib/sumup-server';
 
@@ -257,11 +257,38 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      console.log('💾 Ukládám prodej do databáze...', { storeId, userId, itemsCount: cartItems.length });
-      
-      // Ulož prodej do databáze
-      const saleRef = await addDoc(collection(db, 'users', userId, 'stores', storeId, 'sales'), sale);
-      console.log('✅ Prodej uložen s ID:', saleRef.id);
+      // Idempotence: prodej ukládáme pod deterministickým ID dokladu (documentId).
+      // Návrat ze SumUp může callback vyvolat vícekrát (původní okno + fallback na
+      // návratové stránce, více kanálů). Transakce zajistí, že se doklad vytvoří jen
+      // jednou – druhý (duplicitní) callback existující doklad najde a přeskočí.
+      const saleDocId = documentId || foreignTxId;
+      const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', saleDocId);
+
+      console.log('💾 Ukládám prodej do databáze...', { storeId, userId, saleDocId, itemsCount: cartItems.length });
+
+      let alreadyExists = false;
+      await runTransaction(db, async (tx) => {
+        const existing = await tx.get(saleRef);
+        if (existing.exists()) {
+          alreadyExists = true;
+          return;
+        }
+        tx.set(saleRef, sale);
+      });
+
+      if (alreadyExists) {
+        console.log('ℹ️ Prodej s tímto documentId už existuje – duplicitní callback ignorován:', saleDocId);
+        return NextResponse.json({
+          success: true,
+          saleId: saleDocId,
+          duplicate: true,
+          message: 'Prodej už byl uložen dříve (duplicitní callback ignorován)',
+          tipAmount,
+          totalAmount: saleTotalAmount,
+        });
+      }
+
+      console.log('✅ Prodej uložen s ID:', saleDocId);
 
       // Aktualizace produktů je best-effort: případné chyby logujeme, ale neblokují odpověď
       let inventoryUpdated = 0;
@@ -286,14 +313,14 @@ export async function POST(request: NextRequest) {
         console.error('⚠️ Chyba při hromadné aktualizaci produktů:', e);
       }
 
-      console.log('✅ SumUp platba úspěšně uložena:', saleRef.id, {
+      console.log('✅ SumUp platba úspěšně uložena:', saleDocId, {
         inventoryUpdated,
         inventoryFailed,
       });
 
       return NextResponse.json({
         success: true,
-        saleId: saleRef.id,
+        saleId: saleDocId,
         message: 'Prodej byl úspěšně uložen',
         inventoryUpdated,
         inventoryFailed,
