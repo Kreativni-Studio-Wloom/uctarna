@@ -23,7 +23,15 @@ const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
   const docId = (sale.documentId || '').toString().toLowerCase();
   const vs = ((sale as any).variableSymbol || '').toString().toLowerCase();
   const id = (sale.id || '').toString().toLowerCase();
-  return docId.includes(q) || vs.includes(q) || id.includes(q);
+  const sumUpTxCode = (sale.sumUpData?.sumUpTxCode || '').toString().toLowerCase();
+  const sumUpForeignId = (sale.sumUpData?.foreignTxId || '').toString().toLowerCase();
+  return (
+    docId.includes(q) ||
+    vs.includes(q) ||
+    id.includes(q) ||
+    sumUpTxCode.includes(q) ||
+    sumUpForeignId.includes(q)
+  );
 };
 
 const formatSaleDate = (date: any) => {
@@ -510,7 +518,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <input
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Hledat podle ID nebo čísla dokladu"
+          placeholder="Hledat podle čísla dokladu, ID nebo SumUp kódu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
       </div>
