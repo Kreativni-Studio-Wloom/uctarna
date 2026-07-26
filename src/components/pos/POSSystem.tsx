@@ -1242,7 +1242,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           {/* Odložené nákupy */}
           {pendingPurchases.length > 0 && (
             <div>
-              <div className={`flex items-center gap-2 ${pendingPurchasesExpanded ? 'mb-4' : 'mb-0'}`}>
+              <div className={`flex items-center justify-between ${pendingPurchasesExpanded ? 'mb-4' : 'mb-0'}`}>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Odložené nákupy
+                </h3>
                 <button
                   type="button"
                   onClick={() => setPendingPurchasesExpanded((v) => !v)}
@@ -1257,16 +1260,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   >
                     <ChevronDown className="h-5 w-5" />
                   </motion.span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingPurchasesExpanded((v) => !v)}
-                  className="text-left text-lg font-semibold text-gray-900 dark:text-white hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-                >
-                  Odložené nákupy
-                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                    ({pendingPurchases.length})
-                  </span>
                 </button>
               </div>
               <motion.div
