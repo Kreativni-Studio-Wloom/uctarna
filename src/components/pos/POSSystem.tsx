@@ -76,6 +76,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [isReturnMode, setIsReturnMode] = useState(false);
   const [discount, setDiscount] = useState<{ type: 'percentage' | 'amount'; value: number } | null>(null);
   const [pendingPurchases, setPendingPurchases] = useState<PendingPurchase[]>([]);
+  const [pendingPurchasesExpanded, setPendingPurchasesExpanded] = useState(true);
   const [showPinnedManager, setShowPinnedManager] = useState(false);
   const pinnedProductIds = storeDoc?.pinnedProductIds ?? [];
   const [pinnedSearchTerm, setPinnedSearchTerm] = useState('');
@@ -1241,9 +1242,42 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           {/* Odložené nákupy */}
           {pendingPurchases.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Odložené nákupy
-              </h3>
+              <div className={`flex items-center gap-2 ${pendingPurchasesExpanded ? 'mb-4' : 'mb-0'}`}>
+                <button
+                  type="button"
+                  onClick={() => setPendingPurchasesExpanded((v) => !v)}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+                  aria-expanded={pendingPurchasesExpanded}
+                  aria-label={pendingPurchasesExpanded ? 'Skrýt odložené nákupy' : 'Zobrazit odložené nákupy'}
+                >
+                  <motion.span
+                    animate={{ rotate: pendingPurchasesExpanded ? 0 : -90 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center justify-center"
+                  >
+                    <ChevronDown className="h-5 w-5" />
+                  </motion.span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingPurchasesExpanded((v) => !v)}
+                  className="text-left text-lg font-semibold text-gray-900 dark:text-white hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                >
+                  Odložené nákupy
+                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                    ({pendingPurchases.length})
+                  </span>
+                </button>
+              </div>
+              <motion.div
+                initial={false}
+                animate={{
+                  height: pendingPurchasesExpanded ? 'auto' : 0,
+                  opacity: pendingPurchasesExpanded ? 1 : 0,
+                }}
+                transition={{ duration: 0.25, ease: 'easeInOut' }}
+                className="overflow-hidden"
+              >
               <div className="space-y-3">
                 {pendingPurchases.map((pending) => (
                   <motion.div
@@ -1317,6 +1351,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
                   </motion.div>
                 ))}
               </div>
+              </motion.div>
             </div>
           )}
 
