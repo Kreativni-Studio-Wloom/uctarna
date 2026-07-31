@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addDoc, collection, serverTimestamp, doc, updateDoc, increment, runTransaction } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { fetchSumUpTerminalTip } from '@/lib/sumup-server';
 
 // Funkce pro ukládání všech SumUp odpovědí do Firebase
@@ -231,7 +233,7 @@ export async function POST(request: NextRequest) {
         totalAmount: saleTotalAmount,
         paymentMethod: 'card',
         documentId: documentId || foreignTxId, // Použij documentId nebo fallback na foreignTxId
-        createdAt: serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         storeId,
         userId,
         customerName: customerName || null,
@@ -248,7 +250,7 @@ export async function POST(request: NextRequest) {
           sumUpTxCode: txCode,
           status: 'success',
           callbackReceived: true,
-          callbackTimestamp: new Date(),
+          callbackTimestamp: FieldValue.serverTimestamp(),
           sentToSumUp: Number.isFinite(sentToSumUp) ? sentToSumUp : null,
           terminalTip: terminalTip > 0 ? terminalTip : null,
           terminalTipSource: terminalLookup.source,
@@ -258,18 +260,17 @@ export async function POST(request: NextRequest) {
       };
 
       // Idempotence: prodej ukládáme pod deterministickým ID dokladu (documentId).
-      // Návrat ze SumUp může callback vyvolat vícekrát (původní okno + fallback na
-      // návratové stránce, více kanálů). Transakce zajistí, že se doklad vytvoří jen
-      // jednou – druhý (duplicitní) callback existující doklad najde a přeskočí.
+      // Admin SDK – transakce musí umět přečíst existující doklad (klientská pravidla
+      // bez auth read neumožňují, proto runTransaction přes web SDK selhával).
       const saleDocId = documentId || foreignTxId;
-      const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', saleDocId);
+      const saleRef = adminDb.doc(`users/${userId}/stores/${storeId}/sales/${saleDocId}`);
 
       console.log('💾 Ukládám prodej do databáze...', { storeId, userId, saleDocId, itemsCount: cartItems.length });
 
       let alreadyExists = false;
-      await runTransaction(db, async (tx) => {
+      await adminDb.runTransaction(async (tx) => {
         const existing = await tx.get(saleRef);
-        if (existing.exists()) {
+        if (existing.exists) {
           alreadyExists = true;
           return;
         }
@@ -298,10 +299,12 @@ export async function POST(request: NextRequest) {
         for (const item of cartItems) {
           try {
             console.log(`  - Produkt ${item.productId}: +${item.quantity} kusů`);
-            const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
-            await updateDoc(productRef, {
-              soldCount: increment(item.quantity),
-              updatedAt: serverTimestamp()
+            const productRef = adminDb.doc(
+              `users/${userId}/stores/${storeId}/products/${item.productId}`
+            );
+            await productRef.update({
+              soldCount: FieldValue.increment(item.quantity),
+              updatedAt: FieldValue.serverTimestamp(),
             });
             inventoryUpdated += 1;
           } catch (e) {
