@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
 import { motion } from 'framer-motion';
-import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette } from 'lucide-react';
+import { Settings, Euro, Save, Check, CreditCard, QrCode, Banknote, Store as StoreIcon, Palette, UserRound } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBrandColor } from '@/lib/colorScheme';
@@ -22,6 +22,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
   const [eurRate, setEurRate] = useState(25.0);
   const [redirectToSumUp, setRedirectToSumUp] = useState(true);
   const [tipsEnabled, setTipsEnabled] = useState(false);
+  const [customerNameEnabled, setCustomerNameEnabled] = useState(true);
   const [iban, setIban] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [ico, setIco] = useState<string>('');
@@ -43,6 +44,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
     }
     if (typeof storeDoc.tipsEnabled === 'boolean') {
       setTipsEnabled(storeDoc.tipsEnabled);
+    }
+    if (typeof storeDoc.customerNameEnabled === 'boolean') {
+      setCustomerNameEnabled(storeDoc.customerNameEnabled);
+    } else {
+      setCustomerNameEnabled(true);
     }
     if (typeof storeDoc.iban === 'string') {
       setIban(storeDoc.iban);
@@ -80,6 +86,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         eurRate,
         redirectToSumUp,
         tipsEnabled,
+        customerNameEnabled,
         iban: iban.trim(),
         companyName: companyName.trim(),
         ico: ico.trim(),
@@ -373,6 +380,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               </label>
             </div>
           </motion.div>
+
+          {storeDoc?.type === 'bistro' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.09 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+            >
+              <div className="flex items-start mb-4">
+                <div className="w-12 h-12 shrink-0 bg-violet-100 dark:bg-violet-900/20 rounded-lg flex items-center justify-center mr-4">
+                  <UserRound className="h-6 w-6 text-violet-600" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Jméno u objednávky
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Volitelné jméno zákazníka při placení — zobrazí se u dokladu a ve výdeji.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                    Jméno v checkoutu
+                  </div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {customerNameEnabled
+                      ? 'V checkoutu se zobrazí pole pro jméno zákazníka.'
+                      : 'Checkout zůstane bez pole pro jméno.'}
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={customerNameEnabled}
+                    onChange={(e) => setCustomerNameEnabled(e.target.checked)}
+                    aria-label="Zapnout jméno u objednávky v pokladně"
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+              </div>
+            </motion.div>
+          )}
 
           {/* QR Payment Setting */}
           <motion.div

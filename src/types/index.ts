@@ -32,6 +32,8 @@ export interface Store {
   pinnedProductIds?: string[];
   /** Zapnuté zadávání spropitného v checkoutu (přičte se k úhradě, uloží se na doklad). */
   tipsEnabled?: boolean;
+  /** Jméno zákazníka u objednávky v checkoutu (typicky bistro). Vypnuté = pole se nezobrazí. */
+  customerNameEnabled?: boolean;
   iban?: string; // IBAN pro platby QR kódem (SPAYD)
   /** Barevné schéma designu prodejny — legacy preset ID. */
   colorScheme?: ColorSchemeId;

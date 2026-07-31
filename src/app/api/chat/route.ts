@@ -826,6 +826,13 @@ const SETTING_DEFINITIONS: SettingDefinition[] = [
     aliases: ['tipsEnabled', 'tips'],
   },
   {
+    field: 'customerNameEnabled',
+    target: 'store',
+    type: 'boolean',
+    label: 'Customer name on order',
+    aliases: ['customerNameEnabled', 'orderCustomerName', 'customer_name_enabled'],
+  },
+  {
     field: 'iban',
     target: 'store',
     type: 'string',

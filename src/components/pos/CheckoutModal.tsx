@@ -96,6 +96,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const canProceedWithCard = !requiresSumUpRedirect || sumUpAffiliateKeyConfigured;
   const hasIban = Boolean(iban && iban.trim().length > 0);
   const canUseQr = !isRefund && displayCurrency === 'CZK' && paymentMethod !== 'card' ? hasIban : hasIban && !isRefund; // guard; UI also checks
+  const customerNameEnabled = storeDoc?.customerNameEnabled !== false;
+  const collectCustomerName = storeType === 'bistro' && customerNameEnabled;
 
   // Nastavení prodejny sdílená z StoreContext (bez duplicitního Firestore listeneru).
   useEffect(() => {
@@ -129,6 +131,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (!tipsEnabled) setTipInput('');
   }, [tipsEnabled]);
+
+  useEffect(() => {
+    if (!collectCustomerName) setCustomerName('');
+  }, [collectCustomerName]);
 
   useEffect(() => {
     setTipInput('');
@@ -241,7 +247,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           createdAt: serverTimestamp(),
           storeId,
           userId: user.uid,
-          customerName: storeType === 'bistro' ? (customerName || null) : null,
+          customerName: collectCustomerName ? (customerName || null) : null,
           isRefund,
           refundAmount: isRefund ? refundAmount : null,
           paidAmount: null,
@@ -293,7 +299,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           discountAmount: discountAmount || 0,
           finalAmount: actualTotalAmount,
           tipAmount: tipAmountKč > 0 ? tipAmountKč : 0,
-          customerName: storeType === 'bistro' ? (customerName || null) : null
+          customerName: collectCustomerName ? (customerName || null) : null
         }));
         
         const paymentParams: SumUpPaymentParams = {
@@ -329,7 +335,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         createdAt: serverTimestamp(),
         storeId,
         userId: user.uid,
-        customerName: storeType === 'bistro' ? (customerName || null) : null,
+        customerName: collectCustomerName ? (customerName || null) : null,
         isRefund, // Přidáno pole pro identifikaci vratky
         refundAmount: isRefund ? refundAmount : null, // Přidáno pole pro částku vratky
         // Informace o vrácení při platbě v eurech
@@ -606,7 +612,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </h3>
 
             {/* Jméno zákazníka - pouze pro bistro */}
-            {storeType === 'bistro' && (
+            {collectCustomerName && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Jméno
