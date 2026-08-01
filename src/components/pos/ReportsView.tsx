@@ -9,7 +9,7 @@ import { cs } from 'date-fns/locale';
 import { Sale, Product } from '@/types';
 import { saleTipInCzk } from '@/lib/saleTip';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode } from 'lucide-react';
+import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode, Package } from 'lucide-react';
 import { generateEmailContent, EmailReportData, buildEmailReportData } from '@/lib/email';
 import { useStore } from '@/contexts/StoreContext';
 
@@ -263,15 +263,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       }, 0);
     const customerCount = filteredSales.length;
 
-    // Výpočet celkových nákladů a zisku
+    // Výpočet celkových nákladů, zisku a prodaných kusů
     let totalCosts = 0;
     let totalProfit = 0;
+    let totalItemsSold = 0;
 
     // Vytvoření mapy produktů pro rychlé vyhledávání
     const productMap = new Map(products.map(p => [p.id, p]));
 
     filteredSales.forEach(sale => {
       sale.items?.forEach(item => {
+        totalItemsSold += item.quantity;
         // Přednostně použij nákupní cenu zafixovanou v okamžiku prodeje;
         // u starších prodejů (bez item.cost) padni zpět na aktuální cenu z katalogu.
         const lockedCost = typeof item.cost === 'number' ? item.cost : undefined;
@@ -308,6 +310,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       totalDiscounts, // Celkové slevy
       salesWithDiscount, // Počet prodejů se slevou
       totalTips,
+      totalItemsSold,
       sales: filteredSales,
     };
   };
@@ -892,6 +895,27 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </p>
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.customerCount}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.47 }}
+          className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4"
+        >
+          <div className="flex items-center">
+            <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/20 rounded-lg flex items-center justify-center mr-3">
+              <Package className="h-5 w-5 text-cyan-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                Položky
+              </p>
+              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+                {reportData.totalItemsSold.toLocaleString('cs-CZ')} ks
               </p>
             </div>
           </div>

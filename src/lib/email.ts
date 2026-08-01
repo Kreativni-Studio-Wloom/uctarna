@@ -28,6 +28,7 @@ export interface EmailReportData {
   numCashSales: number;
   numCardSales: number;
   numQrSales: number;
+  totalItemsSold: number;
   productSummary: ProductSummaryRow[];
 }
 
@@ -97,12 +98,19 @@ export function buildEmailReportData(
     });
   });
 
+  const totalItemsSold = sales.reduce(
+    (sum, sale) =>
+      sum + (sale.items?.reduce((itemSum, item) => itemSum + item.quantity, 0) ?? 0),
+    0
+  );
+
   return {
     ...meta,
     ...totals,
     numCashSales: sales.filter((sale) => sale.paymentMethod === 'cash').length,
     numCardSales: sales.filter((sale) => sale.paymentMethod === 'card').length,
     numQrSales: sales.filter((sale) => sale.paymentMethod === 'qr').length,
+    totalItemsSold,
     productSummary: Array.from(summaryMap.values()).sort((a, b) => b.totalPrice - a.totalPrice),
   };
 }
@@ -200,18 +208,24 @@ export function generateEmailContent(reportData: EmailReportData, actionName?: s
                   <div style="font-size:14px; color:#666;">Počet zákazníků</div>
                 </td>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+                  <div style="font-size:24px; font-weight:bold; color:#17a2b8; margin-bottom:5px;">${reportData.totalItemsSold.toLocaleString('cs-CZ')}</div>
+                  <div style="font-size:14px; color:#666;">Položky (ks)</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#6f42c1; margin-bottom:5px;">${reportData.cardSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">Karty</div>
                   <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numCardSales} prodejů</div>
                 </td>
-              </tr>
-              <tr>
                 <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
                   <div style="font-size:24px; font-weight:bold; color:#ffc107; margin-bottom:5px;">${reportData.cashSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">Hotovost</div>
                   <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numCashSales} prodejů</div>
                 </td>
-                <td style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center; width:50%;">
+              </tr>
+              <tr>
+                <td colspan="2" style="background:#f8f9fa; padding:15px; border:1px solid #e9ecef; text-align:center;">
                   <div style="font-size:24px; font-weight:bold; color:#0d6efd; margin-bottom:5px;">${reportData.qrSales.toLocaleString('cs-CZ')} Kč</div>
                   <div style="font-size:14px; color:#666;">QR kód</div>
                   <div style="font-size:12px; color:#666; margin-top:5px;">${reportData.numQrSales} prodejů</div>
@@ -255,6 +269,7 @@ export function generateEmailContent(reportData: EmailReportData, actionName?: s
               <p><strong>Spropitné:</strong> ${(reportData.totalTips ?? 0).toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Eura (vybrané):</strong> ${reportData.salesInEUR.toFixed(2)} €</p>
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
+              <p><strong>Prodané položky celkem:</strong> ${reportData.totalItemsSold.toLocaleString('cs-CZ')} ks</p>
               <p><strong>Počet různých produktů:</strong> ${uniqueProductCount}</p>
             </div>
           </div>
@@ -281,6 +296,7 @@ Období: ${periodLabel}
 - Eura (vybrané): ${reportData.salesInEUR.toFixed(2)} €
 - Koruny (po vrácení): ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč
 - Zákazníci: ${reportData.customerCount}
+- Položky (ks): ${reportData.totalItemsSold.toLocaleString('cs-CZ')}
 - Slevy: ${(reportData.totalDiscounts || 0).toLocaleString('cs-CZ')} Kč (${reportData.salesWithDiscount || 0} prodejů)
 - Počet různých produktů: ${uniqueProductCount}
 
