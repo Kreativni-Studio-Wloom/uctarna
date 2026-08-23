@@ -180,7 +180,10 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [daySales, setDaySales] = useState<Sale[]>([]);
   const [dayLoading, setDayLoading] = useState(false);
   const [generatingDayPdf, setGeneratingDayPdf] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const isSearchMode = debouncedSearch.length > 0;
   const isDayMode = !isSearchMode && filterDate !== null;
@@ -195,6 +198,34 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuDropdownRef.current?.contains(target)) return;
+      setShowMenu(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowMenu(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showMenu]);
 
   // Běžný režim: načítat vždy jen jednu stránku (12 dokladů).
   useEffect(() => {
@@ -501,16 +532,99 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Doklady
         </h2>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          {isSearchMode
-            ? searchLoading
-              ? 'Načítám doklady pro vyhledávání…'
-              : `${searchResults.length} nalezených dokladů`
-            : isDayMode
-              ? dayLoading
-                ? 'Načítám doklady za den…'
-                : `${daySales.length} dokladů za den`
-              : `Strana ${currentPage}${displaySales.length > 0 ? ` · ${displaySales.length} dokladů` : ''}`}
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="hidden sm:block text-sm text-gray-500 dark:text-gray-400">
+            {isSearchMode
+              ? searchLoading
+                ? 'Načítám doklady pro vyhledávání…'
+                : `${searchResults.length} nalezených dokladů`
+              : isDayMode
+                ? dayLoading
+                  ? 'Načítám doklady za den…'
+                  : `${daySales.length} dokladů za den`
+                : `Strana ${currentPage}${displaySales.length > 0 ? ` · ${displaySales.length} dokladů` : ''}`}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMenu((visible) => !visible)}
+              ref={menuButtonRef}
+              aria-expanded={showMenu}
+              aria-haspopup="menu"
+              aria-label="Menu dokladů"
+              className="w-10 h-10 md:w-auto md:px-3 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 active:bg-gray-100 dark:active:bg-gray-600 transition-colors flex items-center justify-center md:gap-2 text-gray-600 dark:text-gray-300 text-sm"
+            >
+              <svg className="h-4 w-4 md:h-5 md:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <span className="hidden md:inline">Menu</span>
+            </button>
+
+            {showMenu && (
+              <div
+                ref={menuDropdownRef}
+                role="menu"
+                className="absolute top-full right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50"
+              >
+                <div className="p-4">
+                  <label htmlFor="receipts-day-filter" className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <Calendar className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                    Doklady za den
+                  </label>
+                  <input
+                    id="receipts-day-filter"
+                    type="date"
+                    value={filterDate ? format(filterDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFilterDate(value ? new Date(`${value}T00:00:00`) : null);
+                      setCurrentPage(1);
+                    }}
+                    disabled={isSearchMode}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+
+                  {isDayMode && (
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      {format(filterDate as Date, 'EEEE, d. MMMM yyyy', { locale: cs })}
+                    </p>
+                  )}
+
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-1">
+                    <button
+                      type="button"
+                      onClick={handleDownloadDayReport}
+                      disabled={!isDayMode || dayLoading || generatingDayPdf || daySales.length === 0}
+                      className="w-full text-left px-3 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    >
+                      <span className="w-8 flex items-center justify-center flex-shrink-0">
+                        {generatingDayPdf ? (
+                          <Loader2 className="h-5 w-5 text-brand-600 dark:text-brand-400 animate-spin" />
+                        ) : (
+                          <Download className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+                        )}
+                      </span>
+                      <span>{generatingDayPdf ? 'Generuji PDF…' : 'Stáhnout seznam dokladů (PDF)'}</span>
+                    </button>
+
+                    {isDayMode && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterDate(null)}
+                        className="w-full text-left px-3 py-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center text-sm"
+                      >
+                        <span className="w-8 flex items-center justify-center flex-shrink-0">
+                          <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                        </span>
+                        <span>Zrušit filtr dne</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -521,62 +635,6 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           placeholder="Hledat podle čísla dokladu, ID nebo SumUp kódu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
-      </div>
-
-      {/* Filtr podle dne + stažení souhrnného PDF */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Doklady za den
-              </label>
-              <input
-                type="date"
-                value={filterDate ? format(filterDate, 'yyyy-MM-dd') : ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setFilterDate(value ? new Date(`${value}T00:00:00`) : null);
-                  setCurrentPage(1);
-                }}
-                disabled={isSearchMode}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-            </div>
-            {isDayMode && (
-              <button
-                onClick={() => setFilterDate(null)}
-                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <X className="h-4 w-4 mr-1" />
-                Zrušit filtr
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={handleDownloadDayReport}
-            disabled={!isDayMode || dayLoading || generatingDayPdf || daySales.length === 0}
-            className="inline-flex items-center justify-center px-4 py-2.5 bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {generatingDayPdf ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generuji PDF…
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Stáhnout seznam dokladů (PDF)
-              </>
-            )}
-          </button>
-        </div>
-        {isDayMode && (
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {format(filterDate as Date, 'EEEE, d. MMMM yyyy', { locale: cs })}
-          </p>
-        )}
       </div>
 
       {(searchLoading && isSearchMode) || (dayLoading && isDayMode) ? (

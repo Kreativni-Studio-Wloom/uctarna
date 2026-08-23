@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sale } from '@/types';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { CheckCircle2, Timer, Clock } from 'lucide-react';
+import { CheckCircle2, Timer, Clock, ArrowDown, ArrowUp } from 'lucide-react';
 
 interface DispatchViewProps {
 	storeId: string;
@@ -15,6 +15,7 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 	const [loading, setLoading] = useState(true);
 	const [updatingId, setUpdatingId] = useState<string | null>(null);
 	const [bulkAction, setBulkAction] = useState<'prepare' | 'serve' | null>(null);
+	const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
 
 	useEffect(() => {
 		if (!user || !storeId) return;
@@ -116,6 +117,8 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 		);
 	}
 
+	const visibleOrders = sortOrder === 'oldest' ? orders : [...orders].reverse();
+
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
@@ -127,23 +130,58 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 			</div>
 
 			{orders.length > 0 && (
-				<div className="flex flex-wrap gap-3">
-					<button
-						onClick={markAllPrepared}
-						disabled={bulkAction !== null || orders.every((o) => o.prepared || o.served)}
-						className="inline-flex items-center justify-center bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div className="flex flex-wrap gap-3">
+						<button
+							onClick={markAllPrepared}
+							disabled={bulkAction !== null || orders.every((o) => o.prepared || o.served)}
+							className="inline-flex items-center justify-center bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+						>
+							<Clock className="h-5 w-5 mr-2" />
+							{bulkAction === 'prepare' ? 'Připravuji vše...' : 'Připravit vše'}
+						</button>
+						<button
+							onClick={markAllServed}
+							disabled={bulkAction !== null || orders.every((o) => o.served)}
+							className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+						>
+							<CheckCircle2 className="h-5 w-5 mr-2" />
+							{bulkAction === 'serve' ? 'Vydávám vše...' : 'Vydat vše'}
+						</button>
+					</div>
+
+					<div
+						className="inline-flex self-start sm:self-auto items-center rounded-xl bg-gray-100 dark:bg-gray-900/60 p-1 border border-gray-200 dark:border-gray-700"
+						role="group"
+						aria-label="Řazení objednávek"
 					>
-						<Clock className="h-5 w-5 mr-2" />
-						{bulkAction === 'prepare' ? 'Připravuji vše...' : 'Připravit vše'}
-					</button>
-					<button
-						onClick={markAllServed}
-						disabled={bulkAction !== null || orders.every((o) => o.served)}
-						className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
-					>
-						<CheckCircle2 className="h-5 w-5 mr-2" />
-						{bulkAction === 'serve' ? 'Vydávám vše...' : 'Vydat vše'}
-					</button>
+						<button
+							type="button"
+							onClick={() => setSortOrder('oldest')}
+							aria-pressed={sortOrder === 'oldest'}
+							className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+								sortOrder === 'oldest'
+									? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm'
+									: 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+							}`}
+						>
+							<ArrowUp className="h-4 w-4" />
+							Nejstarší
+						</button>
+						<button
+							type="button"
+							onClick={() => setSortOrder('newest')}
+							aria-pressed={sortOrder === 'newest'}
+							className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+								sortOrder === 'newest'
+									? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm'
+									: 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+							}`}
+						>
+							<ArrowDown className="h-4 w-4" />
+							Nejnovější
+						</button>
+					</div>
 				</div>
 			)}
 
@@ -155,7 +193,7 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 				</div>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{orders.map((order) => {
+					{visibleOrders.map((order) => {
 						const isPrepared = order.prepared && !order.served;
 						const isWaiting = !order.prepared && !order.served;
 						
