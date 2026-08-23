@@ -130,28 +130,32 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 			</div>
 
 			{orders.length > 0 && (
-				<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-					<div className="flex flex-wrap gap-3">
+				<div className="grid grid-cols-2 items-stretch gap-2 sm:flex sm:items-center sm:justify-between sm:gap-4">
+					<div className="grid min-w-0 grid-cols-2 gap-2 sm:flex sm:gap-3">
 						<button
 							onClick={markAllPrepared}
 							disabled={bulkAction !== null || orders.every((o) => o.prepared || o.served)}
-							className="inline-flex items-center justify-center bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+							aria-label={bulkAction === 'prepare' ? 'Připravuji všechny objednávky' : 'Připravit všechny objednávky'}
+							className="inline-flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl bg-orange-600 px-1 py-2 text-xs font-medium text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 sm:h-auto sm:flex-row sm:gap-0 sm:rounded-lg sm:px-4 sm:py-2.5 sm:text-base"
 						>
-							<Clock className="h-5 w-5 mr-2" />
-							{bulkAction === 'prepare' ? 'Připravuji vše...' : 'Připravit vše'}
+							<Clock className="h-5 w-5 flex-shrink-0 sm:mr-2" />
+							<span className="sm:hidden">{bulkAction === 'prepare' ? 'Pracuji…' : 'Připravit'}</span>
+							<span className="hidden sm:inline">{bulkAction === 'prepare' ? 'Připravuji vše...' : 'Připravit vše'}</span>
 						</button>
 						<button
 							onClick={markAllServed}
 							disabled={bulkAction !== null || orders.every((o) => o.served)}
-							className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
+							aria-label={bulkAction === 'serve' ? 'Vydávám všechny objednávky' : 'Vydat všechny objednávky'}
+							className="inline-flex h-16 min-w-0 flex-col items-center justify-center gap-1 rounded-xl bg-green-600 px-1 py-2 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300 sm:h-auto sm:flex-row sm:gap-0 sm:rounded-lg sm:px-4 sm:py-2.5 sm:text-base"
 						>
-							<CheckCircle2 className="h-5 w-5 mr-2" />
-							{bulkAction === 'serve' ? 'Vydávám vše...' : 'Vydat vše'}
+							<CheckCircle2 className="h-5 w-5 flex-shrink-0 sm:mr-2" />
+							<span className="sm:hidden">{bulkAction === 'serve' ? 'Pracuji…' : 'Vydat'}</span>
+							<span className="hidden sm:inline">{bulkAction === 'serve' ? 'Vydávám vše...' : 'Vydat vše'}</span>
 						</button>
 					</div>
 
 					<div
-						className="inline-flex self-start sm:self-auto items-center rounded-xl bg-gray-100 dark:bg-gray-900/60 p-1 border border-gray-200 dark:border-gray-700"
+						className="grid min-w-0 grid-cols-2 items-stretch rounded-xl border border-gray-200 bg-gray-100 p-1 dark:border-gray-700 dark:bg-gray-900/60 sm:inline-flex sm:self-auto sm:items-center"
 						role="group"
 						aria-label="Řazení objednávek"
 					>
@@ -159,27 +163,29 @@ export const DispatchView: React.FC<DispatchViewProps> = ({ storeId }) => {
 							type="button"
 							onClick={() => setSortOrder('oldest')}
 							aria-pressed={sortOrder === 'oldest'}
-							className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+							className={`inline-flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-all sm:h-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm ${
 								sortOrder === 'oldest'
 									? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm'
 									: 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
 							}`}
 						>
 							<ArrowUp className="h-4 w-4" />
-							Nejstarší
+							<span className="sm:hidden">Starší</span>
+							<span className="hidden sm:inline">Nejstarší</span>
 						</button>
 						<button
 							type="button"
 							onClick={() => setSortOrder('newest')}
 							aria-pressed={sortOrder === 'newest'}
-							className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+							className={`inline-flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-xs font-medium transition-all sm:h-auto sm:flex-row sm:gap-1.5 sm:px-3 sm:py-2 sm:text-sm ${
 								sortOrder === 'newest'
 									? 'bg-white dark:bg-gray-700 text-brand-600 dark:text-brand-400 shadow-sm'
 									: 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
 							}`}
 						>
 							<ArrowDown className="h-4 w-4" />
-							Nejnovější
+							<span className="sm:hidden">Novější</span>
+							<span className="hidden sm:inline">Nejnovější</span>
 						</button>
 					</div>
 				</div>

@@ -565,9 +565,9 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
               <div
                 ref={menuDropdownRef}
                 role="menu"
-                className="absolute top-full right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50"
+                className="absolute top-full right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50"
               >
-                <div className="p-4">
+                <div className="min-w-0 p-4">
                   <label htmlFor="receipts-day-filter" className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     <Calendar className="h-5 w-5 text-brand-600 dark:text-brand-400" />
                     Doklady za den
@@ -582,7 +582,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       setCurrentPage(1);
                     }}
                     disabled={isSearchMode}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="receipts-day-input block w-full min-w-0 max-w-full box-border px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   />
 
                   {isDayMode && (
