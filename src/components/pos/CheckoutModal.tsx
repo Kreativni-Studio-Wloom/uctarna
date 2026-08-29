@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CreditCard, DollarSign, Euro, Calculator, QrCode } from 'lucide-react';
+import { X, CreditCard, DollarSign, Euro, Calculator, QrCode, Maximize2 } from 'lucide-react';
 import { CartItem } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
@@ -53,6 +53,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [iban, setIban] = useState<string>('');
   const [qrDocumentId, setQrDocumentId] = useState<string>(''); // 10 chars (existing format)
   const [qrVariableSymbol, setQrVariableSymbol] = useState<string>(''); // numeric only
+  const [qrFullscreen, setQrFullscreen] = useState(false);
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   const baseAmount = finalAmount !== undefined ? finalAmount : totalAmount;
@@ -198,6 +199,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setQrVariableSymbol(digits);
     }
   }, [paymentMethod, qrDocumentId, qrVariableSymbol]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'qr') setQrFullscreen(false);
+  }, [paymentMethod]);
+
+  useEffect(() => {
+    if (!qrFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setQrFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [qrFullscreen]);
 
   const normalizeIban = (value: string) => value.replace(/\s+/g, '').toUpperCase();
   const normalizeSpaydMsg = (value: string) => {
@@ -385,7 +402,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-        onClick={onClose}
+        onClick={() => {
+          if (qrFullscreen) {
+            setQrFullscreen(false);
+            return;
+          }
+          onClose();
+        }}
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -587,9 +610,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </h4>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex items-center justify-center">
-                  <QRCode value={getSpaydString()} size={220} />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setQrFullscreen(true)}
+                  className="group relative w-full bg-white p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex flex-col items-center justify-center transition-all duration-200 hover:border-brand-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                  aria-label="Zvětšit QR kód na celou obrazovku"
+                >
+                  <QRCode
+                    value={getSpaydString()}
+                    size={220}
+                    style={{ height: 'auto', maxWidth: '220px', width: '100%' }}
+                    viewBox="0 0 256 256"
+                  />
+                  <span className="absolute top-3 right-3 w-9 h-9 rounded-lg bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-brand-700 opacity-90 group-hover:opacity-100 group-hover:bg-brand-50 transition-all">
+                    <Maximize2 className="h-4 w-4" />
+                  </span>
+                  <span className="mt-3 text-sm text-gray-500 group-hover:text-brand-700 transition-colors">
+                    Klepněte pro zvětšení
+                  </span>
+                </button>
 
                 <div className="mt-4">
                   <motion.button
@@ -819,6 +858,91 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
         </motion.div>
+
+        <AnimatePresence>
+          {qrFullscreen && paymentMethod === 'qr' && hasIban && !isRefund && (
+            <motion.div
+              key="qr-fullscreen"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-[80] flex flex-col bg-gray-950/90 backdrop-blur-sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQrFullscreen(false);
+              }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="QR kód na celou obrazovku"
+            >
+              <div className="flex items-center justify-between px-5 py-4 shrink-0">
+                <div className="flex items-center min-w-0">
+                  <div className="w-9 h-9 bg-brand-500/20 rounded-lg flex items-center justify-center mr-3">
+                    <QrCode className="h-5 w-5 text-brand-300" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white font-semibold truncate">Platba QR kódem</p>
+                    <p className="text-sm text-gray-400 truncate">
+                      {actualTotalAmount.toLocaleString('cs-CZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Kč
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setQrFullscreen(false);
+                  }}
+                  className="w-11 h-11 text-white/90 hover:text-white transition-colors rounded-xl hover:bg-white/10 flex items-center justify-center"
+                  aria-label="Zavřít zvětšený QR kód"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center px-4 min-h-0">
+                <motion.div
+                  initial={{ scale: 0.92, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.96, opacity: 0 }}
+                  transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+                  className="bg-white rounded-3xl p-5 sm:p-8 shadow-2xl flex items-center justify-center"
+                  style={{
+                    width: 'min(92vw, calc(100dvh - 12rem))',
+                    height: 'min(92vw, calc(100dvh - 12rem))',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <QRCode
+                    value={getSpaydString()}
+                    size={512}
+                    style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
+                    viewBox="0 0 256 256"
+                  />
+                </motion.div>
+              </div>
+
+              <div
+                className="shrink-0 px-5 pb-6 pt-3 space-y-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="text-center text-sm text-gray-400">
+                  Namiřte fotoaparát bankovní aplikace na kód
+                </p>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handlePayment}
+                  disabled={loading}
+                  className="w-full max-w-lg mx-auto block bg-gradient-to-r from-brand-500 to-brand-700 text-white px-4 py-3.5 rounded-xl font-medium hover:from-brand-600 hover:to-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-400 focus:ring-offset-2 focus:ring-offset-gray-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  {loading ? 'Zpracování...' : 'Dokončit prodej'}
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
