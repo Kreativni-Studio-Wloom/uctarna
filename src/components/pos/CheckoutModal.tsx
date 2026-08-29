@@ -613,19 +613,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setQrFullscreen(true)}
-                  className="group relative w-full bg-white p-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex flex-col items-center justify-center transition-all duration-200 hover:border-brand-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                  className="group relative w-full bg-white px-4 py-4 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex flex-col items-center gap-3 transition-all duration-200 hover:border-brand-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                   aria-label="Zvětšit QR kód na celou obrazovku"
                 >
                   <QRCode
                     value={getSpaydString()}
                     size={220}
-                    style={{ height: 'auto', maxWidth: '220px', width: '100%' }}
+                    className="block"
+                    style={{ display: 'block', height: 'auto', maxWidth: '220px', width: '100%' }}
                     viewBox="0 0 256 256"
                   />
-                  <span className="absolute top-3 right-3 w-9 h-9 rounded-lg bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-brand-700 opacity-90 group-hover:opacity-100 group-hover:bg-brand-50 transition-all">
+                  <span className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-brand-700 opacity-90 group-hover:opacity-100 group-hover:bg-brand-50 transition-all">
                     <Maximize2 className="h-4 w-4" />
                   </span>
-                  <span className="mt-3 text-sm text-gray-500 group-hover:text-brand-700 transition-colors">
+                  <span className="text-sm leading-none text-gray-500 group-hover:text-brand-700 transition-colors">
                     Klepněte pro zvětšení
                   </span>
                 </button>
