@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CreditCard, DollarSign, Euro, Calculator, QrCode, Maximize2 } from 'lucide-react';
+import { X, CreditCard, DollarSign, Euro, Calculator, QrCode } from 'lucide-react';
 import { CartItem } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
@@ -623,9 +623,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     style={{ display: 'block', height: 'auto', maxWidth: '220px', width: '100%' }}
                     viewBox="0 0 256 256"
                   />
-                  <span className="absolute top-4 right-4 w-9 h-9 rounded-lg bg-white/90 border border-gray-200 shadow-sm flex items-center justify-center text-brand-700 opacity-90 group-hover:opacity-100 group-hover:bg-brand-50 transition-all">
-                    <Maximize2 className="h-4 w-4" />
-                  </span>
                   <span className="text-sm leading-none text-gray-500 group-hover:text-brand-700 transition-colors">
                     Klepněte pro zvětšení
                   </span>
