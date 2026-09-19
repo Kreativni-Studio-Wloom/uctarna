@@ -3,13 +3,18 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
+import { getCanonicalSiteUrl } from '@/lib/site'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getCanonicalSiteUrl()),
   title: 'Účtárna - Profesionální prodejní systém',
   description: 'Moderní online prodejní systém s Firebase a SumUp integrací',
   manifest: '/manifest.json',
+  alternates: {
+    canonical: '/',
+  },
   icons: {
     icon: [
       { url: '/favicon.svg', type: 'image/svg+xml' },

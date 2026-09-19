@@ -74,6 +74,38 @@ vercel --prod
 - ✅ Serverless funkce
 - ✅ Edge runtime
 
+## 🌍 Obě domény: uctarna.vercel.app + uctarna.eu
+
+Aplikace je origin-agnostic (SumUp callbacky a redirecty berou aktuální `window.location.origin` / request origin). V kódu není pevně zadrátovaná jedna webová doména.
+
+### 1) Vercel → Project → Settings → Domains
+Přidejte:
+- `uctarna.eu`
+- `www.uctarna.eu` (volitelně s redirectem na apex)
+
+`*.vercel.app` je vždy k dispozici automaticky.
+
+### 2) DNS u registrátora (aktuálně Wedos)
+Podle instrukcí ve Vercel Domains typicky:
+- **A** `uctarna.eu` → IP, které ukáže Vercel (nebo jejich doporučený záznam)
+- **CNAME** `www` → `cname.vercel-dns.com`
+
+Dokud A záznam míří na Wedos (`185.8.237.22`), na `uctarna.eu` nepoběží Vercel deployment.
+
+### 3) Firebase → Authentication → Settings → Authorized domains
+Přidejte:
+- `uctarna.vercel.app`
+- `uctarna.eu`
+- `www.uctarna.eu`
+- `localhost` (pro vývoj)
+
+Bez toho Firebase Auth na nové doméně odmítne přihlášení.
+
+### 4) Environment na Vercelu
+Nastavte `NEXT_PUBLIC_SITE_URL=https://uctarna.eu` (kanonická URL pro metadata/SEO). Runtime i tak funguje na obou hostitelích.
+
+**Poznámka:** přihlášení na `uctarna.vercel.app` a na `uctarna.eu` se nesdílí (různé origins / localStorage).
+
 ## 🏠 Deployment na Wedos
 
 ### ⚠️ Důležité upozornění
