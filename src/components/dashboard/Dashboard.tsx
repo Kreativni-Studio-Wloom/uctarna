@@ -26,6 +26,7 @@ export const Dashboard: React.FC = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [storeToDuplicate, setStoreToDuplicate] = useState<Store | null>(null);
   const [duplicating, setDuplicating] = useState(false);
+  const [copySalesHistory, setCopySalesHistory] = useState(false);
   const userMenuContainerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -173,7 +174,15 @@ export const Dashboard: React.FC = () => {
 
   const handleDuplicateStore = (store: Store) => {
     setStoreToDuplicate(store);
+    setCopySalesHistory(false);
     setShowDuplicateModal(true);
+  };
+
+  const closeDuplicateModal = () => {
+    if (duplicating) return;
+    setShowDuplicateModal(false);
+    setStoreToDuplicate(null);
+    setCopySalesHistory(false);
   };
 
   const duplicateStore = async () => {
@@ -181,81 +190,92 @@ export const Dashboard: React.FC = () => {
 
     setDuplicating(true);
     try {
-      const batch = writeBatch(db);
-      
-      // Vytvořit novou prodejnu s názvem "Název 2"
-      const newStoreName = `${storeToDuplicate.name} 2`;
+      const sourceStoreRef = doc(db, 'users', user.uid, 'stores', storeToDuplicate.id);
+      const productsRef = collection(db, 'users', user.uid, 'stores', storeToDuplicate.id, 'products');
+      const [storeSnap, productsSnapshot, salesSnapshot] = await Promise.all([
+        getDoc(sourceStoreRef),
+        getDocs(productsRef),
+        copySalesHistory
+          ? getDocs(collection(db, 'users', user.uid, 'stores', storeToDuplicate.id, 'sales'))
+          : Promise.resolve(null),
+      ]);
+
+      const storeData = storeSnap.exists() ? storeSnap.data() : {};
       const newStoreRef = doc(collection(db, 'users', user.uid, 'stores'));
-      
-      const newStore = {
-        name: newStoreName,
-        type: storeToDuplicate.type,
-        companyName: storeToDuplicate.companyName || '',
-        ico: storeToDuplicate.ico || '',
-        companyAddress: storeToDuplicate.companyAddress || '',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        isActive: true,
-        eurRate: 25.0, // Výchozí kurz EUR
-      };
-      
-      batch.set(newStoreRef, newStore);
-      
-      // Získat všechny produkty z původní prodejny
-      const productsQuery = query(
-        collection(db, 'users', user.uid, 'stores', storeToDuplicate.id, 'products')
-      );
-      const productsSnapshot = await getDocs(productsQuery);
-      
-      // Duplikovat produkty
+      const productIdMap = new Map<string, string>();
+
+      const writes: Array<{ ref: ReturnType<typeof doc>; data: Record<string, unknown> }> = [];
+
       productsSnapshot.forEach((productDoc) => {
         const productData = productDoc.data();
         const newProductRef = doc(collection(db, 'users', user.uid, 'stores', newStoreRef.id, 'products'));
-        
-        const newProduct = {
-          ...productData,
-          soldCount: 0, // Resetovat počet prodaných kusů
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        };
-        
-        batch.set(newProductRef, newProduct);
+        productIdMap.set(productDoc.id, newProductRef.id);
+        writes.push({
+          ref: newProductRef,
+          data: {
+            ...productData,
+            soldCount: copySalesHistory ? (productData.soldCount ?? 0) : 0,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          },
+        });
       });
-      
-      // Získat všechny prodeje z původní prodejny
-      const salesQuery = query(
-        collection(db, 'users', user.uid, 'stores', storeToDuplicate.id, 'sales')
-      );
-      const salesSnapshot = await getDocs(salesQuery);
-      
-      // Duplikovat prodeje
-      salesSnapshot.forEach((saleDoc) => {
+
+      const newStoreData: Record<string, unknown> = {
+        ...storeData,
+        name: `${storeToDuplicate.name} 2`,
+        type: storeData.type || storeToDuplicate.type || 'prodejna',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isActive: true,
+      };
+
+      if (Array.isArray(storeData.pinnedProductIds)) {
+        newStoreData.pinnedProductIds = storeData.pinnedProductIds
+          .map((id: string) => productIdMap.get(id))
+          .filter((id): id is string => Boolean(id));
+      }
+
+      writes.unshift({
+        ref: newStoreRef,
+        data: newStoreData,
+      });
+
+      salesSnapshot?.forEach((saleDoc) => {
         const saleData = saleDoc.data();
         const newSaleRef = doc(collection(db, 'users', user.uid, 'stores', newStoreRef.id, 'sales'));
-        
-        const newSale = {
-          ...saleData,
-          createdAt: serverTimestamp(),
-        };
-        
-        batch.set(newSaleRef, newSale);
+        const items = Array.isArray(saleData.items)
+          ? saleData.items.map((item: { productId?: string }) => ({
+              ...item,
+              productId: item.productId
+                ? productIdMap.get(item.productId) || item.productId
+                : item.productId,
+            }))
+          : saleData.items;
+
+        writes.push({
+          ref: newSaleRef,
+          data: {
+            ...saleData,
+            items,
+            storeId: newStoreRef.id,
+            userId: user.uid,
+          },
+        });
       });
-      
-      // Získat nastavení prodejny (kurz EUR atd.)
-      const storeDocRef = doc(db, 'users', user.uid, 'stores', storeToDuplicate.id);
-      const storeDoc = await getDoc(storeDocRef);
-      if (storeDoc.exists()) {
-        const storeData = storeDoc.data();
-        if (storeData.eurRate) {
-          batch.update(newStoreRef, { eurRate: storeData.eurRate });
+
+      const chunkSize = 450;
+      for (let i = 0; i < writes.length; i += chunkSize) {
+        const batch = writeBatch(db);
+        for (const write of writes.slice(i, i + chunkSize)) {
+          batch.set(write.ref, write.data);
         }
+        await batch.commit();
       }
-      
-      // Provedení všech změn
-      await batch.commit();
-      
+
       setShowDuplicateModal(false);
       setStoreToDuplicate(null);
+      setCopySalesHistory(false);
     } catch (error) {
       console.error('Error duplicating store:', error);
       alert('Chyba při duplikaci prodejny. Zkuste to znovu.');
@@ -557,17 +577,37 @@ export const Dashboard: React.FC = () => {
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
                   Chcete duplikovat prodejnu <strong>"{storeToDuplicate.name}"</strong>?
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Bude vytvořena nová prodejna s názvem <strong>"{storeToDuplicate.name} 2"</strong> včetně všech produktů, prodejů a nastavení.
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Nová prodejna <strong>"{storeToDuplicate.name} 2"</strong> vždy dostane název, nastavení, produkty a ceny.
                 </p>
+                <div className="flex items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                      Kopírovat historii prodejů a tržby
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      {copySalesHistory
+                        ? 'Doklady, tržby a počty prodaných kusů se přenesou.'
+                        : 'Historie zůstane prázdná, počty prodaných kusů začnou od nuly.'}
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={copySalesHistory}
+                      onChange={(e) => setCopySalesHistory(e.target.checked)}
+                      disabled={duplicating}
+                      aria-label="Kopírovat historii prodejů a tržby"
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-blue-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-800 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full peer-disabled:opacity-50"></div>
+                  </label>
+                </div>
               </div>
               
               <div className="flex space-x-3">
                 <button
-                  onClick={() => {
-                    setShowDuplicateModal(false);
-                    setStoreToDuplicate(null);
-                  }}
+                  onClick={closeDuplicateModal}
                   disabled={duplicating}
                   className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
                 >
