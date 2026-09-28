@@ -13,6 +13,8 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
   const [needsPin, setNeedsPin] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [protectionEnabled, setProtectionEnabled] = useState(false);
+  const [protectionLoaded, setProtectionLoaded] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const active = useRef(true);
   useEffect(() => {
@@ -27,17 +29,34 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
     return () => { active.current = false; document.removeEventListener('visibilitychange', hide); };
   }, []);
 
+  // Stav ochrany načteme při otevření přehledu, aby kliknutí na blur nebylo
+  // závislé na odezvě sítě.
+  useEffect(() => {
+    let active = true;
+    profitProtectionRequest().then(status => {
+      if (!active) return;
+      setProtectionEnabled(status.enabled === true);
+      setHideProfit(status.hideProfit !== false);
+      setProtectionLoaded(true);
+    }).catch(() => {
+      if (active) setProtectionLoaded(true);
+    });
+    return () => { active = false; };
+  }, []);
+
   const reveal = async () => {
     if (busy) return;
     setBusy(true);
     setError('');
     setNeedsPin(false);
     try {
-      const status = await profitProtectionRequest();
+      if (!protectionLoaded) {
+        setBusy(false);
+        return;
+      }
       if (!active.current || document.hidden) return;
-      setHideProfit(status.hideProfit !== false);
-      if (status.hideProfit === false) setRevealed(true);
-      else if (status.enabled) { setNeedsPin(true); dialog.current?.showModal(); }
+      if (!hideProfit) setRevealed(true);
+      else if (protectionEnabled) { setNeedsPin(true); dialog.current?.showModal(); }
       else setRevealed(true);
     } catch (e) {
       if (active.current && !document.hidden) {
@@ -93,7 +112,7 @@ export function PrivateProfit({ value }: { value: number }) {
   if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-block overflow-visible whitespace-nowrap rounded py-2 -my-2 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-block overflow-visible whitespace-nowrap rounded border-0 p-0 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}

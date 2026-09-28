@@ -64,7 +64,10 @@ export function ProfitProtectionSettings() {
     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Nejdříve zvolte, zda se má zisk skrývat. PIN pak může chránit jeho odkrytí.</p>
     {hideProfit !== null && <div className="mt-4 rounded-lg bg-gray-50 dark:bg-gray-700/60 p-4">
       <div className="flex items-center justify-between gap-4"><div><p className="font-medium text-gray-900 dark:text-white">Skrývat zisk</p><p className="text-xs text-gray-500 dark:text-gray-400">Zisk bude rozmazaný do kliknutí.</p></div>
-        <button type="button" role="switch" aria-checked={hideProfit} disabled={busy} onClick={() => { setPassword(''); setAction(hideProfit ? 'hide-disable' : 'hide-enable'); }} className={`relative h-6 w-11 rounded-full transition-colors ${hideProfit ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${hideProfit ? 'translate-x-6' : 'translate-x-1'}`} /></button>
+        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+          <input type="checkbox" checked={hideProfit} disabled={busy} onChange={() => { setPassword(''); setAction(hideProfit ? 'hide-disable' : 'hide-enable'); }} aria-label="Skrývat zisk" className="sr-only peer" />
+          <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+        </label>
       </div>
     </div>}
     <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null ? (error ? 'Ochrana zisku není dostupná' : 'Načítám nastavení…') : enabled ? 'Ochrana PINem je zapnutá' : 'Ochrana PINem je vypnutá'}</p>
