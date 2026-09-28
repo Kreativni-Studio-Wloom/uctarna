@@ -49,7 +49,7 @@ export function ProfitProtectionSettings() {
   return <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-lg">
     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"><Lock className="h-5 w-5 text-brand-600" /> Soukromí zisku</h3>
     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Zisk v přehledu je rozmazaný do kliknutí. Volitelný PIN platí pro všechny prodejny tohoto účtu.</p>
-    <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null ? 'Načítám nastavení…' : enabled ? 'Ochrana PINem je zapnutá' : 'Ochrana PINem je vypnutá'}</p>
+    <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null ? (error ? 'Ochrana zisku není dostupná' : 'Načítám nastavení…') : enabled ? 'Ochrana PINem je zapnutá' : 'Ochrana PINem je vypnutá'}</p>
     {error && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
     {message && <p role="status" className="mt-3 text-sm text-green-600 dark:text-green-400">{message}</p>}
     {enabled === null && error && <button onClick={() => setRetry(v => v + 1)} className="mt-3 text-sm text-brand-600">Zkusit znovu</button>}

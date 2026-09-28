@@ -765,7 +765,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
                 Zisk
               </p>
-              <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
                 <PrivateProfit value={reportData.totalProfit} />
               </p>
             </div>

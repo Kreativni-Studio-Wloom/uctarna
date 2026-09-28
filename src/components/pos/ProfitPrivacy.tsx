@@ -89,7 +89,7 @@ export function PrivateProfit({ value }: { value: number }) {
   const reduceMotion = useReducedMotion();
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-block max-w-full rounded disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-block overflow-visible whitespace-nowrap rounded px-2 py-2 -my-2 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}

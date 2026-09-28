@@ -4,12 +4,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
 const vm = require('node:vm');
-function load(file, mocks = {}) {
+function load(file, mocks = {}, globals = {}) {
   const source = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(source, { module, exports: module.exports, require: name => mocks[name] ?? require(name), Buffer, Date, console });
+  vm.runInNewContext(source, { module, exports: module.exports, require: name => mocks[name] ?? require(name), Buffer, Date, console, ...globals });
   return module.exports;
 }
 const pin = load('src/lib/profit-pin.ts');
@@ -86,4 +86,28 @@ test('hidden profit is absent from HTML and accessible labels', () => {
   assert.ok(!html.includes('123') && !html.includes('456') && !html.includes('789'));
   assert.ok(html.includes('Zobrazit zisk'));
   assert.ok(html.includes('select-none'));
+});
+
+// Import the actual production dependency; mocking getAuth alone misses runtime/ESM failures.
+test('Firebase Admin Auth can load in the selected Node runtime', () => {
+  assert.equal(typeof require('firebase-admin/auth').getAuth, 'function');
+});
+function client(fetch) {
+  return load('src/lib/profit-protection-client.ts', {
+    '@/lib/firebase': { auth: { currentUser: { uid: 'owner', getIdToken: async () => 'test-token' } } },
+  }, { fetch }).profitProtectionRequest;
+}
+test('HTML server failures produce a Czech error instead of a JSON parsing error', async () => {
+  const request = client(async () => new Response('<html>500</html>', { status: 500 }));
+  await assert.rejects(request(), /Ochrana zisku je dočasně nedostupná/);
+});
+test('malformed success never disables protection or unlocks profit', async () => {
+  const request = client(async () => Response.json({}));
+  await assert.rejects(request(), /Ochrana zisku je dočasně nedostupná/);
+  await assert.rejects(request({ action: 'verify', pin: '1234' }), /Ochrana zisku je dočasně nedostupná/);
+});
+test('network failures are readable and valid responses still work', async () => {
+  await assert.rejects(client(async () => { throw new TypeError('Failed to fetch'); })(), /Zkontrolujte připojení/);
+  assert.equal((await client(async () => Response.json({ enabled: false }))()).enabled, false);
+  assert.equal((await client(async () => Response.json({ ok: true }))({ action: 'verify', pin: '0123' })).ok, true);
 });
