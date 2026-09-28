@@ -89,8 +89,10 @@ test('hidden profit is absent from HTML and accessible labels', () => {
 });
 
 // Import the actual production dependency; mocking getAuth alone misses runtime/ESM failures.
-test('Firebase Admin Auth can load in the selected Node runtime', () => {
-  assert.equal(typeof require('firebase-admin/auth').getAuth, 'function');
+test('Firebase Admin Auth loads even when the host disables require(ESM)', () => {
+  require('node:child_process').execFileSync(process.execPath, [
+    '--no-experimental-require-module', '-e', "require('firebase-admin/auth')",
+  ], { cwd: process.cwd(), stdio: 'pipe' });
 });
 function client(fetch) {
   return load('src/lib/profit-protection-client.ts', {
