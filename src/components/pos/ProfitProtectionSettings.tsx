@@ -58,7 +58,7 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       setPassword('');
     } finally { setBusy(false); }
   };
-  const inputClass = 'mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500';
+  const inputClass = 'mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-500))] focus:border-[rgb(var(--brand-500))]';
   return <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-lg">
     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"><Lock className="h-5 w-5 text-brand-600" /> Soukromí zisku</h3>
     <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Nejdříve zvolte, zda se má zisk skrývat. PIN pak může chránit jeho odkrytí.</p>

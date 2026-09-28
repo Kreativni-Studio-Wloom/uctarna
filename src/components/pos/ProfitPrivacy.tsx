@@ -96,7 +96,7 @@ export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode
         <label htmlFor="profit-pin" className="block text-sm mb-2">Čtyřmístný PIN</label>
         <input id="profit-pin" type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4}
           autoComplete="off" autoFocus required value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ''))}
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent px-4 py-3 text-center text-xl tracking-[0.5em] focus:ring-2 focus:ring-brand-500" />
+          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent px-4 py-3 text-center text-xl tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-500))] focus:border-[rgb(var(--brand-500))]" />
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">Zapomenutý PIN obnovíte v nastavení pomocí hesla účtu.</p>
         <button disabled={busy || pin.length !== 4} className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2 text-white disabled:opacity-50">{busy ? 'Ověřuji…' : 'Zobrazit zisk'}</button>
       </form>}
@@ -112,7 +112,7 @@ export function PrivateProfit({ value }: { value: number }) {
   if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="block w-fit overflow-visible whitespace-nowrap rounded border-0 p-0 text-left leading-7 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-flex h-7 w-fit items-center overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-middle leading-7 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}
