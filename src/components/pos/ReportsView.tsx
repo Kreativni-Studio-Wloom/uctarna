@@ -11,6 +11,7 @@ import { saleTipInCzk } from '@/lib/saleTip';
 import { motion } from 'framer-motion';
 import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Banknote, Mail, BarChart3, Euro, Calculator, QrCode, Package } from 'lucide-react';
 import { generateEmailContent, EmailReportData, buildEmailReportData } from '@/lib/email';
+import { ProfitPrivacy, PrivateProfit } from '@/components/pos/ProfitPrivacy';
 import { useStore } from '@/contexts/StoreContext';
 
 // Rozšířený User interface s prodejnami
@@ -91,7 +92,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const storeDoc = useStore();
   const [sales, setSales] = useState<Sale[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [salesStatus, setSalesStatus] = useState({ key: '', ready: false, error: false });
+  const [productsStatus, setProductsStatus] = useState({ key: '', ready: false, error: false });
+  const [retry, setRetry] = useState(0);
+  const [offline, setOffline] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'month' | 'total' | 'custom'>('day');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -117,88 +121,87 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   );
   const isCustomRangeInvalid = customRangeStart.getTime() > customRangeEnd.getTime();
 
+  const uid = user?.uid;
+  const storeKey = JSON.stringify([uid, storeId, retry]);
+  const range = useMemo(() => {
+    if (selectedPeriod === 'day') return [startOfDay(selectedDate), endOfDay(selectedDate)];
+    if (selectedPeriod === 'month') return [startOfMonth(selectedDate), endOfMonth(selectedDate)];
+    if (selectedPeriod === 'custom') return [customRangeStart, customRangeEnd];
+    return null;
+  }, [selectedPeriod, selectedDate, customRangeStart, customRangeEnd]);
+  const rangeKey = JSON.stringify([storeKey, range?.map(date => date.getTime())]);
+  const invalidRange = selectedPeriod === 'custom' && isCustomRangeInvalid;
+  // Klíč blokuje starý součet už při renderu nového období, ještě před spuštěním effectu.
+  const loadError = (salesStatus.key === rangeKey && salesStatus.error) ||
+    (productsStatus.key === storeKey && productsStatus.error);
+  const reportReady = !invalidRange && salesStatus.key === rangeKey && salesStatus.ready &&
+    productsStatus.key === storeKey && productsStatus.ready && !loadError;
+
   useEffect(() => {
-    if (!user || !user.uid || !storeId) return;
-
-    const salesRef = collection(db, 'users', user.uid, 'stores', storeId, 'sales');
-
-    // Serverové datové hranice podle vybraného období - aby se nestahovala celá historie.
-    let rangeStart: Date | null = null;
-    let rangeEnd: Date | null = null;
-    if (selectedPeriod === 'day') {
-      rangeStart = startOfDay(selectedDate);
-      rangeEnd = endOfDay(selectedDate);
-    } else if (selectedPeriod === 'month') {
-      rangeStart = startOfMonth(selectedDate);
-      rangeEnd = endOfMonth(selectedDate);
-    } else if (selectedPeriod === 'custom') {
-      rangeStart = customRangeStart;
-      rangeEnd = customRangeEnd;
-    }
-
-    const productsQuery = query(
-      collection(db, 'users', user.uid, 'stores', storeId, 'products')
-    );
-
-    let unsubscribeSales: (() => void) | undefined;
-
-    if (selectedPeriod === 'custom' && isCustomRangeInvalid) {
-      setSales([]);
-    } else if (selectedPeriod === 'total') {
-      const salesQuery = query(salesRef, orderBy('createdAt', 'desc'));
-      unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
-        const salesData: Sale[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          salesData.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-          } as Sale);
-        });
-        setSales(salesData);
-      });
-    } else if (rangeStart && rangeEnd) {
-      const salesQuery = query(
-        salesRef,
-        where('createdAt', '>=', Timestamp.fromDate(rangeStart)),
-        where('createdAt', '<=', Timestamp.fromDate(rangeEnd)),
-        orderBy('createdAt', 'desc')
-      );
-      unsubscribeSales = onSnapshot(salesQuery, (snapshot) => {
-        const salesData: Sale[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          salesData.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-          } as Sale);
-        });
-        setSales(salesData);
-      });
-    }
-
-    const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
-      const productsData: Product[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        productsData.push({
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as Product);
-      });
-      setProducts(productsData);
-      setLoading(false);
-    });
-
+    const updateOnline = () => setOffline(!navigator.onLine);
+    updateOnline();
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
     return () => {
-      unsubscribeSales?.();
-      unsubscribeProducts();
+      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('offline', updateOnline);
     };
-  }, [user, storeId, selectedPeriod, selectedDate, customRangeStart, customRangeEnd, isCustomRangeInvalid]);
+  }, []);
+
+  useEffect(() => {
+    if (!uid || !storeId || invalidRange) return;
+    let active = true;
+    setSalesStatus({ key: rangeKey, ready: false, error: false });
+    const salesRef = collection(db, 'users', uid, 'stores', storeId, 'sales');
+    const salesQuery = range
+      ? query(salesRef,
+          where('createdAt', '>=', Timestamp.fromDate(range[0])),
+          where('createdAt', '<=', Timestamp.fromDate(range[1])),
+          orderBy('createdAt', 'desc'))
+      : query(salesRef, orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(salesQuery, { includeMetadataChanges: true }, (snapshot) => {
+      if (!active) return;
+      // Lokální cache může obsahovat jen část období. Metadata zachytí i potvrzení beze změny dat.
+      const ready = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+      if (ready) {
+        setSales(snapshot.docs.map(doc => ({
+          ...doc.data(), id: doc.id,
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+        } as Sale)));
+      }
+      setSalesStatus({ key: rangeKey, ready, error: false });
+    }, () => {
+      if (active) setSalesStatus({ key: rangeKey, ready: false, error: true });
+    });
+    return () => { active = false; unsubscribe(); };
+  }, [uid, storeId, range, rangeKey, invalidRange]);
+
+  // Produkty nezávisí na období; při změně období není třeba obnovovat jejich odběr.
+  useEffect(() => {
+    if (!uid || !storeId) return;
+    let active = true;
+    setProductsStatus({ key: storeKey, ready: false, error: false });
+    const unsubscribe = onSnapshot(
+      collection(db, 'users', uid, 'stores', storeId, 'products'),
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        if (!active) return;
+        const ready = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+        if (ready) {
+          setProducts(snapshot.docs.map(doc => ({
+            ...doc.data(), id: doc.id,
+            createdAt: doc.data().createdAt?.toDate() || new Date(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+          } as Product)));
+        }
+        setProductsStatus({ key: storeKey, ready, error: false });
+      },
+      () => {
+        if (active) setProductsStatus({ key: storeKey, ready: false, error: true });
+      }
+    );
+    return () => { active = false; unsubscribe(); };
+  }, [uid, storeId, storeKey]);
 
   const handlePeriodChange = (period: 'day' | 'month' | 'total' | 'custom') => {
     setSelectedPeriod(period);
@@ -384,7 +387,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                 : 'Celková',
         startDate:
           selectedPeriod === 'day'
-            ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+            ? format(selectedDate, 'd.M.yyyy (EEEE)', { locale: cs })
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
@@ -396,7 +399,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                   : 'Od založení',
         endDate:
           selectedPeriod === 'day'
-            ? format(selectedDate, 'd.M.yyyy', { locale: cs })
+            ? format(selectedDate, 'd.M.yyyy (EEEE)', { locale: cs })
             : selectedPeriod === 'month'
               ? format(selectedDate, 'MMMM yyyy', { locale: cs })
               : selectedPeriod === 'custom'
@@ -423,6 +426,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   };
 
   const generatePDFReport = async (customActionName?: string) => {
+    if (!reportReady) return;
     if (!user || !firebaseUser) {
       alert('Pro generování uzávěrky musíte být přihlášeni');
       return;
@@ -548,15 +552,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
-      </div>
-    );
-  }
-
   return (
+    <ProfitPrivacy key={rangeKey}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -573,7 +570,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                 generatePDFReport();
               }
             }}
-            disabled={generatingPDF || reportData.sales.length === 0}
+            disabled={!reportReady || generatingPDF || reportData.sales.length === 0}
             className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center"
           >
             {generatingPDF ? (
@@ -714,6 +711,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         )}
       </div>
 
+      {!reportReady && !invalidRange && (
+        <div role={loadError ? 'alert' : 'status'} aria-live="polite" aria-busy={!loadError}
+          className="flex flex-wrap items-center justify-center gap-3 py-12">
+          {!loadError && <div aria-hidden="true" className="animate-spin motion-reduce:animate-none rounded-full h-10 w-10 border-b-2 border-brand-600" />}
+          <span className="text-gray-600 dark:text-gray-400">
+            {loadError ? 'Data se nepodařilo načíst.' : offline ? 'Pro ověření tržeb čekám na připojení…' : 'Načítám tržby…'}
+          </span>
+          {loadError && <button onClick={() => setRetry(value => value + 1)}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-white hover:bg-brand-700">
+            Zkusit znovu
+          </button>}
+        </div>
+      )}
+
+      {reportReady && <>
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {/* celkova trzba */}
@@ -754,7 +766,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                 Zisk
               </p>
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
-                {reportData.totalProfit.toLocaleString('cs-CZ')} Kč
+                <PrivateProfit value={reportData.totalProfit} />
               </p>
             </div>
           </div>
@@ -1037,7 +1049,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                       <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{item.unitPrice.toLocaleString('cs-CZ')} Kč</td>
                       <td className="py-3 px-2 text-right font-medium text-gray-900 dark:text-white">{item.revenue.toLocaleString('cs-CZ')} Kč</td>
                       <td className="py-3 px-2 text-right text-gray-700 dark:text-gray-300">{item.costs.toLocaleString('cs-CZ')} Kč</td>
-                      <td className="py-3 px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{item.profit.toLocaleString('cs-CZ')} Kč</td>
+                      <td className="py-3 px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400"><PrivateProfit value={item.profit} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1055,7 +1067,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                       {soldProductsSummary.reduce((sum, [, item]) => sum + item.costs, 0).toLocaleString('cs-CZ')} Kč
                     </td>
                     <td className="py-3 px-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                      {soldProductsSummary.reduce((sum, [, item]) => sum + item.profit, 0).toLocaleString('cs-CZ')} Kč
+                      <PrivateProfit value={soldProductsSummary.reduce((sum, [, item]) => sum + item.profit, 0)} />
                     </td>
                   </tr>
                 </tfoot>
@@ -1080,6 +1092,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
           </p>
         </div>
       )}
+
+      </>}
 
       {/* Action Name Modal */}
       {showActionNameModal && (
@@ -1121,7 +1135,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               </button>
               <button
                 onClick={handleActionNameSubmit}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                disabled={!reportReady || generatingPDF}
+                className="disabled:opacity-50 disabled:cursor-not-allowed flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 Generovat uzávěrku
               </button>
@@ -1169,5 +1184,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         </div>
       )}
     </div>
+    </ProfitPrivacy>
   );
 };

@@ -9,6 +9,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBrandColor } from '@/lib/colorScheme';
 import { ColorWheelPicker } from '@/components/pos/ColorWheelPicker';
+import { ProfitProtectionSettings } from '@/components/pos/ProfitProtectionSettings';
 import { DuplicateSalesCleaner } from '@/components/pos/DuplicateSalesCleaner';
 
 interface SettingsViewProps {
@@ -533,6 +534,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
           </div>
         </motion.div>
       </div>
+
+      <ProfitProtectionSettings key={user?.uid} />
 
       {/* Additional Settings */}
       <motion.div
