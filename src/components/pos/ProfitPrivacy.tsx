@@ -8,7 +8,7 @@ const Privacy = createContext({ revealed: false, hideProfit: true, busy: false, 
 
 export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
   const [revealed, setRevealed] = useState(false);
-  const [hideProfit, setHideProfit] = useState(true);
+  const [hideProfit, setHideProfit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needsPin, setNeedsPin] = useState(false);
   const [pin, setPin] = useState('');

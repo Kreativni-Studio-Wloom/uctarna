@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
     const doc = await adminDb.collection('profitProtection').doc(user.uid).get();
-    return reply({ enabled: doc.data()?.enabled === true, hideProfit: doc.data()?.hideProfit !== false });
+    return reply({ enabled: doc.data()?.enabled === true, hideProfit: doc.data()?.hideProfit === true });
   } catch { return reply({ error: 'Ochranu zisku se nepodařilo načíst.' }, 503); }
 }
 
