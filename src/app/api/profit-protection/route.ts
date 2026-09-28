@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
     const doc = await adminDb.collection('profitProtection').doc(user.uid).get();
-    return reply({ enabled: doc.data()?.enabled === true });
+    return reply({ enabled: doc.data()?.enabled === true, hideProfit: doc.data()?.hideProfit !== false });
   } catch { return reply({ error: 'Ochranu zisku se nepodařilo načíst.' }, 503); }
 }
 
@@ -26,10 +26,15 @@ export async function POST(request: Request) {
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
     const { action, pin } = await request.json();
-    if (!['verify', 'enable', 'disable'].includes(action) || (action !== 'disable' && !validProfitPin(pin))) {
+    if (!['verify', 'enable', 'disable', 'hide-enable', 'hide-disable'].includes(action) || (action === 'enable' && !validProfitPin(pin))) {
       return reply({ error: 'Zadejte čtyřmístný číselný PIN.' }, 400);
     }
     const ref = adminDb.collection('profitProtection').doc(user.uid);
+    if (action === 'hide-enable' || action === 'hide-disable') {
+      if (user.firebase.sign_in_provider !== 'password' || Date.now() / 1000 - user.auth_time > 60) return reply({ error: 'Nejprve znovu potvrďte heslo účtu.' }, 403);
+      await ref.set({ hideProfit: action === 'hide-enable' }, { merge: true });
+      return reply({ hideProfit: action === 'hide-enable' });
+    }
     if (action !== 'verify') {
       // Správa vyžaduje čerstvé ověření účtu heslem, kontrolované na serveru.
       if (user.firebase.sign_in_provider !== 'password' || Date.now() / 1000 - user.auth_time > 60) {

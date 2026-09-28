@@ -4,10 +4,11 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { motion, useReducedMotion } from 'framer-motion';
 import { profitProtectionRequest } from '@/lib/profit-protection-client';
 
-const Privacy = createContext({ revealed: false, busy: false, reveal: () => {}, hide: () => {} });
+const Privacy = createContext({ revealed: false, hideProfit: true, busy: false, reveal: () => {}, hide: () => {} });
 
 export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
   const [revealed, setRevealed] = useState(false);
+  const [hideProfit, setHideProfit] = useState(true);
   const [busy, setBusy] = useState(false);
   const [needsPin, setNeedsPin] = useState(false);
   const [pin, setPin] = useState('');
@@ -34,7 +35,9 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
     try {
       const status = await profitProtectionRequest();
       if (!active.current || document.hidden) return;
-      if (status.enabled) { setNeedsPin(true); dialog.current?.showModal(); }
+      setHideProfit(status.hideProfit !== false);
+      if (status.hideProfit === false) setRevealed(true);
+      else if (status.enabled) { setNeedsPin(true); dialog.current?.showModal(); }
       else setRevealed(true);
     } catch (e) {
       if (active.current && !document.hidden) {
@@ -62,7 +65,7 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
       if (active.current) { setError(e instanceof Error ? e.message : 'Ověření se nepodařilo.'); setPin(''); }
     } finally { if (active.current) setBusy(false); }
   };
-  return <Privacy.Provider value={{ revealed, busy, reveal, hide: () => setRevealed(false) }}>
+  return <Privacy.Provider value={{ revealed, hideProfit, busy, reveal, hide: () => setRevealed(false) }}>
     {children}
     <dialog ref={dialog} onClose={() => { setPin(''); setError(''); }}
       aria-labelledby="profit-pin-title"
@@ -85,11 +88,12 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
 }
 
 export function PrivateProfit({ value }: { value: number }) {
-  const { revealed, busy, reveal, hide } = useContext(Privacy);
+  const { revealed, hideProfit, busy, reveal, hide } = useContext(Privacy);
   const reduceMotion = useReducedMotion();
+  if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-block overflow-visible whitespace-nowrap rounded px-2 py-2 -my-2 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-block overflow-visible whitespace-nowrap rounded py-2 -my-2 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}

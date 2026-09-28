@@ -9,7 +9,8 @@ import { Lock } from 'lucide-react';
 export function ProfitProtectionSettings() {
   const { firebaseUser } = useAuth();
   const [enabled, setEnabled] = useState<boolean | null>(null);
-  const [action, setAction] = useState<'enable' | 'disable' | null>(null);
+  const [hideProfit, setHideProfit] = useState<boolean | null>(null);
+  const [action, setAction] = useState<'enable' | 'disable' | 'hide-enable' | 'hide-disable' | null>(null);
   const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -20,11 +21,23 @@ export function ProfitProtectionSettings() {
   useEffect(() => {
     let active = true;
     setError('');
-    profitProtectionRequest().then(data => { if (active) setEnabled(data.enabled === true); })
+    profitProtectionRequest().then(data => { if (active) { setEnabled(data.enabled === true); setHideProfit(data.hideProfit !== false); } })
       .catch(() => { if (active) setError('Nastavení ochrany se nepodařilo načíst.'); });
     return () => { active = false; };
   }, [firebaseUser?.uid, retry]);
   const clear = () => { setPassword(''); setPin(''); setConfirmPin(''); setAction(null); };
+  const toggleHiding = async (next: boolean) => {
+    if (!firebaseUser?.email || busy) return;
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await reauthenticateWithCredential(firebaseUser, EmailAuthProvider.credential(firebaseUser.email, password));
+      const result = await profitProtectionRequest({ action: next ? 'hide-enable' : 'hide-disable' });
+      setHideProfit(result.hideProfit === true);
+      setMessage(next ? 'Skrývání zisku je zapnuté.' : 'Skrývání zisku je vypnuté.');
+      setPassword('');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Uložení se nepodařilo.'); }
+    finally { setBusy(false); }
+  };
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!firebaseUser?.email || !action || busy) return;
@@ -48,7 +61,12 @@ export function ProfitProtectionSettings() {
   const inputClass = 'mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500';
   return <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-lg">
     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"><Lock className="h-5 w-5 text-brand-600" /> Soukromí zisku</h3>
-    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Zisk v přehledu je rozmazaný do kliknutí. Volitelný PIN platí pro všechny prodejny tohoto účtu.</p>
+    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Nejdříve zvolte, zda se má zisk skrývat. PIN pak může chránit jeho odkrytí.</p>
+    {hideProfit !== null && <div className="mt-4 rounded-lg bg-gray-50 dark:bg-gray-700/60 p-4">
+      <div className="flex items-center justify-between gap-4"><div><p className="font-medium text-gray-900 dark:text-white">Skrývat zisk</p><p className="text-xs text-gray-500 dark:text-gray-400">Zisk bude rozmazaný do kliknutí.</p></div>
+        <button type="button" role="switch" aria-checked={hideProfit} disabled={busy} onClick={() => { setPassword(''); setAction(hideProfit ? 'hide-disable' : 'hide-enable'); }} className={`relative h-6 w-11 rounded-full transition-colors ${hideProfit ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${hideProfit ? 'translate-x-6' : 'translate-x-1'}`} /></button>
+      </div>
+    </div>}
     <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null ? (error ? 'Ochrana zisku není dostupná' : 'Načítám nastavení…') : enabled ? 'Ochrana PINem je zapnutá' : 'Ochrana PINem je vypnutá'}</p>
     {error && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
     {message && <p role="status" className="mt-3 text-sm text-green-600 dark:text-green-400">{message}</p>}
@@ -57,7 +75,7 @@ export function ProfitProtectionSettings() {
       <button onClick={() => { setAction('enable'); setMessage(''); setError(''); }} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">{enabled ? 'Změnit / resetovat PIN' : 'Zapnout ochranu PINem'}</button>
       {enabled && <button onClick={() => { setAction('disable'); setMessage(''); setError(''); }} className="rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200">Vypnout ochranu</button>}
     </div>}
-    {action && <form onSubmit={save} className="mt-4 max-w-sm space-y-3">
+    {action && <form onSubmit={action.startsWith('hide-') ? (e) => { e.preventDefault(); toggleHiding(action === 'hide-enable'); setAction(null); } : save} className="mt-4 max-w-sm space-y-3">
       <label className="block text-sm text-gray-700 dark:text-gray-300">Heslo účtu
         <input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
       </label>
@@ -71,7 +89,7 @@ export function ProfitProtectionSettings() {
         <p className="text-xs text-gray-500 dark:text-gray-400">Původní PIN nepotřebujete. Změnu potvrdíte heslem účtu.</p>
       </>}
       <div className="flex gap-3">
-        <button disabled={busy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white disabled:opacity-50">{busy ? 'Ukládám…' : action === 'enable' ? 'Uložit PIN' : 'Vypnout ochranu'}</button>
+        <button disabled={busy} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white disabled:opacity-50">{busy ? 'Ukládám…' : action.startsWith('hide-') ? 'Potvrdit heslem' : action === 'enable' ? 'Uložit PIN' : 'Vypnout ochranu'}</button>
         <button type="button" disabled={busy} onClick={clear} className="rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200">Zrušit</button>
       </div>
     </form>}

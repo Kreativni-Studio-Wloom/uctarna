@@ -56,7 +56,7 @@ test('enable, verify, reset without old PIN, disable; status never exposes hash'
   assert.equal(f.getData().pin, undefined);
   const status = await f.route.GET(f.request());
   assert.equal(status.headers.get('cache-control'), 'no-store');
-  assert.deepEqual(await status.json(), { enabled: true });
+  assert.deepEqual(await status.json(), { enabled: true, hideProfit: true });
   assert.equal((await f.route.POST(f.request({ action: 'verify', pin: '0123' }))).status, 200);
   await f.route.POST(f.request({ action: 'enable', pin: '9876' }));
   assert.equal((await f.route.POST(f.request({ action: 'verify', pin: '0123' }))).status, 403);
