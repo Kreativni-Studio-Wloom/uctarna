@@ -6,7 +6,7 @@ import { profitProtectionRequest } from '@/lib/profit-protection-client';
 
 const Privacy = createContext({ revealed: false, hideProfit: true, busy: false, reveal: () => {}, hide: () => {} });
 
-export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
+export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode; storeId: string }) {
   const [revealed, setRevealed] = useState(false);
   const [hideProfit, setHideProfit] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -33,16 +33,16 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
   // závislé na odezvě sítě.
   useEffect(() => {
     let active = true;
-    profitProtectionRequest().then(status => {
+    profitProtectionRequest(storeId).then(status => {
       if (!active) return;
       setProtectionEnabled(status.enabled === true);
-      setHideProfit(status.hideProfit !== false);
+      setHideProfit(status.hideProfit === true);
       setProtectionLoaded(true);
     }).catch(() => {
       if (active) setProtectionLoaded(true);
     });
     return () => { active = false; };
-  }, []);
+  }, [storeId]);
 
   const reveal = async () => {
     if (busy) return;
@@ -75,7 +75,7 @@ export function ProfitPrivacy({ children }: { children: React.ReactNode }) {
     setBusy(true);
     setError('');
     try {
-      await profitProtectionRequest({ action: 'verify', pin });
+      await profitProtectionRequest(storeId, { action: 'verify', pin });
       if (active.current && dialog.current?.open) {
         setRevealed(true);
         dialog.current.close();
@@ -112,7 +112,7 @@ export function PrivateProfit({ value }: { value: number }) {
   if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-block overflow-visible whitespace-nowrap rounded border-0 p-0 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="block w-fit overflow-visible whitespace-nowrap rounded border-0 p-0 text-left leading-7 align-middle disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}

@@ -11,12 +11,19 @@ async function authenticate(request: Request) {
   if (!token) return null;
   try { return await getAuth().verifyIdToken(token, true); } catch { return null; }
 }
+function storeRef(userId: string, request: Request, body?: { storeId?: string }) {
+  const storeId = request.headers.get('x-store-id') || body?.storeId;
+  if (!storeId || !/^[A-Za-z0-9_-]{1,120}$/.test(storeId)) return null;
+  return adminDb.collection('profitProtection').doc(`${userId}_${storeId}`);
+}
 
 export async function GET(request: Request) {
   const user = await authenticate(request);
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
-    const doc = await adminDb.collection('profitProtection').doc(user.uid).get();
+    const ref = storeRef(user.uid, request);
+    if (!ref) return reply({ error: 'Chybí provozovna.' }, 400);
+    const doc = await ref.get();
     return reply({ enabled: doc.data()?.enabled === true, hideProfit: doc.data()?.hideProfit === true });
   } catch { return reply({ error: 'Ochranu zisku se nepodařilo načíst.' }, 503); }
 }
@@ -25,11 +32,12 @@ export async function POST(request: Request) {
   const user = await authenticate(request);
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
-    const { action, pin } = await request.json();
+    const { action, pin, storeId } = await request.json();
+    const ref = storeRef(user.uid, request, { storeId });
+    if (!ref) return reply({ error: 'Chybí provozovna.' }, 400);
     if (!['verify', 'enable', 'disable', 'hide-enable', 'hide-disable'].includes(action) || (action === 'enable' && !validProfitPin(pin))) {
       return reply({ error: 'Zadejte čtyřmístný číselný PIN.' }, 400);
     }
-    const ref = adminDb.collection('profitProtection').doc(user.uid);
     if (action === 'hide-enable' || action === 'hide-disable') {
       if (user.firebase.sign_in_provider !== 'password' || Date.now() / 1000 - user.auth_time > 60) return reply({ error: 'Nejprve znovu potvrďte heslo účtu.' }, 403);
       await ref.set({ hideProfit: action === 'hide-enable' }, { merge: true });

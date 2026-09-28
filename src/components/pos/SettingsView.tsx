@@ -535,7 +535,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
         </motion.div>
       </div>
 
-      <ProfitProtectionSettings key={user?.uid} />
+      <ProfitProtectionSettings key={`${user?.uid}-${storeId}`} storeId={storeId} />
 
       {/* Additional Settings */}
       <motion.div

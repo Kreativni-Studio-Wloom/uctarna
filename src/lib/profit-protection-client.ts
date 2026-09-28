@@ -1,6 +1,6 @@
 import { auth } from '@/lib/firebase';
 
-export async function profitProtectionRequest(body?: { action: 'verify' | 'enable' | 'disable' | 'hide-enable' | 'hide-disable'; pin?: string }) {
+export async function profitProtectionRequest(storeId: string, body?: { action: 'verify' | 'enable' | 'disable' | 'hide-enable' | 'hide-disable'; pin?: string }) {
   const user = auth.currentUser;
   if (!user) throw new Error('Přihlaste se znovu.');
   const token = await user.getIdToken();
@@ -8,9 +8,9 @@ export async function profitProtectionRequest(body?: { action: 'verify' | 'enabl
   try {
     response = await fetch('/api/profit-protection', {
       method: body ? 'POST' : 'GET',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Store-Id': storeId },
       cache: 'no-store',
-      ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: JSON.stringify({ ...body, storeId }) } : {}),
     });
   } catch {
     throw new Error('Ochranu zisku se nepodařilo ověřit. Zkontrolujte připojení a zkuste to znovu.');

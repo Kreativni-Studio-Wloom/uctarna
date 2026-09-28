@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { profitProtectionRequest } from '@/lib/profit-protection-client';
 import { Lock } from 'lucide-react';
 
-export function ProfitProtectionSettings() {
+export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
   const { firebaseUser } = useAuth();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [hideProfit, setHideProfit] = useState<boolean | null>(null);
@@ -21,17 +21,17 @@ export function ProfitProtectionSettings() {
   useEffect(() => {
     let active = true;
     setError('');
-    profitProtectionRequest().then(data => { if (active) { setEnabled(data.enabled === true); setHideProfit(data.hideProfit !== false); } })
+    profitProtectionRequest(storeId).then(data => { if (active) { setEnabled(data.enabled === true); setHideProfit(data.hideProfit === true); } })
       .catch(() => { if (active) setError('Nastavení ochrany se nepodařilo načíst.'); });
     return () => { active = false; };
-  }, [firebaseUser?.uid, retry]);
+  }, [firebaseUser?.uid, retry, storeId]);
   const clear = () => { setPassword(''); setPin(''); setConfirmPin(''); setAction(null); };
   const toggleHiding = async (next: boolean) => {
     if (!firebaseUser?.email || busy) return;
     setBusy(true); setError(''); setMessage('');
     try {
       await reauthenticateWithCredential(firebaseUser, EmailAuthProvider.credential(firebaseUser.email, password));
-      const result = await profitProtectionRequest({ action: next ? 'hide-enable' : 'hide-disable' });
+      const result = await profitProtectionRequest(storeId, { action: next ? 'hide-enable' : 'hide-disable' });
       setHideProfit(result.hideProfit === true);
       setMessage(next ? 'Skrývání zisku je zapnuté.' : 'Skrývání zisku je vypnuté.');
       setPassword('');
@@ -48,7 +48,7 @@ export function ProfitProtectionSettings() {
     setBusy(true);
     try {
       await reauthenticateWithCredential(firebaseUser, EmailAuthProvider.credential(firebaseUser.email, password));
-      const result = await profitProtectionRequest({ action, ...(action === 'enable' ? { pin } : {}) });
+      const result = await profitProtectionRequest(storeId, { action, ...(action === 'enable' ? { pin } : {}) });
       setEnabled(result.enabled === true);
       setMessage(action === 'enable' ? 'PIN byl uložen. Zisk je chráněný.' : 'Ochrana PINem je vypnutá. Zisk zůstává skrytý do kliknutí.');
       clear();
