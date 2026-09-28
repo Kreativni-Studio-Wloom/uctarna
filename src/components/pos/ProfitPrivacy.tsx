@@ -112,7 +112,7 @@ export function PrivateProfit({ value }: { value: number }) {
   if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-flex h-7 w-fit items-center overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-middle leading-7 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-flex h-7 w-fit items-center overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-top leading-7 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}
