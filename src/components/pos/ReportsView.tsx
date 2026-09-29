@@ -553,7 +553,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   };
 
   return (
-    <ProfitPrivacy key={rangeKey} storeId={storeId}>
+    // Odkrytí platí pro návštěvu uzávěrek, nezávisle na zvoleném období.
+    // Odchod ze stránky nebo změna účtu/provozovny ochranu resetuje.
+    <ProfitPrivacy key={JSON.stringify([uid, storeId])} storeId={storeId}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
