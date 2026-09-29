@@ -7,8 +7,12 @@ import { profitProtectionRequest } from '@/lib/profit-protection-client';
 const Privacy = createContext({ revealed: false, hideProfit: true, busy: false, reveal: () => {}, hide: () => {} });
 
 export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode; storeId: string }) {
+  return <ProfitPrivacyState key={storeId} storeId={storeId}>{children}</ProfitPrivacyState>;
+}
+
+function ProfitPrivacyState({ children, storeId }: { children: React.ReactNode; storeId: string }) {
   const [revealed, setRevealed] = useState(false);
-  const [hideProfit, setHideProfit] = useState(false);
+  const [hideProfit, setHideProfit] = useState(true);
   const [busy, setBusy] = useState(false);
   const [needsPin, setNeedsPin] = useState(false);
   const [pin, setPin] = useState('');
@@ -39,7 +43,7 @@ export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode
       setHideProfit(status.hideProfit === true);
       setProtectionLoaded(true);
     }).catch(() => {
-      if (active) setProtectionLoaded(true);
+      // Bez ověřeného nastavení zůstává zisk skrytý; kliknutí načtení zopakuje.
     });
     return () => { active = false; };
   }, [storeId]);
@@ -50,13 +54,20 @@ export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode
     setError('');
     setNeedsPin(false);
     try {
+      let hidden = hideProfit;
+      let protectedByPin = protectionEnabled;
       if (!protectionLoaded) {
-        setBusy(false);
-        return;
+        const status = await profitProtectionRequest(storeId);
+        if (!active.current || document.hidden) return;
+        hidden = status.hideProfit === true;
+        protectedByPin = status.enabled === true;
+        setHideProfit(hidden);
+        setProtectionEnabled(protectedByPin);
+        setProtectionLoaded(true);
       }
       if (!active.current || document.hidden) return;
-      if (!hideProfit) setRevealed(true);
-      else if (protectionEnabled) { setNeedsPin(true); dialog.current?.showModal(); }
+      if (!hidden) setRevealed(true);
+      else if (protectedByPin) { setNeedsPin(true); dialog.current?.showModal(); }
       else setRevealed(true);
     } catch (e) {
       if (active.current && !document.hidden) {
@@ -112,14 +123,14 @@ export function PrivateProfit({ value }: { value: number }) {
   if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
     aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-flex h-7 w-fit items-center overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-top leading-7 disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    className="inline-block !min-h-0 !min-w-0 overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-baseline leading-[inherit] disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
-      initial={revealed ? { filter: 'blur(6px)', opacity: 0.5 } : false}
-      animate={{ filter: revealed ? 'blur(0px)' : 'blur(6px)', opacity: revealed ? 1 : 0.6 }}
+      initial={revealed ? { filter: 'blur(4px)', opacity: 0.65 } : false}
+      animate={{ filter: revealed ? 'blur(0px)' : 'blur(4px)', opacity: revealed ? 1 : 0.65 }}
       transition={{ duration: reduceMotion ? 0 : 0.22 }}
       className={revealed ? 'inline-block' : 'inline-block select-none pointer-events-none'}>
-      {revealed ? `${value.toLocaleString('cs-CZ')} Kč` : '•• ••• Kč'}
+      {revealed ? `${value.toLocaleString('cs-CZ')} Kč` : '88 888 Kč'}
     </motion.span>
   </button>;
 }

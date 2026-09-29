@@ -26,6 +26,8 @@ export async function profitProtectionRequest(storeId: string, body?: { action: 
     if (result.ok !== true) throw new Error(unavailable);
     return { ok: true };
   }
-  if (typeof result.enabled !== 'boolean' && typeof result.hideProfit !== 'boolean') throw new Error(unavailable);
+  if ((!body && (typeof result.enabled !== 'boolean' || typeof result.hideProfit !== 'boolean')) ||
+      (body?.action.startsWith('hide-') && typeof result.hideProfit !== 'boolean') ||
+      (body && !body.action.startsWith('hide-') && typeof result.enabled !== 'boolean')) throw new Error(unavailable);
   return { enabled: result.enabled, hideProfit: result.hideProfit };
 }

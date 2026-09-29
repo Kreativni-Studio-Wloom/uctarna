@@ -21,6 +21,8 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
   useEffect(() => {
     let active = true;
     setError('');
+    setEnabled(null);
+    setHideProfit(null);
     profitProtectionRequest(storeId).then(data => { if (active) { setEnabled(data.enabled === true); setHideProfit(data.hideProfit === true); } })
       .catch(() => { if (active) setError('Nastavení ochrany se nepodařilo načíst.'); });
     return () => { active = false; };
@@ -34,8 +36,8 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       const result = await profitProtectionRequest(storeId, { action: next ? 'hide-enable' : 'hide-disable' });
       setHideProfit(result.hideProfit === true);
       setMessage(next ? 'Skrývání zisku je zapnuté.' : 'Skrývání zisku je vypnuté.');
-      setPassword('');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Uložení se nepodařilo.'); }
+      clear();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Uložení se nepodařilo.'); setPassword(''); }
     finally { setBusy(false); }
   };
   const save = async (event: React.FormEvent) => {
@@ -50,7 +52,7 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       await reauthenticateWithCredential(firebaseUser, EmailAuthProvider.credential(firebaseUser.email, password));
       const result = await profitProtectionRequest(storeId, { action, ...(action === 'enable' ? { pin } : {}) });
       setEnabled(result.enabled === true);
-      setMessage(action === 'enable' ? 'PIN byl uložen. Zisk je chráněný.' : 'Ochrana PINem je vypnutá. Zisk zůstává skrytý do kliknutí.');
+      setMessage(action === 'enable' ? (hideProfit ? 'PIN byl uložen. Zisk je chráněný.' : 'PIN byl uložen. Pro ochranu zisku zapněte také jeho skrývání.') : (hideProfit ? 'Ochrana PINem je vypnutá. Zisk zůstává skrytý do kliknutí.' : 'Ochrana PINem je vypnutá.'));
       clear();
     } catch (e) {
       const code = (e as { code?: string }).code;
@@ -78,7 +80,7 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       <button onClick={() => { setAction('enable'); setMessage(''); setError(''); }} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">{enabled ? 'Změnit / resetovat PIN' : 'Zapnout ochranu PINem'}</button>
       {enabled && <button onClick={() => { setAction('disable'); setMessage(''); setError(''); }} className="rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200">Vypnout ochranu</button>}
     </div>}
-    {action && <form onSubmit={action.startsWith('hide-') ? (e) => { e.preventDefault(); toggleHiding(action === 'hide-enable'); setAction(null); } : save} className="mt-4 max-w-sm space-y-3">
+    {action && <form onSubmit={action.startsWith('hide-') ? (e) => { e.preventDefault(); void toggleHiding(action === 'hide-enable'); } : save} className="mt-4 max-w-sm space-y-3">
       <label className="block text-sm text-gray-700 dark:text-gray-300">Heslo účtu
         <input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className={inputClass} />
       </label>

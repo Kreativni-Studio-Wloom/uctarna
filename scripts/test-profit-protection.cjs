@@ -16,12 +16,17 @@ const pin = load('src/lib/profit-pin.ts');
 function fixture() {
   let data;
   const identity = { uid: 'owner', auth_time: Math.floor(Date.now() / 1000), firebase: { sign_in_provider: 'password' } };
-  const ref = { get: async () => ({ data: () => data }), set: async value => { data = value; } };
+  const deleted = Symbol('deleted');
+  const ref = { get: async () => ({ data: () => data }), set: async (value, options) => {
+    data = options?.merge ? { ...data, ...value } : value;
+    for (const key of Object.keys(data)) if (data[key] === deleted) delete data[key];
+  } };
   const adminDb = { collection: name => {
     assert.equal(name, 'profitProtection');
-    return { doc: uid => { assert.equal(uid, 'owner'); return ref; } };
+    return { doc: uid => { assert.equal(uid, 'owner_store1'); return ref; } };
   }, runTransaction: async fn => fn({ get: ref.get, update: (_, value) => { data = { ...data, ...value }; } }) };
   const route = load('src/app/api/profit-protection/route.ts', {
+    'firebase-admin/firestore': { FieldValue: { delete: () => deleted } },
     '@/lib/firebase-admin': { adminDb }, '@/lib/profit-pin': pin,
     'firebase-admin/auth': { getAuth: () => ({ verifyIdToken: async token => {
       if (token !== 'valid') throw Error('Invalid token');
@@ -29,7 +34,7 @@ function fixture() {
     } }) },
   });
   const request = (body, token = 'valid') => new Request('http://localhost/api/profit-protection', {
-    method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-store-id': 'store1' },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   return { route, identity, request, getData: () => data, setData: value => { data = value; } };
@@ -106,10 +111,35 @@ test('HTML server failures produce a Czech error instead of a JSON parsing error
 test('malformed success never disables protection or unlocks profit', async () => {
   const request = client(async () => Response.json({}));
   await assert.rejects(request(), /Ochrana zisku je dočasně nedostupná/);
-  await assert.rejects(request({ action: 'verify', pin: '1234' }), /Ochrana zisku je dočasně nedostupná/);
+  await assert.rejects(request('store1', { action: 'verify', pin: '1234' }), /Ochrana zisku je dočasně nedostupná/);
 });
 test('network failures are readable and valid responses still work', async () => {
   await assert.rejects(client(async () => { throw new TypeError('Failed to fetch'); })(), /Zkontrolujte připojení/);
-  assert.equal((await client(async () => Response.json({ enabled: false }))()).enabled, false);
-  assert.equal((await client(async () => Response.json({ ok: true }))({ action: 'verify', pin: '0123' })).ok, true);
+  assert.equal((await client(async () => Response.json({ enabled: false, hideProfit: false }))()).enabled, false);
+  assert.equal((await client(async () => Response.json({ ok: true }))('store1', { action: 'verify', pin: '0123' })).ok, true);
+});
+
+test('PIN changes preserve the hiding preference', async () => {
+  const f = fixture();
+  await f.route.POST(f.request({ action: 'hide-enable' }));
+  for (const action of ['enable', 'enable', 'disable']) {
+    assert.equal((await f.route.POST(f.request({ action, pin: '1234' }))).status, 200);
+    assert.equal(f.getData().hideProfit, true);
+  }
+});
+test('first provider render never exposes profit before settings load', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const { ProfitPrivacy, PrivateProfit } = load('src/components/pos/ProfitPrivacy.tsx', {
+    '@/lib/profit-protection-client': { profitProtectionRequest: () => { throw Error('Unexpected request'); } },
+  });
+  const html = renderToStaticMarkup(React.createElement(ProfitPrivacy, { storeId: 'store1' },
+    React.createElement(PrivateProfit, { value: 123456789 })));
+  assert.ok(!html.includes('123') && !html.includes('456') && !html.includes('789'));
+  assert.ok(html.includes('blur(4px)'));
+});
+test('partial settings responses cannot silently disable hiding or PIN', async () => {
+  for (const data of [{ enabled: false }, { hideProfit: false }]) {
+    await assert.rejects(client(async () => Response.json(data))('store1'), /Ochrana zisku je dočasně nedostupná/);
+  }
 });

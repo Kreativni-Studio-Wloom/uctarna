@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { adminDb } from '@/lib/firebase-admin';
 import { hashProfitPin, matchesProfitPin, validProfitPin } from '@/lib/profit-pin';
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
       }
       await ref.set(action === 'enable'
         ? { enabled: true, ...hashProfitPin(pin), attempts: 0, lockedUntil: 0 }
-        : { enabled: false, attempts: 0, lockedUntil: 0 });
+        : { enabled: false, salt: FieldValue.delete(), hash: FieldValue.delete(), attempts: 0, lockedUntil: 0 }, { merge: true });
       return reply({ enabled: action === 'enable' });
     }
     // Počítadlo je sdílené mezi zařízeními; transakce brání souběžnému hádání PINu.
