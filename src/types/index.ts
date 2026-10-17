@@ -81,9 +81,19 @@ export interface StoreEetSettings {
     validTo: FirestoreTime;
     uploadedAt: FirestoreTime;
     env: EetEnvironmentId;
+    /** 'ca-renew' = automatická obnova přes API CA EET (fáze E), jinak ruční nahrání. */
+    source?: 'ca-renew';
   };
+  /** Stav automatické obnovy certifikátu (zapisuje jen server, bez tajných dat). */
+  certificateRenewal?: StoreEetCertificateRenewal;
   /** Číselná řada. `{YYYY}` v prefixu se nahradí rokem. Výchozí `{ prefix: '{YYYY}-', resetYearly: true }`. */
   receiptSeries?: { prefix: string; resetYearly: boolean };
+}
+
+export interface StoreEetCertificateRenewal {
+  state: 'in_process' | 'renewed' | 'rejected' | 'failed';
+  at: FirestoreTime;
+  message?: string;
 }
 
 export type SaleEetStatus = 'test' | 'not_required' | 'pending' | 'sent' | 'queued' | 'failed_permanent';

@@ -16,6 +16,7 @@ export const paths = {
   sale: (uid: string, storeId: string, saleId: string) => `users/${uid}/stores/${storeId}/sales/${saleId}`,
   counter: (uid: string, storeId: string) => `users/${uid}/stores/${storeId}/counters/receipts`,
   privateEet: (uid: string, storeId: string) => `users/${uid}/stores/${storeId}/private/eet`,
+  privateEetRenewal: (uid: string, storeId: string) => `users/${uid}/stores/${storeId}/private/eetRenewal`,
   product: (uid: string, storeId: string, productId: string) => `users/${uid}/stores/${storeId}/products/${productId}`,
 };
 

@@ -13,6 +13,7 @@ import { DiscountModal } from './DiscountModal';
 import { isEetEnabled } from '@/lib/eet/flags';
 import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
 import { EetQueueBanner } from '@/components/eet/EetQueueBanner';
+import { EetCertificateBanner } from '@/components/eet/EetCertificateBanner';
 import { EetResultHost, type EetResultSource } from '@/components/eet/EetResultHost';
 import { useEetQueue, useMinuteTick } from '@/components/eet/useEetQueue';
 
@@ -943,6 +944,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         </button>
         </div>
       </div>
+
+      {eetEnabled && <EetCertificateBanner className="mb-4" store={storeDoc} now={minuteNow} />}
 
       {eetEnabled && (
         <EetQueueBanner

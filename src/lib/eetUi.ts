@@ -533,3 +533,45 @@ export function receiptEetInfo(
   }
   return info;
 }
+
+// ---------------------------------------------------------------------------
+// Konec platnosti certifikátu (fáze E: záloha k automatické obnově)
+// ---------------------------------------------------------------------------
+
+/** Od kolika dní před koncem platnosti ukazovat upozornění (= začátek automatické obnovy). */
+export const CERT_NOTICE_DAYS = 21;
+
+export interface CertificateNotice {
+  tone: 'info' | 'warning' | 'danger';
+  daysLeft: number;
+  text: string;
+}
+
+const pluralDen = (n: number) => (n === 1 ? 'den' : n >= 2 && n <= 4 ? 'dny' : 'dní');
+
+/**
+ * Banner „certifikát vyprší za N dní“ (jen při zapnutém EET). Produkční certifikát obnovuje
+ * server sám (/api/eet/cert-renew); banner je pojistka, kdyby obnova neproběhla.
+ */
+export function certificateNotice(store: StoreLike, now: Date = new Date()): CertificateNotice | null {
+  if (!isEetEnabled(store)) return null;
+  const cert = store?.eet?.certificate;
+  const validTo = toDateLoose(cert?.validTo);
+  if (!cert || !validTo) return null;
+  const daysLeft = Math.ceil((validTo.getTime() - now.getTime()) / 86_400_000);
+  if (daysLeft <= 0) {
+    return { tone: 'danger', daysLeft, text: 'Certifikát EET vypršel, tržby nejde evidovat. Nahrajte nový v Nastavení → EET 2.0.' };
+  }
+  if (daysLeft > CERT_NOTICE_DAYS) return null;
+  const renewal = store?.eet?.certificateRenewal;
+  const base = `Certifikát EET vyprší za ${daysLeft} ${pluralDen(daysLeft)}.`;
+  if (renewal?.state === 'rejected' || renewal?.state === 'failed') {
+    return { tone: 'danger', daysLeft, text: `${base} Automatická obnova selhala${renewal.message ? `: ${renewal.message}` : '.'} Nahrajte nový certifikát v Nastavení.` };
+  }
+  if (cert.env !== 'production') {
+    return { tone: daysLeft <= 7 ? 'danger' : 'warning', daysLeft, text: `${base} Nahrajte nový v Nastavení → EET 2.0.` };
+  }
+  const tone = daysLeft <= 3 ? 'danger' : daysLeft <= 14 ? 'warning' : 'info';
+  const tail = renewal?.state === 'in_process' ? 'Žádost o nový certifikát je podaná, čeká se na vydání.' : 'Obnovuje se automaticky; kdyby se to nepovedlo, nahrajte nový v Nastavení.';
+  return { tone, daysLeft, text: `${base} ${tail}` };
+}
