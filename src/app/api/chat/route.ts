@@ -11,6 +11,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { endOfDay, format, isValid, parseISO, startOfDay } from 'date-fns';
 import { cs } from 'date-fns/locale';
 import nodemailer from 'nodemailer';
+import { getSmtpConfig } from '@/lib/smtp-config';
 import { buildEmailReportData, generateEmailContent } from '@/lib/email';
 import { saleTipInCzk } from '@/lib/saleTip';
 import { adminDb, saveChat } from '@/lib/firebase-admin';
@@ -1774,9 +1775,10 @@ async function sendClosureReportEmail(
   const emailContent = generateEmailContent(reportData, eventName);
   const emailSubject = `${reportData.period} uzávěrka - ${eventName} - ${reportData.storeName}`;
 
+  const smtp = getSmtpConfig();
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.seznam.cz',
-    port: Number(process.env.SMTP_PORT || 465),
+    host: smtp.host,
+    port: smtp.port,
     secure: true,
     pool: true,
     maxConnections: 1,
@@ -1784,8 +1786,8 @@ async function sendClosureReportEmail(
     greetingTimeout: 8000,
     socketTimeout: 10000,
     auth: {
-      user: process.env.SMTP_USER || 'info@uctarna.fun',
-      pass: process.env.SMTP_PASS || 'xeQvep-coccec-watza7',
+      user: smtp.user,
+      pass: smtp.pass,
     },
     tls: {
       rejectUnauthorized: false,
@@ -1793,7 +1795,7 @@ async function sendClosureReportEmail(
   });
 
   await transporter.sendMail({
-    from: process.env.SMTP_FROM || 'info@uctarna.fun',
+    from: smtp.from,
     to,
     subject: emailSubject,
     html: emailContent.html,

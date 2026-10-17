@@ -54,7 +54,7 @@ firebase deploy --only functions
 - **Server**: smtp.seznam.cz
 - **Port**: 465 (SSL/TLS)
 - **Email**: info@uctarna.fun
-- **Heslo**: xeQvep-coccec-watza7
+- **Heslo**: nastavuje se v env proměnné `SMTP_PASS` (Vercel), nikdy ne v repu
 
 ### Funkce
 - ✅ Generování denních reportů

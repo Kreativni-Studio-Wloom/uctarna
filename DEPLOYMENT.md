@@ -29,7 +29,7 @@ firebase init
 # Adresa: smtp.seznam.cz
 # Port: 465 (SSL/TLS)
 # Uživatel: info@uctarna.fun
-# Heslo: xeQvep-coccec-watza7
+# Heslo: nastavuje se v env proměnné SMTP_PASS (Vercel), nikdy ne v repu
 
 # Konfigurace je v src/lib/real-smtp.ts
 # A v src/lib/email.ts

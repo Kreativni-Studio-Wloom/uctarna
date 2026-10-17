@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer, { type Transporter } from 'nodemailer';
+import { getSmtpConfig, SmtpConfigError } from '@/lib/smtp-config';
 
 export const runtime = 'nodejs';
 
@@ -7,9 +8,10 @@ let transporter: Transporter | null = null;
 
 function getTransporter() {
   if (!transporter) {
+    const smtp = getSmtpConfig();
     transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.seznam.cz',
-      port: Number(process.env.SMTP_PORT || 465),
+      host: smtp.host,
+      port: smtp.port,
       secure: true,
       pool: true,
       maxConnections: 1,
@@ -17,8 +19,8 @@ function getTransporter() {
       greetingTimeout: 8000,
       socketTimeout: 10000,
       auth: {
-        user: process.env.SMTP_USER || 'info@uctarna.fun',
-        pass: process.env.SMTP_PASS || 'xeQvep-coccec-watza7',
+        user: smtp.user,
+        pass: smtp.pass,
       },
       tls: {
         rejectUnauthorized: false,
@@ -42,8 +44,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const smtp = getSmtpConfig();
     const userInfo = await getTransporter().sendMail({
-      from: process.env.SMTP_FROM || 'info@uctarna.fun',
+      from: smtp.from,
       to,
       subject,
       html,
@@ -56,6 +59,14 @@ export async function POST(request: NextRequest) {
       messageId: userInfo.messageId,
     });
   } catch (error) {
+    if (error instanceof SmtpConfigError) {
+      console.error('❌ send-email API: SMTP není nakonfigurováno, chybí:', error.missing.join(', '));
+      return NextResponse.json(
+        { error: 'Odesílání e-mailů není na serveru nakonfigurováno. Kontaktujte správce.' },
+        { status: 500 }
+      );
+    }
+
     console.error('❌ Error in send-email API:', error);
 
     const message = error instanceof Error ? error.message : 'Neznámá chyba';

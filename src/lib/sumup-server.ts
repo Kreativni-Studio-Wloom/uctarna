@@ -30,7 +30,6 @@ export function getSumUpApiKey(): string | null {
     process.env.SUMUP_SECRET_API_KEY,
     process.env.SUMUP_API_KEY,
     process.env.SUMUP_ACCESS_TOKEN,
-    process.env.NEXT_PUBLIC_SUMUP_ACCESS_TOKEN,
   ];
   for (const c of candidates) {
     const trimmed = c?.trim();
