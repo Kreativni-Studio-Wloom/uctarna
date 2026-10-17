@@ -57,6 +57,14 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "sales",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "eet.status", "order": "ASCENDING" },
+        { "fieldPath": "eet.nextRetryAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

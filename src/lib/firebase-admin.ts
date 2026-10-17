@@ -1,4 +1,5 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import type { UIMessage } from 'ai';
 
@@ -20,6 +21,7 @@ function initAdminApp() {
 }
 
 export const adminDb = getFirestore(initAdminApp());
+export const adminAuth = getAuth(initAdminApp());
 
 export type StoredChatMessage = {
   id: string;

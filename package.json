@@ -15,7 +15,8 @@
     "firebase:deploy": "chmod +x deploy-functions.sh && ./deploy-functions.sh",
     "firebase:serve": "cd functions && npm run serve",
     "test": "vitest run",
-    "eet:smoke": "tsx --conditions=react-server scripts/eet-playground-smoke.ts"
+    "eet:smoke": "tsx --conditions=react-server scripts/eet-playground-smoke.ts",
+    "eet:e2e": "tsx --conditions=react-server scripts/eet-finalize-e2e.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.86",
