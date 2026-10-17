@@ -15,6 +15,8 @@ import { ProfitPrivacy, PrivateProfit } from '@/components/pos/ProfitPrivacy';
 import { useStore } from '@/contexts/StoreContext';
 import { TestSalesReportControls } from '@/components/pos/TestSalesReportControls';
 import { filterSales, isTestSale, summarizeTestSales, testSalesUiEnabled } from '@/lib/testSales';
+import { isEetEnabled } from '@/lib/eet/flags';
+import { pluralDoklad, summarizeEetReport } from '@/lib/eetUi';
 
 // Rozšířený User interface s prodejnami
 interface ExtendedUser {
@@ -215,6 +217,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const getFilteredSales = () => filterSales(sales, includeTestSales);
   const testSalesSummary = useMemo(() => summarizeTestSales(sales), [sales]);
   const showTestSalesControls = testSalesUiEnabled(storeDoc) || testSalesSummary.count > 0;
+  // EET 2.0: „z toho zaevidováno v EET“ a počet neodeslaných (jen při zapnutém EET).
+  const eetEnabled = isEetEnabled(storeDoc);
+  const eetSummary = useMemo(() => (eetEnabled ? summarizeEetReport(sales) : null), [eetEnabled, sales]);
 
   const getReportData = () => {
     const filteredSales = getFilteredSales();
@@ -764,6 +769,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               <p className="text-lg font-bold text-gray-900 dark:text-white truncate">
                 {reportData.totalSales.toLocaleString('cs-CZ')} Kč
               </p>
+              {eetSummary && (
+                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  z toho zaevidováno v EET {eetSummary.sentAmount.toLocaleString('cs-CZ', { maximumFractionDigits: 2 })} Kč
+                </p>
+              )}
+              {eetSummary && eetSummary.unsentCount > 0 && (
+                <p className="text-xs font-medium text-red-600 dark:text-red-400 truncate">
+                  {pluralDoklad(eetSummary.unsentCount)} ve frontě EET
+                </p>
+              )}
             </div>
           </div>
         </motion.div>

@@ -12,6 +12,7 @@ import type { CartItem, Sale, SaleEet, Store } from '@/types';
  * Idempotentní: druhé storno téhož dokladu vrátí to první.
  */
 
+export const PRE_EET_STORNO_REASON = 'Původní doklad byl vystaven před zapnutím EET';
 export const NON_CASH_REFUND_REASON = 'Bezhotovostní vratka (karta / QR) se do EET neeviduje';
 
 const neg = (v: unknown) => (typeof v === 'number' && v !== 0 ? -v : v);
@@ -86,12 +87,13 @@ export async function stornoSale(
     if (original.isTest === true) throw new HttpError(400, 'is_test', 'Testovací doklad se nestornuje, smažte ho');
 
     // Do EET jen hotovostní vratka reálného dokladu, který do EET patřil.
-    const originalNotSent = original.eet?.status === 'not_required';
+    // Doklad z doby před zapnutím EET (bez `eet`) se nikdy neevidoval, jeho storno tedy taky ne.
+    const originalNotSent = original.eet?.status === 'not_required' || !original.eet;
     const reason =
       original.paymentMethod !== 'cash'
         ? NON_CASH_REFUND_REASON
         : originalNotSent
-          ? original.eet?.reason ?? 'Původní doklad se do EET neevidoval'
+          ? original.eet?.reason ?? (original.eet ? 'Původní doklad se do EET neevidoval' : PRE_EET_STORNO_REASON)
           : undefined;
     const prepared = await prepareNewSaleEet(tx, db, uid, storeId, store, { notRequiredReason: reason, now });
     const doc = compact({

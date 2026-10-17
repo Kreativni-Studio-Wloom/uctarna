@@ -185,6 +185,22 @@ export async function registerSale(
       return { kind: 'skip', reason: 'final', eet: testEet, receiptNo };
     }
 
+    // Offline uložený doklad s výjimkou z evidence (checkout „Platba nepodléhá evidenci“): jen číslo, neodesílá se.
+    if (eet.exemptReason && !eet.data && !eet.firstAttemptAt) {
+      let receiptNo = sale.receiptNo;
+      let commitCounter: (() => void) | undefined;
+      if (!receiptNo) {
+        const alloc = await allocateReceiptNo(tx, db, uid, storeId, settings.receiptSeries, t);
+        receiptNo = alloc.receiptNo;
+        commitCounter = alloc.commit;
+      }
+      const { exemptReason, ...rest } = eet;
+      const exemptEet: SaleEet = compact({ ...rest, status: 'not_required', reason: exemptReason, env: eet.env ?? settings.environment, nextRetryAt: null, lockUntil: null });
+      commitCounter?.();
+      tx.update(saleRef, { eet: exemptEet, receiptNo, pendingNumber: false });
+      return { kind: 'skip', reason: 'final', eet: exemptEet, receiptNo };
+    }
+
     const fail = (message: string): ClaimResult => {
       const failed: SaleEet = compact({ ...eet, status: 'failed_permanent', message, nextRetryAt: null, lockUntil: null });
       tx.update(saleRef, { eet: failed });

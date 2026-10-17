@@ -16,6 +16,8 @@ import { buildEmailReportData, generateEmailContent } from '@/lib/email';
 import { saleTipInCzk } from '@/lib/saleTip';
 import { filterSales, isTestSale, summarizeTestSales, type TestSalesSummary } from '@/lib/testSales';
 import { adminDb, saveChat } from '@/lib/firebase-admin';
+import { DELETE_BLOCKED_REASON, saleRemovalPolicy } from '@/lib/eetUi';
+import type { Store } from '@/types';
 
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -1355,6 +1357,20 @@ async function executeDeleteInvoice(userId: string, storeId: string, params: Del
   }
 
   const data = saleDoc.data()!;
+
+  // EET 2.0: u prodejny se zapnutým EET jde smazat jen testovací doklad, reálný se stornuje v historii.
+  const storeSnap = await storeRef(userId, storeId).get();
+  const removal = saleRemovalPolicy(storeSnap.data() as Pick<Store, 'eet'> | undefined, data);
+  if (removal.action !== 'delete') {
+    const reason = removal.reason ?? DELETE_BLOCKED_REASON;
+    return {
+      deleted: false,
+      requiresConfirmation: false,
+      error: reason,
+      message: `${reason} Storno se dělá v Historii dokladů tlačítkem Stornovat; AI ho neprovádí.`,
+    };
+  }
+
   const items = (data.items ?? []) as Array<{ productId?: string; productName?: string; quantity?: number }>;
   const { sumUpTxCode } = extractSumUpInfo(data);
 

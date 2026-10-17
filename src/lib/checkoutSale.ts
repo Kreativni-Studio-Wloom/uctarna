@@ -141,12 +141,19 @@ export function buildSumUpPaymentData(
 /**
  * Doklad uložený z klienta u prodejny s EET, když /api/sales/finalize nejde zavolat (offline,
  * chyba serveru). Číslo dokladu a odeslání do EET dodělá server z fronty (`pendingNumber`).
- * Testovací doklad jde frontou taky (jen kvůli číslu); `registerSale` ho nikdy neodešle.
+ * Testovací doklad jde frontou taky (jen kvůli číslu); `registerSale` ho nikdy neodešle,
+ * stejně jako doklad s `exemptReason` (výjimka z evidence).
  */
-export function withOfflineEet<T extends object>(sale: T, now: Date) {
+export function withOfflineEet<T extends object>(sale: T, now: Date, exemptReason?: string) {
   return {
     ...sale,
     pendingNumber: true,
-    eet: { status: 'queued' as const, saleAt: now.toISOString(), nextRetryAt: now },
+    eet: {
+      status: 'queued' as const,
+      saleAt: now.toISOString(),
+      nextRetryAt: now,
+      // Výjimka z evidence: server doklad jen očísluje a označí 'not_required'.
+      ...(exemptReason ? { exemptReason } : {}),
+    },
   };
 }

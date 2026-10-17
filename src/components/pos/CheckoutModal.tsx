@@ -15,6 +15,8 @@ import { defaultTestSaleState, resolveIsTestSale, testSalesUiEnabled, withTestFl
 import { buildCashCardSaleDraft, buildQrSaleDraft, buildSumUpPaymentData, type SaleDraftObject } from '@/lib/checkoutSale';
 import { decideSaleSavePath, isEetEnabled } from '@/lib/eet/flags';
 import { saveSaleWithEet, type EetSaveResult } from '@/lib/eetCheckout';
+import { defaultEvidenceChoice, resolveCheckoutEvidence, type EetEvidenceChoice } from '@/lib/eetUi';
+import { EetEvidenceRow } from '@/components/eet/EetEvidenceRow';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -28,8 +30,8 @@ interface CheckoutModalProps {
   finalAmount?: number;
   /** ID testovacích produktů; doklad jen s nimi má přepínač „Testovací prodej“ zapnutý. */
   testProductIds?: string[];
-  /** EET 2.0 (jen při zapnutém EET): výsledek uložení přes /api/sales/finalize. Napojí fáze D. */
-  onEetResult?: (result: EetSaveResult) => void;
+  /** EET 2.0 (jen při zapnutém EET): výsledek uložení přes /api/sales/finalize (POS ukáže okno výsledku). */
+  onEetResult?: (result: EetSaveResult, sale: { saleId: string; amountLabel: string; isTest: boolean }) => void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -68,7 +70,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [testSaleToggle, setTestSaleToggle] = useState(() => defaultTestSaleState(cart, testProductIds ?? []));
   // Bez zapnutého vypínače prodejny je prodej vždy reálný (chování jako dřív).
   const showTestSaleToggle = testSalesUiEnabled(storeDoc);
-  const isTestSale = showTestSaleToggle && resolveIsTestSale(storeDoc, testSaleToggle);
+  // EET 2.0: řádek „Evidovat v EET“ nahrazuje přepínač testovacího prodeje (jen při zapnutém EET).
+  const eetEnabled = isEetEnabled(storeDoc);
+  const [eetChoice, setEetChoice] = useState<EetEvidenceChoice>(() => defaultEvidenceChoice(defaultTestSaleState(cart, testProductIds ?? [])));
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   const baseAmount = finalAmount !== undefined ? finalAmount : totalAmount;
@@ -108,6 +112,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
+  const eetEvidence = eetEnabled
+    ? resolveCheckoutEvidence({ store: storeDoc, choice: eetChoice, viaSumUpRedirect: paymentMethod === 'card' && sumUpAvailable && redirectToSumUp })
+    : null;
+  const isTestSale = eetEvidence ? eetEvidence.isTest : showTestSaleToggle && resolveIsTestSale(storeDoc, testSaleToggle);
   // Testovací prodej kartou neprochází SumUp terminálem, uloží se jen doklad.
   const requiresSumUpRedirect = paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !isTestSale;
   const canProceedWithCard = !requiresSumUpRedirect || sumUpAffiliateKeyConfigured;
@@ -292,8 +300,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       await legacySave();
       return;
     }
-    const result = await saveSaleWithEet({ uid: userId, storeId, draft, isTest: isTestSale, cart, legacySave });
-    onEetResult?.(result);
+    const result = await saveSaleWithEet({
+      uid: userId,
+      storeId,
+      draft,
+      isTest: isTestSale,
+      nonEvidenceReason: eetEvidence?.nonEvidenceReason,
+      cart,
+      legacySave,
+    });
+    const amountLabel = draft.currency === 'EUR' ? `${draft.totalAmount.toFixed(2)} €` : `${draft.totalAmount.toFixed(2)} Kč`;
+    onEetResult?.(result, { saleId: draft.documentId, amountLabel, isTest: isTestSale });
   };
 
   const handlePayment = async () => {
@@ -492,7 +509,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             </div>
 
-            {showTestSaleToggle && (
+            {eetEvidence && <EetEvidenceRow evidence={eetEvidence} choice={eetChoice} onChange={setEetChoice} />}
+
+            {!eetEvidence && showTestSaleToggle && (
               <TestSaleToggle
                 checked={isTestSale}
                 locked={storeDoc?.testMode === true}

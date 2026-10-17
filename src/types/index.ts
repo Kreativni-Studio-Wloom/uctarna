@@ -123,6 +123,8 @@ export interface SaleEet {
   firstAttemptAt?: FirestoreTime;
   /** U 'not_required' (např. bezhotovostní vratka) */
   reason?: string;
+  /** Offline záloha z checkoutu s výjimkou z evidence: server doklad očísluje a nastaví 'not_required' s tímto důvodem. */
+  exemptReason?: string;
   /** Okamžik tržby (ISO), zdroj pro dat_trzby, dokud nejsou data zmrazená. */
   saleAt?: string;
   /** Poslední zpráva pro obsluhu (česky). */

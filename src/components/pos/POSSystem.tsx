@@ -12,6 +12,9 @@ import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin
 import { DiscountModal } from './DiscountModal';
 import { isEetEnabled } from '@/lib/eet/flags';
 import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
+import { EetQueueBanner } from '@/components/eet/EetQueueBanner';
+import { EetResultHost, type EetResultSource } from '@/components/eet/EetResultHost';
+import { useEetQueue, useMinuteTick } from '@/components/eet/useEetQueue';
 
 const CheckoutModal = dynamic(
   () => import('./CheckoutModal').then((m) => ({ default: m.CheckoutModal })),
@@ -87,6 +90,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
   /** Odpočet popupu úspěšné platby; null = popup skrytý */
   const [successPopupCountdown, setSuccessPopupCountdown] = useState<number | null>(null);
+  /** EET 2.0: okno s výsledkem evidence (jen při zapnutém EET). */
+  const [eetResultSource, setEetResultSource] = useState<EetResultSource | null>(null);
   /** Čas posledního zpracovaného PAYMENT_SUCCESS – deduplikace zpráv z více kanálů */
   const paymentSuccessHandledAtRef = useRef(0);
   const highlightTimerRef = useRef<number | null>(null);
@@ -298,6 +303,11 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // EET 2.0: fronta neodeslaných dokladů této prodejny (náhrada za častý cron na tarifu Hobby).
   // Jen při zapnutém EET; bez něj se nic nevolá.
   const eetEnabled = isEetEnabled(storeDoc);
+  const eetEnabledRef = useRef(eetEnabled);
+  eetEnabledRef.current = eetEnabled;
+  const eetQueue = useEetQueue(user?.uid, storeId, eetEnabled);
+  const minuteNow = useMinuteTick();
+  const closeEetResult = useCallback(() => setEetResultSource(null), []);
   useEffect(() => {
     if (!eetEnabled || !user?.uid || !storeId) return;
     const run = () => {
@@ -329,7 +339,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
   // Posluchač úspěšné platby (SumUp návrat – stejné kanály jako CheckoutModal)
   useEffect(() => {
-    const handlePaymentSuccess = () => {
+    const handlePaymentSuccess = (saleId?: string | null) => {
       // Stejná platba dorazí více kanály (BroadcastChannel, storage event,
       // postMessage) – zpracujeme jen první signál, aby opožděný duplikát
       // znovu neotevřel popup, který už uživatel zavřel.
@@ -340,7 +350,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       void clearCartState();
       setShowCheckout(false);
       setDiscount(null);
-      setSuccessPopupCountdown(3);
+      // EET 2.0: jedno okno „Platba ✓ + stav EET“ místo prostého potvrzení platby.
+      if (eetEnabledRef.current && saleId) setEetResultSource({ kind: 'sumup', saleId });
+      else setSuccessPopupCountdown(3);
       console.log('✅ Úspěšná platba – košík vyčištěn');
     };
 
@@ -349,12 +361,12 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     const handleSuccessData = (data: { type?: string; pendingSave?: boolean; txCode?: string | null; foreignTxId?: string | null } | undefined) => {
       if (data?.type !== 'PAYMENT_SUCCESS') return;
       if (data.pendingSave) {
-        void finishSumUpCheckout(data.txCode ?? null, data.foreignTxId ?? null).then(
-          handlePaymentSuccess
+        void finishSumUpCheckout(data.txCode ?? null, data.foreignTxId ?? null).then(() =>
+          handlePaymentSuccess(data.foreignTxId)
         );
         return;
       }
-      handlePaymentSuccess();
+      handlePaymentSuccess(data.foreignTxId);
     };
 
     const onMessage = (event: MessageEvent) => {
@@ -932,6 +944,17 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         </div>
       </div>
 
+      {eetEnabled && (
+        <EetQueueBanner
+          className="mb-4"
+          sales={eetQueue}
+          now={minuteNow}
+          onRetry={async () => {
+            await retryMyEetQueue(storeId).catch((e) => console.warn('EET fronta:', e));
+          }}
+        />
+      )}
+
       {/* Menu dropdown - responzivní pozice */}
       {showMenu && (
         <div ref={menuDropdownRef} className="absolute top-16 md:top-20 right-2 md:right-4 lg:right-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl z-50 min-w-40 md:min-w-48 max-w-xs">
@@ -1438,6 +1461,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             discountAmount={discountAmount}
             finalAmount={finalAmount}
             testProductIds={testProductIds}
+            onEetResult={(result, sale) => {
+              if (result.kind === 'legacy' || !user?.uid) return;
+              setEetResultSource({ kind: 'checkout', saleId: sale.saleId, save: result, amountLabel: sale.amountLabel, isTest: sale.isTest });
+            }}
             onSuccess={() => {
               void clearCartState();
               setShowCheckout(false);
@@ -1622,6 +1649,20 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             storeId={storeId}
             onClose={() => { setShowSelectExtras(false); setExtrasParentItemId(null); }}
             onSelect={handleSelectExtras}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* EET 2.0: výsledek evidence (checkout i SumUp návrat) */}
+      <AnimatePresence>
+        {eetEnabled && eetResultSource && user?.uid && (
+          <EetResultHost
+            key={eetResultSource.saleId}
+            uid={user.uid}
+            storeId={storeId}
+            store={storeDoc}
+            source={eetResultSource}
+            onClose={closeEetResult}
           />
         )}
       </AnimatePresence>

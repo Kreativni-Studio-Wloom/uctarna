@@ -1,10 +1,14 @@
-import { Sale } from '@/types';
+import { Sale, StoreEetSettings } from '@/types';
 import { filterSales, isTestSale, saleAmountCzk, TEST_RECEIPT_WATERMARK } from '@/lib/testSales';
+import { receiptEetInfo } from '@/lib/eetUi';
 
 type ReceiptStoreData = {
   companyName?: string;
   ico?: string;
   companyAddress?: string;
+  /** EET 2.0: DIČ a nastavení (provozovna, pokladna). Doklady bez EET se tisknou jako dřív. */
+  dic?: string;
+  eet?: StoreEetSettings;
 };
 
 const RECEIPT_WIDTH_MM = 58;
@@ -127,10 +131,15 @@ export const generateReceiptPdfBlob = async (
   const ico = removeDiacritics(trimOrEmpty(store.ico));
 
   const isTest = isTestSale(sale);
+  const eetInfo = receiptEetInfo(sale, store);
   if (isTest) estimatedHeight += LINE_HEIGHT * 1.5;
   addTextBlockHeight(companyName, 10);
   addTextBlockHeight(companyAddress, 8.4);
   addTextBlockHeight(ico ? `IC: ${ico}` : '', 8.4);
+  addTextBlockHeight(eetInfo.dic ? `DIC: ${eetInfo.dic}` : '', 8.4);
+  estimatedHeight += eetInfo.rows.length * LINE_HEIGHT;
+  if (eetInfo.pok) estimatedHeight += LINE_HEIGHT * (eetInfo.pokNote ? 4 : 3);
+  eetInfo.notes.forEach((note) => addTextBlockHeight(note, 7.5));
   addTextBlockHeight('Neplatce DPH', 8.4);
   estimatedHeight += SECTION_SPACING + DIVIDER_PADDING * 2;
   estimatedHeight += LINE_HEIGHT * 2 + SECTION_SPACING + DIVIDER_PADDING * 2;
@@ -209,13 +218,14 @@ export const generateReceiptPdfBlob = async (
     });
   }
   if (ico) drawCentered(`IC: ${ico}`, 8.5);
+  if (eetInfo.dic) drawCentered(`DIC: ${eetInfo.dic}`, 8.5);
   drawCentered('Neplatce DPH', 8.5, true);
 
   y += 1.5;
   drawDivider();
 
   const createdAt = toDate(sale.createdAt);
-  drawLabelValue('Cislo dokladu', sale.documentId || sale.id);
+  drawLabelValue('Cislo dokladu', eetInfo.receiptNo);
   drawLabelValue(
     'Datum',
     new Intl.DateTimeFormat('cs-CZ', {
@@ -226,6 +236,7 @@ export const generateReceiptPdfBlob = async (
       minute: '2-digit',
     }).format(createdAt)
   );
+  eetInfo.rows.forEach((row) => drawLabelValue(row.label, row.value));
 
   y += 1;
   drawDivider();
@@ -283,6 +294,28 @@ export const generateReceiptPdfBlob = async (
   doc.text('CELKEM', PADDING_MM, y + 1);
   doc.text(removeDiacritics(formatAmount(totalWithoutTip, sale.currency)), pageWidth - PADDING_MM, y + 1, { align: 'right' });
   y += LINE_HEIGHT + 1;
+
+  // EET 2.0: POK (zkrácené písmo, 39 znaků se vejde na 58 mm) nebo poznámka o frontě.
+  if (eetInfo.pok || eetInfo.notes.length) {
+    y += 1;
+    if (eetInfo.pok) {
+      drawCentered('POK', 8, true);
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(6.2);
+      doc.text(eetInfo.pok, CENTER_X, y, { align: 'center' });
+      y += LINE_HEIGHT;
+      if (eetInfo.pokNote) drawCentered(removeDiacritics(eetInfo.pokNote).replace('–', '-'), 7, true);
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    eetInfo.notes.forEach((note) => {
+      const lines = doc.splitTextToSize(removeDiacritics(note), layout.contentWidth);
+      lines.forEach((line: string) => {
+        doc.text(line, CENTER_X, y, { align: 'center' });
+        y += LINE_HEIGHT;
+      });
+    });
+  }
 
   y += 2;
   doc.setFont('helvetica', 'bold');
@@ -514,7 +547,7 @@ export const generateDailySalesReportPdfBlob = async (
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9.5);
     doc.text(
-      removeDiacritics(`${index + 1}. Doklad c. ${sale.documentId || sale.id}`),
+      removeDiacritics(`${index + 1}. Doklad c. ${sale.receiptNo || sale.documentId || sale.id}`),
       leftX + 1.5,
       y
     );

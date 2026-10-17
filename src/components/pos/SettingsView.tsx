@@ -11,6 +11,7 @@ import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBr
 import { ColorWheelPicker } from '@/components/pos/ColorWheelPicker';
 import { ProfitProtectionSettings } from '@/components/pos/ProfitProtectionSettings';
 import { TestSalesSettings } from '@/components/pos/TestSalesSettings';
+import { EetSettings } from '@/components/eet/EetSettings';
 import { DuplicateSalesCleaner } from '@/components/pos/DuplicateSalesCleaner';
 
 interface SettingsViewProps {
@@ -539,6 +540,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
       <ProfitProtectionSettings key={`${user?.uid}-${storeId}`} storeId={storeId} />
 
       <TestSalesSettings storeId={storeId} />
+
+      <EetSettings storeId={storeId} />
 
       {/* Additional Settings */}
       <motion.div
