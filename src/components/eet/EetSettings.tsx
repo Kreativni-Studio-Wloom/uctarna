@@ -11,6 +11,8 @@ import { isEetEnabled } from '@/lib/eet/flags';
 import { verifyEetConnection } from '@/lib/eetClient';
 import { checkEetSettings, eetFormToUpdate, eetSettingsToForm, type EetSettingsForm } from '@/lib/eetUi';
 import { EetCertificateUpload } from './EetCertificateUpload';
+import { ReceiptSeriesEditor } from './ReceiptSeriesEditor';
+import { Switch } from './Switch';
 
 interface EetSettingsProps {
   storeId: string;
@@ -31,13 +33,6 @@ const Field: React.FC<{ label: string; hint?: string; error?: string; htmlFor: s
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</p>
     ) : null}
   </div>
-);
-
-const Toggle: React.FC<{ checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; label: string }> = ({ checked, disabled, onChange, label }) => (
-  <label className={`relative inline-flex items-center shrink-0 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-    <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label} className="sr-only peer" />
-    <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-disabled:opacity-50 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
-  </label>
 );
 
 /**
@@ -171,7 +166,7 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
           {saving === 'toggle' ? (
             <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
           ) : (
-            <Toggle checked={enabled} disabled={saving !== null || (!enabled && !canEnable)} onChange={(v) => void setEnabled(v)} label="Zapnout EET" />
+            <Switch checked={enabled} disabled={saving !== null || (!enabled && !canEnable)} onChange={(v) => void setEnabled(v)} label="Zapnout EET" />
           )}
         </div>
 
@@ -244,16 +239,15 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
 
         <EetCertificateUpload storeId={storeId} certificate={certificate} environment={form.environment} eic={form.eic} eetEnabled={enabled} />
 
+        <ReceiptSeriesEditor
+          prefix={form.receiptPrefix}
+          resetYearly={form.resetYearly}
+          error={check.fieldErrors.receiptPrefix}
+          onChange={({ prefix, resetYearly }) => setForm((f) => ({ ...f, receiptPrefix: prefix, resetYearly }))}
+        />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Prefix číselné řady" htmlFor="eet-prefix" hint={check.receiptPreview ? `První doklad: ${check.receiptPreview}` : undefined} error={check.fieldErrors.receiptPrefix}>
-            <input
-              id="eet-prefix"
-              value={form.receiptPrefix}
-              onChange={(e) => set('receiptPrefix', e.target.value)}
-              className={`${inputCls} ${check.fieldErrors.receiptPrefix ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
-            />
-          </Field>
-          <Field label="Mezní doba odezvy (s)" htmlFor="eet-timeout" hint="Zákon vyžaduje nejméně 2 s" error={check.fieldErrors.sendTimeoutMs}>
+          <Field label="Mezní doba odezvy (s)" htmlFor="eet-timeout" hint="Zákon vyžaduje nejméně 2 s, doporučeno 4 s" error={check.fieldErrors.sendTimeoutMs}>
             <input
               id="eet-timeout"
               type="number"
@@ -270,7 +264,6 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
         <div className="space-y-3">
           {(
             [
-              ['resetYearly', 'Nová řada každý rok', 'Číslo dokladu začne v lednu znovu od 1 (rok je součástí čísla).'],
               ['tipsAreBusinessIncome', 'Spropitné je příjem podniku', 'Spropitné se zahrne do evidované tržby.'],
             ] as const
           ).map(([key, title, sub]) => (
@@ -279,7 +272,7 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">{title}</div>
                 <div className="text-xs text-gray-600 dark:text-gray-400">{sub}</div>
               </div>
-              <Toggle checked={form[key]} onChange={(v) => set(key, v)} label={title} />
+              <Switch checked={form[key]} onChange={(v) => set(key, v)} label={title} />
             </div>
           ))}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">

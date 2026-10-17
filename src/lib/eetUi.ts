@@ -477,6 +477,83 @@ export function checkEetSettings(f: EetSettingsForm, cert: CertificateMeta | nul
   return { fieldErrors, blockers, warnings, receiptPreview };
 }
 
+// ---------------------------------------------------------------------------
+// Číselná řada dokladů: přívětivé skládání prefixu (Nastavení → EET 2.0)
+// ---------------------------------------------------------------------------
+
+export type ReceiptPrefixSeparator = '-' | '/' | '';
+export const RECEIPT_PREFIX_SEPARATORS: readonly ReceiptPrefixSeparator[] = ['-', '/', ''];
+
+/** Prefix poskládaný z částí: vlastní označení (např. zkratka prodejny), rok, oddělovač. */
+export interface ReceiptPrefixParts {
+  label: string;
+  year: boolean;
+  separator: ReceiptPrefixSeparator;
+}
+
+const YEAR_TOKEN = '{YYYY}';
+const RECEIPT_DIGITS = 6;
+const PORAD_CIS_MAX = 25;
+
+/** Prefix pro `receiptSeries.prefix`, např. {label:'P1', year:true, separator:'-'} → 'P1-{YYYY}-'. */
+export function composeReceiptPrefix(p: ReceiptPrefixParts): string {
+  const parts = [p.label.trim(), p.year ? YEAR_TOKEN : ''].filter(Boolean);
+  return parts.length ? parts.join(p.separator) + p.separator : '';
+}
+
+/** Rozloží uložený prefix na části; null = vlastní tvar, který jde upravit jen ručně. */
+export function parseReceiptPrefix(prefix: string): ReceiptPrefixParts | null {
+  if (prefix === '') return { label: '', year: false, separator: '-' };
+  for (const separator of RECEIPT_PREFIX_SEPARATORS) {
+    for (const year of [true, false]) {
+      let rest = prefix;
+      if (separator) {
+        if (!rest.endsWith(separator)) continue;
+        rest = rest.slice(0, -separator.length);
+      }
+      if (year) {
+        if (!rest.endsWith(YEAR_TOKEN)) continue;
+        rest = rest.slice(0, -YEAR_TOKEN.length);
+        if (rest && separator) {
+          if (!rest.endsWith(separator)) continue;
+          rest = rest.slice(0, -separator.length);
+        }
+      }
+      if (rest.includes('{') || rest.includes('}') || rest !== rest.trim()) continue;
+      const parts: ReceiptPrefixParts = { label: rest, year, separator };
+      if (composeReceiptPrefix(parts) === prefix) return parts;
+    }
+  }
+  return null;
+}
+
+/** Vlastní označení: jen znaky povolené v čísle dokladu (diakritika se odstraní). */
+export function sanitizeReceiptLabel(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^0-9a-zA-Z.,:;#\-_ ]/g, '');
+}
+
+/** Kolik znaků smí mít vlastní označení, aby se číslo dokladu vešlo do 25 znaků. */
+export function maxReceiptLabelLength(p: Pick<ReceiptPrefixParts, 'year' | 'separator'>): number {
+  const separators = p.separator.length * (p.year ? 2 : 1);
+  return Math.max(0, PORAD_CIS_MAX - RECEIPT_DIGITS - (p.year ? 4 : 0) - separators);
+}
+
+/** Ukázka prvních dvou čísel dokladu, nebo null při neplatném prefixu. */
+export function previewReceiptNumbers(prefix: string, resetYearly: boolean, now: Date = new Date()): [string, string] | null {
+  try {
+    const year = pragueYear(now);
+    return [
+      formatReceiptNo({ prefix, resetYearly }, { year, last: 1 }),
+      formatReceiptNo({ prefix, resetYearly }, { year, last: 2 }),
+    ];
+  } catch {
+    return null;
+  }
+}
+
 export function envLabel(env: string): string {
   return env === 'production' ? 'produkci' : 'Playground (test)';
 }

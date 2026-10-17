@@ -206,7 +206,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   // EET 2.0 (jen při zapnutém EET): fronta neodeslaných dokladů, filtr chyb, storno místo mazání.
   const eetEnabled = isEetEnabled(storeDoc);
   const eetQueue = useEetQueue<Sale>(user?.uid, storeId, eetEnabled);
-  const minuteNow = useMinuteTick();
+  const minuteNow = useMinuteTick(eetEnabled);
   const [eetErrorsOnly, setEetErrorsOnly] = useState(false);
   const [saleToStorno, setSaleToStorno] = useState<Sale | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -708,38 +708,62 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
         <input
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Hledat podle čísla dokladu, ID nebo SumUp kódu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
-        {showTestFilter && (
-          <select
-            value={testFilter}
-            onChange={(e) => setTestFilter(e.target.value as TestFilter)}
-            aria-label="Filtr testovacích dokladů"
-            className="shrink-0 px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="all">Všechny doklady</option>
-            <option value="real">Jen reálné</option>
-            <option value="test">Jen testovací</option>
-          </select>
-        )}
-        {eetEnabled && (
-          <button
-            type="button"
-            onClick={() => setEetErrorsOnly((v) => !v)}
-            aria-pressed={eetErrorsOnly}
-            className={`shrink-0 px-3 py-3 rounded-lg border text-sm font-medium transition-colors ${
-              eetErrorsOnly
-                ? 'bg-red-600 border-red-600 text-white'
-                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-            }`}
-          >
-            Chyby EET
-          </button>
+        {(showTestFilter || eetEnabled) && (
+          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:shrink-0">
+            {showTestFilter && (
+              <div
+                role="radiogroup"
+                aria-label="Filtr testovacích dokladů"
+                className="flex flex-1 md:flex-none p-1 gap-1 rounded-lg bg-gray-100 dark:bg-gray-700"
+              >
+                {(
+                  [
+                    ['all', 'Všechny'],
+                    ['real', 'Reálné'],
+                    ['test', 'Testovací'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={testFilter === value}
+                    onClick={() => setTestFilter(value)}
+                    className={`flex-1 md:flex-none px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                      testFilter === value
+                        ? value === 'test'
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'bg-brand-600 text-white shadow-sm'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {eetEnabled && (
+              <button
+                type="button"
+                onClick={() => setEetErrorsOnly((v) => !v)}
+                aria-pressed={eetErrorsOnly}
+                className={`shrink-0 px-3 py-3 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${
+                  eetErrorsOnly
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                Chyby EET
+              </button>
+            )}
+          </div>
         )}
       </div>
 

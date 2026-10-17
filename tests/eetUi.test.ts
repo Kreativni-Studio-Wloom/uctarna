@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  composeReceiptPrefix,
+  maxReceiptLabelLength,
+  parseReceiptPrefix,
+  previewReceiptNumbers,
+  sanitizeReceiptLabel,
   RECEIPT_QUEUED_NOTE,
   canDeleteSale,
   canResendToEet,
@@ -243,5 +248,45 @@ describe('PDF účtenka', () => {
     const i = receiptEetInfo({ receiptNo: '2026-000002', isTest: true, eet: { status: 'test' } }, store);
     expect(i.notes).toEqual([]);
     expect(i.pok).toBeUndefined();
+  });
+});
+
+describe('číselná řada: skládání prefixu', () => {
+  const now = new Date('2026-10-18T10:00:00Z');
+
+  it.each([
+    [{ label: '', year: true, separator: '-' as const }, '{YYYY}-'],
+    [{ label: 'P1', year: true, separator: '-' as const }, 'P1-{YYYY}-'],
+    [{ label: 'PRAHA', year: false, separator: '/' as const }, 'PRAHA/'],
+    [{ label: 'P1', year: true, separator: '' as const }, 'P1{YYYY}'],
+    [{ label: '', year: false, separator: '-' as const }, ''],
+  ])('compose %o → %s a zpět', (parts, prefix) => {
+    expect(composeReceiptPrefix(parts)).toBe(prefix);
+    expect(composeReceiptPrefix(parseReceiptPrefix(prefix)!)).toBe(prefix);
+  });
+
+  it('výchozí prefix {YYYY}- se rozloží na rok s pomlčkou', () => {
+    expect(parseReceiptPrefix('{YYYY}-')).toEqual({ label: '', year: true, separator: '-' });
+  });
+
+  it('neznámý tvar → null (ruční úprava)', () => {
+    expect(parseReceiptPrefix('A{YYYY}B-')).toBeNull();
+    expect(parseReceiptPrefix('{YYYY}-{YYYY}-')).toBeNull();
+  });
+
+  it('vlastní označení: bez diakritiky a nepovolených znaků', () => {
+    expect(sanitizeReceiptLabel('Plzeň 1/č!')).toBe('Plzen 1c');
+  });
+
+  it('délka označení hlídá limit 25 znaků čísla dokladu', () => {
+    const max = maxReceiptLabelLength({ year: true, separator: '-' });
+    const prefix = composeReceiptPrefix({ label: 'X'.repeat(max), year: true, separator: '-' });
+    expect(previewReceiptNumbers(prefix, true, now)?.[0]).toHaveLength(25);
+    expect(previewReceiptNumbers(composeReceiptPrefix({ label: 'X'.repeat(max + 1), year: true, separator: '-' }), true, now)).toBeNull();
+  });
+
+  it('ukázka čísel', () => {
+    expect(previewReceiptNumbers('P1-{YYYY}-', true, now)).toEqual(['P1-2026-000001', 'P1-2026-000002']);
+    expect(previewReceiptNumbers('', false, now)).toEqual(['000001', '000002']);
   });
 });
