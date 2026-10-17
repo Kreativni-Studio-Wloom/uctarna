@@ -33,12 +33,13 @@ export function useEetQueue<T extends EetSaleLike = EetSaleLike>(uid: string | u
   return sales;
 }
 
-/** Překreslení jednou za minutu (stáří dokladů ve frontě). */
-export function useMinuteTick(): Date {
+/** Překreslení jednou za minutu (stáří dokladů ve frontě). Bez EET (`active` = false) neběží. */
+export function useMinuteTick(active = true): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
+    if (!active) return;
     const t = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(t);
-  }, []);
+  }, [active]);
   return now;
 }

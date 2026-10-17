@@ -307,7 +307,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const eetEnabledRef = useRef(eetEnabled);
   eetEnabledRef.current = eetEnabled;
   const eetQueue = useEetQueue(user?.uid, storeId, eetEnabled);
-  const minuteNow = useMinuteTick();
+  const minuteNow = useMinuteTick(eetEnabled);
   const closeEetResult = useCallback(() => setEetResultSource(null), []);
   useEffect(() => {
     if (!eetEnabled || !user?.uid || !storeId) return;
