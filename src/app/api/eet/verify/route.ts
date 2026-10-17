@@ -6,6 +6,8 @@ import { verifyConnection } from '@/lib/eet/verify';
 import type { Store } from '@/types';
 
 export const runtime = 'nodejs';
+// EET (SPCSS, CZ): z výchozího regionu Vercelu (iad1, USA) spojení nenavázalo (UND_ERR_CONNECT_TIMEOUT), běžet v EU.
+export const preferredRegion = 'fra1';
 export const dynamic = 'force-dynamic';
 
 const schema = z.object({ storeId: z.string().regex(ID_RE) });

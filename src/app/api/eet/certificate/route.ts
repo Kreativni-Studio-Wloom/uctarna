@@ -10,6 +10,8 @@ import type { Store } from '@/types';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
+// EET (SPCSS, CZ): z výchozího regionu Vercelu (iad1, USA) spojení nenavázalo (UND_ERR_CONNECT_TIMEOUT), běžet v EU.
+export const preferredRegion = 'fra1';
 export const dynamic = 'force-dynamic';
 
 const MAX_P12_BYTES = 64 * 1024;
