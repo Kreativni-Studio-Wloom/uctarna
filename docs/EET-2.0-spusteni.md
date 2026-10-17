@@ -31,22 +31,18 @@ Dvě úlohy:
 - `GET /api/eet/cert-renew`: jednou denně kontrola certifikátů (obnova ≤ 21 dní před koncem platnosti,
   API CA EET běží od 1. 11. 2026).
 
-`vercel.json` zatím **neexistuje**. Možnosti:
+**Zvoleno: tarif Hobby.** `vercel.json` je ve větvi a obsahuje:
+- `"regions": ["fra1"]`: všechny serverové funkce běží ve Frankfurtu. Z výchozího regionu `iad1` (USA)
+  se server EET nepřipojí (`UND_ERR_CONNECT_TIMEOUT`), `preferredRegion` v routách Vercel ignoroval.
+  Po sloučení se to týká i SumUp, AI asistenta a e-mailů.
+- crony 1× denně (víc Hobby nedovolí): `/api/eet/retry` v 5:00 UTC a `/api/eet/cert-renew` v 5:30 UTC.
 
-| tarif | `/api/eet/retry` | `/api/eet/cert-renew` |
-|---|---|---|
-| Hobby (cron max. 1× denně, častější rozbije nasazení) | `"0 6 * * *"` jako denní pojistka; jinak spoléhat na `retry-mine` z POS nebo externí plánovač (GitHub Actions, cron-job.org) s hlavičkou `Authorization: Bearer $CRON_SECRET` | `"30 5 * * *"` |
-| Pro | `"*/5 * * * *"` | `"30 5 * * *"` |
+Frontu neodeslaných dokladů průběžně odesílá otevřený POS (`retry-mine` každé 2 min a po obnovení
+připojení), denní cron je pojistka pro zavřený POS (zákonná lhůta 48 h). Volitelně zdarma
+cron-job.org: `GET /api/eet/retry` každých 10 min s hlavičkou `Authorization: Bearer $CRON_SECRET`.
 
-Příklad `vercel.json` (Pro):
-```json
-{
-  "crons": [
-    { "path": "/api/eet/retry", "schedule": "*/5 * * * *" },
-    { "path": "/api/eet/cert-renew", "schedule": "30 5 * * *" }
-  ]
-}
-```
+Pozn.: podmínky Vercelu omezují tarif Hobby na nekomerční použití.
+
 Ruční spuštění (např. po nasazení):
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" https://<adresa>/api/eet/cert-renew
