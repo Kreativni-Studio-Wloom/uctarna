@@ -66,6 +66,8 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
   const check = checkEetSettings(form, certificate);
   const savedCheck = checkEetSettings(saved, certificate);
   const dirty = JSON.stringify(form) !== savedKey;
+  // Prázdné pole nesvítí červeně (chybějící údaj je vidět v textu u vypínače), jen špatně vyplněné.
+  const shownError = (key: 'eic' | 'unitId' | 'registerId') => (form[key].trim() ? check.fieldErrors[key] : undefined);
   const set = <K extends keyof EetSettingsForm>(key: K, value: EetSettingsForm[K]) => setForm((f) => ({ ...f, [key]: value }));
   const storeRef = () => doc(db, 'users', user!.uid, 'stores', storeId);
 
@@ -212,30 +214,30 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
         </fieldset>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="DIČ (EIČ)" htmlFor="eet-eic" error={check.fieldErrors.eic}>
+          <Field label="DIČ (EIČ)" htmlFor="eet-eic" error={shownError('eic')}>
             <input
               id="eet-eic"
               value={form.eic}
               onChange={(e) => set('eic', e.target.value.toUpperCase())}
               placeholder="CZ12345678"
-              className={`${inputCls} ${check.fieldErrors.eic ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
+              className={`${inputCls} ${shownError('eic') ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
             />
           </Field>
-          <Field label="Číslo evidenční jednotky" htmlFor="eet-unit" hint="Provozovna z portálu DIS+" error={check.fieldErrors.unitId}>
+          <Field label="Číslo evidenční jednotky" htmlFor="eet-unit" hint="Provozovna z portálu DIS+" error={shownError('unitId')}>
             <input
               id="eet-unit"
               inputMode="numeric"
               value={form.unitId}
               onChange={(e) => set('unitId', e.target.value.replace(/\D/g, ''))}
-              className={`${inputCls} ${check.fieldErrors.unitId ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
+              className={`${inputCls} ${shownError('unitId') ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
             />
           </Field>
-          <Field label="Označení pokladny" htmlFor="eet-register" error={check.fieldErrors.registerId}>
+          <Field label="Označení pokladny" htmlFor="eet-register" error={shownError('registerId')}>
             <input
               id="eet-register"
               value={form.registerId}
               onChange={(e) => set('registerId', e.target.value)}
-              className={`${inputCls} ${check.fieldErrors.registerId ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
+              className={`${inputCls} ${shownError('registerId') ? 'border-red-400' : 'border-gray-300 dark:border-gray-600'}`}
             />
           </Field>
         </div>

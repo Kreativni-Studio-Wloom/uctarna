@@ -470,7 +470,7 @@ export function checkEetSettings(f: EetSettingsForm, cert: CertificateMeta | nul
     sendTimeoutMs: 'mezní doba odezvy',
     receiptPrefix: 'prefix číselné řady',
   };
-  for (const key of Object.keys(fieldErrors) as (keyof EetSettingsForm)[]) blockers.push(`Opravte pole ${labels[key] ?? key}.`);
+  for (const key of Object.keys(fieldErrors) as (keyof EetSettingsForm)[]) blockers.push(`Vyplňte správně pole ${labels[key] ?? key}.`);
   return { fieldErrors, blockers, warnings, receiptPreview };
 }
 
