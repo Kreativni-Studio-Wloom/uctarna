@@ -4,6 +4,10 @@ import { db } from '@/lib/firebase';
 import { adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { fetchSumUpTerminalTip } from '@/lib/sumup-server';
+import { HttpError, serializeEet } from '@/lib/eet/db';
+import { authenticate } from '@/lib/eet/http';
+import { registerSale, type RegisterOutcome } from '@/lib/eet/register';
+import { saveSumUpSale } from '@/lib/eet/sumupSale';
 
 // Funkce pro ukládání všech SumUp odpovědí do Firebase
 async function saveSumUpResponseToFirebase(body: any, request: NextRequest) {
@@ -263,19 +267,14 @@ export async function POST(request: NextRequest) {
       // Admin SDK – transakce musí umět přečíst existující doklad (klientská pravidla
       // bez auth read neumožňují, proto runTransaction přes web SDK selhával).
       const saleDocId = documentId || foreignTxId;
-      const saleRef = adminDb.doc(`users/${userId}/stores/${storeId}/sales/${saleDocId}`);
 
       console.log('💾 Ukládám prodej do databáze...', { storeId, userId, saleDocId, itemsCount: cartItems.length });
 
-      let alreadyExists = false;
-      await adminDb.runTransaction(async (tx) => {
-        const existing = await tx.get(saleRef);
-        if (existing.exists) {
-          alreadyExists = true;
-          return;
-        }
-        tx.set(saleRef, sale);
-      });
+      // EET 2.0: u prodejny se zapnutým EET přidělí transakce i číslo dokladu (saveSumUpSale).
+      // Bez EET se zapíše přesně `sale` jako dřív. Token posílá klient jen při zapnutém EET.
+      const authUid = request.headers.has('authorization') ? await authenticate(request) : null;
+      const saved = await saveSumUpSale(adminDb, { userId, storeId, saleDocId, sale, authUid });
+      const alreadyExists = saved.alreadyExists;
 
       if (alreadyExists) {
         console.log('ℹ️ Prodej s tímto documentId už existuje – duplicitní callback ignorován:', saleDocId);
@@ -321,6 +320,22 @@ export async function POST(request: NextRequest) {
         inventoryFailed,
       });
 
+      // EET 2.0: odeslání až po commitu. Selhání EET platbu ani uložení dokladu neruší (fronta).
+      let eetRegistration: RegisterOutcome | undefined;
+      if (saved.eetEnabled && saved.eet?.status === 'pending') {
+        try {
+          eetRegistration = await registerSale(adminDb, userId, storeId, saleDocId, { mode: 'auto' });
+        } catch (e) {
+          console.error('⚠️ EET: odeslání po SumUp platbě selhalo, doklad zůstává ve frontě', e);
+        }
+      }
+      const eetResponse = saved.eetEnabled
+        ? {
+            receiptNo: eetRegistration?.receiptNo ?? saved.receiptNo,
+            eet: serializeEet(eetRegistration?.eet ?? saved.eet),
+          }
+        : {};
+
       return NextResponse.json({
         success: true,
         saleId: saleDocId,
@@ -331,6 +346,7 @@ export async function POST(request: NextRequest) {
         tipAmount,
         totalAmount: saleTotalAmount,
         terminalTipDebug: terminalLookup.debugError ?? null,
+        ...eetResponse,
       });
 
     } else {
@@ -344,6 +360,9 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
+    if (error instanceof HttpError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
     console.error('❌ Chyba při zpracování SumUp callback:', error);
     console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'N/A');
     console.error('❌ Error type:', typeof error);

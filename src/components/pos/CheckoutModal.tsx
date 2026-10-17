@@ -12,6 +12,9 @@ import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 import QRCode from 'react-qr-code';
 import { TestSaleToggle } from './TestSaleToggle';
 import { defaultTestSaleState, resolveIsTestSale, testSalesUiEnabled, withTestFlag } from '@/lib/testSales';
+import { buildCashCardSaleDraft, buildQrSaleDraft, buildSumUpPaymentData, type SaleDraftObject } from '@/lib/checkoutSale';
+import { decideSaleSavePath, isEetEnabled } from '@/lib/eet/flags';
+import { saveSaleWithEet, type EetSaveResult } from '@/lib/eetCheckout';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -25,6 +28,8 @@ interface CheckoutModalProps {
   finalAmount?: number;
   /** ID testovacích produktů; doklad jen s nimi má přepínač „Testovací prodej“ zapnutý. */
   testProductIds?: string[];
+  /** EET 2.0 (jen při zapnutém EET): výsledek uložení přes /api/sales/finalize. Napojí fáze D. */
+  onEetResult?: (result: EetSaveResult) => void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -37,7 +42,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   discount,
   discountAmount,
   finalAmount,
-  testProductIds
+  testProductIds,
+  onEetResult
 }) => {
   const { user } = useAuth();
   const storeDoc = useStore();
@@ -253,6 +259,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  const commonSaleParams = (userId: string) => ({
+    cart,
+    actualTotalAmount,
+    totalAmount,
+    storeId,
+    userId,
+    customerName: collectCustomerName ? (customerName || null) : null,
+    isRefund,
+    refundAmount,
+    discount,
+    discountAmount,
+    tipParsed,
+  });
+
+  // Bez zapnutého EET (decideSaleSavePath → 'legacy') přesně jako dřív: addDoc + soldCount z klienta.
+  // Se zapnutým EET: /api/sales/finalize (číslo dokladu a EET na serveru), offline záloha z klienta.
+  const saveSale = async (userId: string, draft: SaleDraftObject) => {
+    const legacySave = async () => {
+      await addDoc(collection(db, 'users', userId, 'stores', storeId, 'sales'), withTestFlag({ ...draft, createdAt: serverTimestamp() }, isTestSale));
+
+      // Aktualizuj počet prodaných kusů pro každý produkt (vratky se odečítají)
+      for (const item of cart) {
+        const productRef = doc(db, 'users', userId, 'stores', storeId, 'products', item.productId);
+        await updateDoc(productRef, {
+          soldCount: increment(item.quantity), // item.quantity je záporné pro vratky
+          updatedAt: serverTimestamp()
+        });
+      }
+    };
+    if (decideSaleSavePath(storeDoc) === 'legacy') {
+      await legacySave();
+      return;
+    }
+    const result = await saveSaleWithEet({ uid: userId, storeId, draft, isTest: isTestSale, cart, legacySave });
+    onEetResult?.(result);
+  };
+
   const handlePayment = async () => {
     if (!user) return;
 
@@ -262,41 +305,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (!hasIban) return;
         const documentId = qrDocumentId || SumUpService.generateDocumentId();
         const variableSymbol = qrVariableSymbol;
-        const sale = {
-          items: cart,
-          totalAmount: actualTotalAmount,
-          paymentMethod: 'qr',
-          currency: 'CZK',
-          eurRate: null,
-          originalAmountCZK: totalAmount,
+        const sale = buildQrSaleDraft({
+          ...commonSaleParams(user.uid),
           documentId,
           variableSymbol,
-          createdAt: serverTimestamp(),
-          storeId,
-          userId: user.uid,
-          customerName: collectCustomerName ? (customerName || null) : null,
-          isRefund,
-          refundAmount: isRefund ? refundAmount : null,
-          paidAmount: null,
-          paidCurrency: null,
-          changeAmount: null,
-          changeAmountEUR: null,
-          discount: discount || null,
-          discountAmount: discountAmount || 0,
-          finalAmount: actualTotalAmount,
-          tipAmount: tipParsed > 0 ? tipParsed : null,
-          served: false,
-        };
+        });
 
-        await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), withTestFlag(sale, isTestSale));
-
-        for (const item of cart) {
-          const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
-          await updateDoc(productRef, {
-            soldCount: increment(item.quantity),
-            updatedAt: serverTimestamp(),
-          });
-        }
+        await saveSale(user.uid, sale);
 
         onSuccess();
         return;
@@ -313,21 +328,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         const documentId = SumUpService.generateDocumentId();
 
         // Uložíme kompletní informace o platbě do localStorage pro callback navigaci a opakování
-        localStorage.setItem('uctarna_payment_data', JSON.stringify({
+        // `eet: true` jen při zapnutém EET: číslo dokladu a odeslání pak řeší server v callbacku.
+        localStorage.setItem('uctarna_payment_data', JSON.stringify(buildSumUpPaymentData({
           storeId,
           userId: user.uid,
-          cartItems: cart,
-          totalAmount: actualTotalAmount,
-          currency: 'CZK',
-          documentId: documentId,
-          foreignTxId: documentId, // Použijeme documentId jako foreignTxId pro SumUp
+          cart,
+          actualTotalAmount,
+          documentId,
           timestamp: Date.now(),
-          discount: discount || null,
-          discountAmount: discountAmount || 0,
-          finalAmount: actualTotalAmount,
-          tipAmount: tipAmountKč > 0 ? tipAmountKč : 0,
+          discount,
+          discountAmount,
+          tipAmountKc: tipAmountKč,
           customerName: collectCustomerName ? (customerName || null) : null
-        }));
+        }, isEetEnabled(storeDoc))));
         
         const paymentParams: SumUpPaymentParams = {
           amount: actualTotalAmount,
@@ -350,52 +363,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       // Hotovost nebo platba kartou bez přesměrování na SumUp - vytvoř prodej/vratku v Firestore
       const documentId = SumUpService.generateDocumentId(); // Generuj documentId i pro hotovost
       const trimmedManualSumUpCode = manualSumUpCode.trim();
-      const tipForDoc = tipParsed > 0 ? tipParsed : null;
-      const sale = {
-        items: cart,
-        totalAmount: payInEUR ? eurAmount : actualTotalAmount, // Uložit částku v eurech pokud je vybrána platba v eurech
-        paymentMethod,
-        currency: payInEUR ? 'EUR' : 'CZK', // Přidat měnu
-        eurRate: payInEUR ? eurRate : null, // Přidat kurz pokud je platba v eurech
-        originalAmountCZK: totalAmount, // Původní částka v korunách pro reference
-        documentId: documentId, // Unikátní ID dokladu
-        createdAt: serverTimestamp(),
-        storeId,
-        userId: user.uid,
-        customerName: collectCustomerName ? (customerName || null) : null,
-        isRefund, // Přidáno pole pro identifikaci vratky
-        refundAmount: isRefund ? refundAmount : null, // Přidáno pole pro částku vratky
-        // Informace o vrácení při platbě v eurech
-        paidAmount: paymentMethod === 'cash' ? paidAmount : null,
-        paidCurrency: paymentMethod === 'cash' ? (payInEUR ? 'EUR' : paidCurrency) : null,
-        changeAmount: paymentMethod === 'cash' ? (payInEUR ? null : changeAmountCZK) : null,
-        changeAmountEUR: paymentMethod === 'cash' && payInEUR ? changeAmountInEUR : null,
-        // Sleva
-        discount: discount || null,
-        discountAmount: discountAmount || 0,
-        finalAmount: actualTotalAmount,
-        tipAmount: tipForDoc,
-        sumUpData: paymentMethod === 'card' && !redirectToSumUp && trimmedManualSumUpCode
-          ? {
-              foreignTxId: documentId,
-              sumUpTxCode: trimmedManualSumUpCode,
-              status: 'success' as const,
-              callbackReceived: false,
-            }
-          : null,
-        served: false,
-      };
+      // Hotovostní vratka (záporná částka) jde se zapnutým EET jako záporná tržba.
+      const sale = buildCashCardSaleDraft({
+        ...commonSaleParams(user.uid),
+        paymentMethod: paymentMethod as 'cash' | 'card',
+        documentId,
+        payInEUR,
+        eurAmount,
+        eurRate,
+        paidAmount,
+        paidCurrency,
+        changeAmountCZK,
+        changeAmountInEUR,
+        redirectToSumUp,
+        manualSumUpCode: trimmedManualSumUpCode,
+      });
 
-      await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), withTestFlag(sale, isTestSale));
-
-      // Aktualizuj počet prodaných kusů pro každý produkt (vratky se odečítají)
-      for (const item of cart) {
-        const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
-        await updateDoc(productRef, {
-          soldCount: increment(item.quantity), // item.quantity je záporné pro vratky
-          updatedAt: serverTimestamp()
-        });
-      }
+      await saveSale(user.uid, sale);
 
       onSuccess();
     } catch (error) {

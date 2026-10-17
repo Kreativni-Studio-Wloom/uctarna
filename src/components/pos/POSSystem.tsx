@@ -10,6 +10,8 @@ import { Product, CartItem, PendingPurchase } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
+import { isEetEnabled } from '@/lib/eet/flags';
+import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
 
 const CheckoutModal = dynamic(
   () => import('./CheckoutModal').then((m) => ({ default: m.CheckoutModal })),
@@ -242,7 +244,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         discountAmount,
         finalAmount,
         customerName,
-        tipAmount: storedTip
+        tipAmount: storedTip,
+        eet: eetMode
       } = JSON.parse(raw);
 
       if (!paymentStoreId || !userId || !Array.isArray(cartItems) || cartItems.length === 0) {
@@ -257,9 +260,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       const appTip = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
 
       // Spropitné z terminálu doplní server v /api/sumup-callback ze SumUp REST API.
+      // EET 2.0: jen u prodejny se zapnutým EET (eet: true v payment datech) posíláme ID token;
+      // server pak v callbacku přidělí číslo dokladu a odešle tržbu.
       const response = await fetch('/api/sumup-callback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: eetMode === true
+          ? { 'Content-Type': 'application/json', ...(await eetAuthHeaders()) }
+          : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'success',
           txCode,
@@ -287,6 +294,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       console.error('❌ Chyba při dokončování SumUp platby:', error);
     }
   }, []);
+
+  // EET 2.0: fronta neodeslaných dokladů této prodejny (náhrada za častý cron na tarifu Hobby).
+  // Jen při zapnutém EET; bez něj se nic nevolá.
+  const eetEnabled = isEetEnabled(storeDoc);
+  useEffect(() => {
+    if (!eetEnabled || !user?.uid || !storeId) return;
+    const run = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      retryMyEetQueue(storeId).catch((e) => console.warn('EET fronta:', e));
+    };
+    run();
+    const timer = window.setInterval(run, 2 * 60_000);
+    window.addEventListener('online', run);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('online', run);
+    };
+  }, [eetEnabled, user?.uid, storeId]);
 
   // Automatické zavření popupu úspěšné platby po odpočtu
   useEffect(() => {
