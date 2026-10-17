@@ -4,7 +4,7 @@ import { checkCertificate, environmentFromPolicyOids } from '@/lib/eet/certifica
 import { clearCredentialsCache, encryptCredentials, getStoreCredentials, invalidateStoreCredentials } from '@/lib/eet/credentials';
 import { finalizeInputSchema, finalizeSale } from '@/lib/eet/finalize';
 import { retryDueAll, retryDueForStore } from '@/lib/eet/queue';
-import { NON_CASH_REFUND_REASON, stornoSale } from '@/lib/eet/storno';
+import { stornoSale } from '@/lib/eet/storno';
 import { STORE, STORE_PATH, UID, attrs, cashDraft, creds, eetFetch, eetSettings, loadCredentials, okBody, salePath, setup } from './fixturesC';
 import { playgroundP12, playgroundPassword } from './helpers';
 import { asDb } from './firestoreMock';
@@ -42,12 +42,13 @@ describe('storno', () => {
     expect(mock.read(`${STORE_PATH}/counters/receipts`)).toMatchObject({ last: 2 });
   });
 
-  it('karta: bezhotovostní vratka → not_required, neodešle se', async () => {
-    const { db, now } = await withSale({ paymentMethod: 'card', paidAmount: null, paidCurrency: null, changeAmount: null });
+  it.each(['card', 'qr'] as const)('%s: bezhotovostní vratka zaevidovaného dokladu se odešle jako záporná tržba', async (paymentMethod) => {
+    const { db, now } = await withSale({ paymentMethod, paidAmount: null, paidCurrency: null, changeAmount: null });
     const { calls, fetchImpl } = eetFetch(okBody);
     const r = await stornoSale(db, UID, STORE, 'orig000001', { now, registerOptions: { fetchImpl, loadCredentials, now } });
-    expect(r.eet).toMatchObject({ status: 'not_required', reason: NON_CASH_REFUND_REASON });
-    expect(calls).toHaveLength(0);
+    expect(r.eet).toMatchObject({ status: 'sent' });
+    expect(calls).toHaveLength(1);
+    expect(r.eet?.data?.celk_trzba).toMatch(/^-\d+\.\d\d$/);
   });
 
   it('testovací doklad, storno storna a vypnuté EET se odmítnou', async () => {

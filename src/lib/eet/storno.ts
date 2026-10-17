@@ -8,12 +8,12 @@ import type { CartItem, Sale, SaleEet, Store } from '@/types';
 /*
  * Storno dokladu (místo mazání u prodejny s EET): nový doklad se zápornou částkou, novým
  * číslem a aktuálním časem. Původní doklad zůstane a dostane `storno: {by, at, saleId}`.
- * Do EET jde jen hotovostní vratka; bezhotovostní (karta, QR) se neeviduje (kap. 2.2).
+ * Do EET jde každá vratka zaevidovaného dokladu, i bezhotovostní (karta, QR). Evidovat ji zákon
+ * nevyžaduje, ale dovoluje (Popis položek, kap. 12); uživatel chce, aby EET sedělo s účetnictvím.
  * Idempotentní: druhé storno téhož dokladu vrátí to první.
  */
 
 export const PRE_EET_STORNO_REASON = 'Původní doklad byl vystaven před zapnutím EET';
-export const NON_CASH_REFUND_REASON = 'Bezhotovostní vratka (karta / QR) se do EET neeviduje';
 
 const neg = (v: unknown) => (typeof v === 'number' && v !== 0 ? -v : v);
 
@@ -88,15 +88,12 @@ export async function stornoSale(
     if (original.stornoOf) throw new HttpError(400, 'is_storno', 'Storno nejde znovu stornovat');
     if (original.isTest === true) throw new HttpError(400, 'is_test', 'Testovací doklad se nestornuje, smažte ho');
 
-    // Do EET jen hotovostní vratka reálného dokladu, který do EET patřil.
+    // Do EET jde vratka každého reálného dokladu, který do EET patřil (hotovost, karta i QR).
     // Doklad z doby před zapnutím EET (bez `eet`) se nikdy neevidoval, jeho storno tedy taky ne.
     const originalNotSent = original.eet?.status === 'not_required' || !original.eet;
-    const reason =
-      original.paymentMethod !== 'cash'
-        ? NON_CASH_REFUND_REASON
-        : originalNotSent
-          ? original.eet?.reason ?? (original.eet ? 'Původní doklad se do EET neevidoval' : PRE_EET_STORNO_REASON)
-          : undefined;
+    const reason = originalNotSent
+      ? original.eet?.reason ?? (original.eet ? 'Původní doklad se do EET neevidoval' : PRE_EET_STORNO_REASON)
+      : undefined;
     const prepared = await prepareNewSaleEet(tx, db, uid, storeId, store, { notRequiredReason: reason, now });
     const doc = compact({
       ...buildStornoSale(original, originalId, stornoId, uid, storeId),

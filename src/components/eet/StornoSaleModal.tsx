@@ -59,8 +59,8 @@ export const StornoSaleModal: React.FC<StornoSaleModalProps> = ({ receiptLabel, 
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {isCash
-              ? 'Hotovostní vratka se odešle do EET jako záporná tržba.'
-              : 'Bezhotovostní vratka (karta / QR) se do EET neeviduje. Peníze zákazníkovi vraťte v SumUp / bance.'}
+              ? 'Vratka se odešle do EET jako záporná tržba.'
+              : 'Vratka se odešle do EET jako záporná tržba. Peníze zákazníkovi vraťte v SumUp / bance.'}
           </p>
           {error && (
             <p role="alert" className="text-sm text-red-600 dark:text-red-400">
