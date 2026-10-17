@@ -306,7 +306,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       draft,
       isTest: isTestSale,
       nonEvidenceReason: eetEvidence?.nonEvidenceReason,
-      cart,
       legacySave,
     });
     const amountLabel = draft.currency === 'EUR' ? `${draft.totalAmount.toFixed(2)} €` : `${draft.totalAmount.toFixed(2)} Kč`;

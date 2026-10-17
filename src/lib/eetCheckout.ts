@@ -1,12 +1,11 @@
 // Uložení prodeje z checkoutu u prodejny se ZAPNUTÝM EET (klient).
 // Bez EET se tato funkce nevolá a CheckoutModal ukládá postaru (addDoc).
 
-import { doc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { withOfflineEet, type SaleDraftObject } from '@/lib/checkoutSale';
 import { EetApiError, finalizeSaleRequest, type FinalizeResponse } from '@/lib/eetClient';
 import { withTestFlag } from '@/lib/testSales';
-import type { CartItem } from '@/types';
 
 export type EetSaveResult =
   | { kind: 'finalized'; result: FinalizeResponse }
@@ -24,7 +23,6 @@ export async function saveSaleWithEet(p: {
   isTest: boolean;
   /** Výjimka z evidence (checkout „Platba nepodléhá evidenci“): doklad se uloží, ale do EET neodešle. */
   nonEvidenceReason?: string;
-  cart: CartItem[];
   /** Dnešní uložení (addDoc + soldCount), použije se při 409 eet_disabled */
   legacySave: () => Promise<void>;
 }): Promise<EetSaveResult> {
@@ -34,15 +32,14 @@ export async function saveSaleWithEet(p: {
     const data = withOfflineEet(withTestFlag({ ...p.draft, createdAt: serverTimestamp() }, p.isTest), new Date(), exemptReason);
     // Kdyby server doklad už uložil (ztracená odpověď), firestore.rules tento zápis odmítnou
     // (receiptNo / eet mění jen server), takže serverový doklad zůstane, jak je.
-    const write = setDoc(ref, data, { merge: true });
+    const write = setDoc(ref, data, { merge: true }).catch((e) => {
+      console.warn('EET: offline záloha odmítnuta (doklad je nejspíš už uložený na serveru):', (e as { code?: string })?.code ?? e);
+    });
     // Offline se promise vyřeší až po spojení; zápis je ale už v lokální frontě Firestore.
     await Promise.race([write, new Promise((r) => setTimeout(r, OFFLINE_WRITE_WAIT_MS))]);
-    for (const item of p.cart) {
-      void updateDoc(doc(db, 'users', p.uid, 'stores', p.storeId, 'products', item.productId), {
-        soldCount: increment(item.quantity),
-        updatedAt: serverTimestamp(),
-      }).catch((e) => console.error('soldCount (offline EET):', e));
-    }
+    // soldCount u offline zálohy NEPŘIČÍTAT: přičte ho server právě jednou, až doklad očísluje
+    // (register.ts, prepareOfflineSoldCount). Kdyby server prodej už uložil (ztracená odpověď),
+    // soldCount přičetl při uložení; opakovaná záloha tak nic nezdvojí.
     return { kind: 'offline', error };
   };
 

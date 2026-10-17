@@ -2,6 +2,7 @@ import 'server-only';
 import { computeEetAmountCZK } from './amount';
 import { EetValidationError, computeNextRetryAt, sendTrzbaAttempt, type EetAttempt } from './attempt';
 import { getStoreCredentials } from './credentials';
+import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import { allocateReceiptNo, compact, paths, toDate, ts, type Db } from './db';
 import { isEetEnabled, resolveEetSettings, type ResolvedEetSettings } from './flags';
 import { formatAmount, formatDateTimePrague, validateTrzbaData } from './format';
@@ -50,6 +51,29 @@ export const LOCK_MS = 60_000;
 const FINAL_STATUSES = new Set(['sent', 'test', 'not_required']);
 
 type SaleDoc = Partial<Sale> & { eet?: SaleEet; createdAt?: unknown };
+
+/*
+ * soldCount offline dokladu (pendingNumber, bez receiptNo) přičítá server, a to právě jednou:
+ * v transakci, která doklad očísluje (číslo se přidělí jen jednou). Klient ho u offline zálohy
+ * nepřičítá (eetCheckout.ts), takže nevznikne dvojí přičtení ani při ztracené odpovědi
+ * (serverový doklad už číslo má a soldCount přičetl finalize / callback), ani při opakované záloze.
+ * Čtení produktů musí proběhnout před zápisy transakce; smazaný produkt se přeskočí.
+ */
+async function prepareOfflineSoldCount(tx: Transaction, db: Db, uid: string, storeId: string, sale: SaleDoc): Promise<() => void> {
+  const qty = new Map<string, number>();
+  for (const item of sale.items ?? []) {
+    if (!item?.productId || typeof item.quantity !== 'number' || !item.quantity) continue;
+    qty.set(item.productId, (qty.get(item.productId) ?? 0) + item.quantity);
+  }
+  const refs = [...qty.keys()].map((id) => db.doc(paths.product(uid, storeId, id)));
+  const snaps = await Promise.all(refs.map((r) => tx.get(r)));
+  return () => {
+    snaps.forEach((snap, i) => {
+      if (!snap.exists) return;
+      tx.update(refs[i], { soldCount: FieldValue.increment(qty.get(refs[i].id)!), updatedAt: FieldValue.serverTimestamp() });
+    });
+  };
+}
 
 /** Sestaví sekci Data z dokladu a nastavení prodejny (bez porad_cis). */
 export function buildTrzbaData(sale: SaleDoc, settings: ResolvedEetSettings, receiptNo: string, now: Date): EetTrzbaData {
@@ -174,11 +198,14 @@ export async function registerSale(
     if (sale.isTest === true) {
       let receiptNo = sale.receiptNo;
       let commitCounter: (() => void) | undefined;
+      let applySold: (() => void) | undefined;
       if (!receiptNo) {
         const alloc = await allocateReceiptNo(tx, db, uid, storeId, settings.receiptSeries, t);
         receiptNo = alloc.receiptNo;
         commitCounter = alloc.commit;
+        if (sale.pendingNumber === true) applySold = await prepareOfflineSoldCount(tx, db, uid, storeId, sale);
       }
+      applySold?.();
       const testEet: SaleEet = compact({ ...eet, status: 'test', env: eet.env ?? settings.environment, nextRetryAt: null, lockUntil: null });
       commitCounter?.();
       tx.update(saleRef, { eet: testEet, receiptNo, pendingNumber: false });
@@ -189,11 +216,14 @@ export async function registerSale(
     if (eet.exemptReason && !eet.data && !eet.firstAttemptAt) {
       let receiptNo = sale.receiptNo;
       let commitCounter: (() => void) | undefined;
+      let applySold: (() => void) | undefined;
       if (!receiptNo) {
         const alloc = await allocateReceiptNo(tx, db, uid, storeId, settings.receiptSeries, t);
         receiptNo = alloc.receiptNo;
         commitCounter = alloc.commit;
+        if (sale.pendingNumber === true) applySold = await prepareOfflineSoldCount(tx, db, uid, storeId, sale);
       }
+      applySold?.();
       const { exemptReason, ...rest } = eet;
       const exemptEet: SaleEet = compact({ ...rest, status: 'not_required', reason: exemptReason, env: eet.env ?? settings.environment, nextRetryAt: null, lockUntil: null });
       commitCounter?.();
@@ -210,6 +240,7 @@ export async function registerSale(
     let data = eet.data;
     let receiptNo = sale.receiptNo;
     let commitCounter: (() => void) | undefined;
+    let applySold: (() => void) | undefined;
     if (!data) {
       let draft: EetTrzbaData;
       try {
@@ -224,9 +255,11 @@ export async function registerSale(
         const alloc = await allocateReceiptNo(tx, db, uid, storeId, settings.receiptSeries, t);
         receiptNo = alloc.receiptNo;
         commitCounter = alloc.commit;
+        if (sale.pendingNumber === true) applySold = await prepareOfflineSoldCount(tx, db, uid, storeId, sale);
       }
       data = { ...draft, porad_cis: receiptNo };
     }
+    // Bez certifikátu se doklad neočísluje (fail nezapíše číslo), takže ani soldCount; přičte se při dalším pokusu.
     if (credentialsError || !credentials) return fail(credentialsError ?? 'Chybí certifikát EET');
     receiptNo = receiptNo ?? data.porad_cis;
 
@@ -241,6 +274,7 @@ export async function registerSale(
       lockUntil: ts(new Date(t.getTime() + LOCK_MS)),
     });
     commitCounter?.();
+    applySold?.();
     tx.update(saleRef, compact({ eet: next, receiptNo, pendingNumber: sale.pendingNumber ? false : undefined }));
     return {
       kind: 'claim',

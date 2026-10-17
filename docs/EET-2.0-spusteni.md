@@ -82,6 +82,16 @@ brew install --cask temurin@21
 ```bash
 java -version
 ```
+Skript volá `firebase` CLI (firebase-tools). Není v devDependencies (velký balík, zbytečně by
+zpomaloval instalaci na Vercelu); na tomto stroji je nainstalovaný globálně (`/opt/homebrew/bin/firebase`, 15.0.0).
+Na jiném stroji ho nainstalovat:
+```bash
+npm install -g firebase-tools@15
+```
+nebo spustit bez instalace:
+```bash
+npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-uctarna-rules "npx vitest run --config vitest.rules.config.ts"
+```
 Spuštění (emulator spustí `firebase emulators:exec`, nic se nenasazuje, projekt `demo-…` je jen lokální):
 ```bash
 npm run test:rules
