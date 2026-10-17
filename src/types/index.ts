@@ -41,6 +41,10 @@ export interface Store {
   brandHue?: number;
   /** Intenzita odstínu (0 = světlý, 100 = tmavý). */
   brandShade?: number;
+  /** Režim školení: každý prodej je testovací (`Sale.isTest`), přes POS svítí pruh. */
+  testMode?: boolean;
+  /** V reálném režimu ukáže v checkoutu přepínač „Testovací prodej“. */
+  testSalesEnabled?: boolean;
 }
 
 export interface Product {
@@ -55,6 +59,8 @@ export interface Product {
   updatedAt: Date;
   // Produkt může být označen jako extra (doplněk k hlavní položce)
   isExtra?: boolean;
+  /** Testovací produkt: doklad jen s takovými produkty se v checkoutu sám označí jako testovací. */
+  isTestProduct?: boolean;
 }
 
 export interface CartItem {
@@ -116,6 +122,8 @@ export interface Sale {
   preparedAt?: Date;
   served?: boolean;
   servedAt?: Date;
+  /** Testovací doklad: nepočítá se do tržeb, neodesílá se do EET. Chybí = reálný doklad. */
+  isTest?: boolean;
 }
 
 export interface SumUpTransactionData {

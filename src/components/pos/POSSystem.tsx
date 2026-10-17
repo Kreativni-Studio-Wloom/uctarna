@@ -553,6 +553,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           soldCount: data.soldCount || 0,
           createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
           updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date(),
+          ...(data.isTestProduct === true ? { isTestProduct: true } : {}),
         };
         
         productsData.push(product);
@@ -862,6 +863,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   
   // Finální částka po slevě
   const finalAmount = totalAmount - discountAmount;
+
+  const testProductIds = products.filter((p) => p.isTestProduct).map((p) => p.id);
 
   if (loading) {
     return (
@@ -1408,6 +1411,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             discount={discount}
             discountAmount={discountAmount}
             finalAmount={finalAmount}
+            testProductIds={testProductIds}
             onSuccess={() => {
               void clearCartState();
               setShowCheckout(false);

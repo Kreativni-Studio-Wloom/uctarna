@@ -10,6 +10,8 @@ import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from '
 import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 import QRCode from 'react-qr-code';
+import { TestSaleToggle } from './TestSaleToggle';
+import { defaultTestSaleState, resolveIsTestSale, testSalesUiEnabled, withTestFlag } from '@/lib/testSales';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -21,6 +23,8 @@ interface CheckoutModalProps {
   discount?: { type: 'percentage' | 'amount'; value: number } | null;
   discountAmount?: number;
   finalAmount?: number;
+  /** ID testovacích produktů; doklad jen s nimi má přepínač „Testovací prodej“ zapnutý. */
+  testProductIds?: string[];
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -32,7 +36,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onSuccess,
   discount,
   discountAmount,
-  finalAmount
+  finalAmount,
+  testProductIds
 }) => {
   const { user } = useAuth();
   const storeDoc = useStore();
@@ -54,6 +59,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [qrDocumentId, setQrDocumentId] = useState<string>(''); // 10 chars (existing format)
   const [qrVariableSymbol, setQrVariableSymbol] = useState<string>(''); // numeric only
   const [qrFullscreen, setQrFullscreen] = useState(false);
+  const [testSaleToggle, setTestSaleToggle] = useState(() => defaultTestSaleState(cart, testProductIds ?? []));
+  // Bez zapnutého vypínače prodejny je prodej vždy reálný (chování jako dřív).
+  const showTestSaleToggle = testSalesUiEnabled(storeDoc);
+  const isTestSale = showTestSaleToggle && resolveIsTestSale(storeDoc, testSaleToggle);
 
   const [eurRate, setEurRate] = useState<number>(25.0);
   const baseAmount = finalAmount !== undefined ? finalAmount : totalAmount;
@@ -93,7 +102,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   // Deaktivace platby kartou při vratce
   const canUseCard = !isRefund;
-  const requiresSumUpRedirect = paymentMethod === 'card' && sumUpAvailable && redirectToSumUp;
+  // Testovací prodej kartou neprochází SumUp terminálem, uloží se jen doklad.
+  const requiresSumUpRedirect = paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !isTestSale;
   const canProceedWithCard = !requiresSumUpRedirect || sumUpAffiliateKeyConfigured;
   const hasIban = Boolean(iban && iban.trim().length > 0);
   const canUseQr = !isRefund && displayCurrency === 'CZK' && paymentMethod !== 'card' ? hasIban : hasIban && !isRefund; // guard; UI also checks
@@ -278,7 +288,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           served: false,
         };
 
-        await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+        await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), withTestFlag(sale, isTestSale));
 
         for (const item of cart) {
           const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
@@ -292,13 +302,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         return;
       }
 
-      if (paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured) {
+      if (requiresSumUpRedirect && !sumUpAffiliateKeyConfigured) {
         alert('Chybí SumUp affiliate key. Nastavte NEXT_PUBLIC_SUMUP_AFFILIATE_KEY a restartujte aplikaci.');
         return;
       }
 
       // SumUp platba kartou - otevře se až při kliknutí "Zaplatit kartou"
-      if (paymentMethod === 'card' && !isRefund && sumUpAvailable && redirectToSumUp) {
+      if (requiresSumUpRedirect && !isRefund) {
         // Vygenerujeme unikátní ID dokladu
         const documentId = SumUpService.generateDocumentId();
 
@@ -376,7 +386,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         served: false,
       };
 
-      await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+      await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), withTestFlag(sale, isTestSale));
 
       // Aktualizuj počet prodaných kusů pro každý produkt (vratky se odečítají)
       for (const item of cart) {
@@ -498,6 +508,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             </div>
 
+            {showTestSaleToggle && (
+              <TestSaleToggle
+                checked={isTestSale}
+                locked={storeDoc?.testMode === true}
+                onChange={setTestSaleToggle}
+              />
+            )}
 
             {/* Zaplaceno - pouze při platbě hotovostí */}
             {paymentMethod === 'cash' && (
@@ -756,7 +773,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
               
               {/* SumUp info - pouze při platbě kartou */}
-              {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && (
+              {requiresSumUpRedirect && (
                 <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                   <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
                     <CreditCard className="h-4 w-4 mr-2" />
@@ -768,7 +785,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
 
               {/* Chybějící affiliate key - může způsobit chybu při volbě terminálu */}
-              {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured && (
+              {requiresSumUpRedirect && !sumUpAffiliateKeyConfigured && (
                 <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
                   <div className="flex items-center text-sm text-red-700 dark:text-red-300">
                     <CreditCard className="h-4 w-4 mr-2" />
@@ -779,6 +796,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
               
+              {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && isTestSale && (
+                <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                  <div className="flex items-center text-sm text-orange-700 dark:text-orange-300">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    <span>Testovací prodej kartou se neodesílá do SumUp. Uloží se jen testovací doklad.</span>
+                  </div>
+                </div>
+              )}
+
               {/* SumUp vypnuté - pouze při platbě kartou */}
               {paymentMethod === 'card' && sumUpAvailable && !redirectToSumUp && (
                 <div className="mt-3 space-y-4">

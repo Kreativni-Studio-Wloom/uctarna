@@ -1,4 +1,5 @@
 import { Sale } from '@/types';
+import { filterSales, isTestSale, saleAmountCzk, TEST_RECEIPT_WATERMARK } from '@/lib/testSales';
 
 type ReceiptStoreData = {
   companyName?: string;
@@ -57,6 +58,27 @@ const normalizePaymentMethod = (method: Sale['paymentMethod']) => {
 
 const trimOrEmpty = (value?: string) => value?.trim() || '';
 
+/** Diagonální poloprůhledný vodotisk „TESTOVACÍ DOKLAD – NEPLATNÝ“ přes celou stránku. */
+const drawTestWatermark = (doc: any, pageWidth: number, pageHeight: number) => {
+  const text = removeDiacritics(TEST_RECEIPT_WATERMARK).replace('–', '-');
+  doc.saveGraphicsState();
+  doc.setGState(new doc.GState({ opacity: 0.2 }));
+  doc.setTextColor(200, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  const fontSize = Math.max(10, Math.min(28, pageWidth / 5));
+  doc.setFontSize(fontSize);
+  const angle = 35;
+  const textWidth = doc.getTextWidth(text);
+  const rise = textWidth * Math.sin((angle * Math.PI) / 180);
+  const startX = Math.max(2, (pageWidth - textWidth * Math.cos((angle * Math.PI) / 180)) / 2);
+  const step = Math.max(rise + 10, 40);
+  for (let y = rise + 8; y < pageHeight + rise; y += step) {
+    doc.text(text, startX, y, { angle });
+  }
+  doc.restoreGraphicsState();
+  doc.setTextColor(0);
+};
+
 const removeDiacritics = (text?: string | null): string => {
   if (text === undefined || text === null) return '';
   return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -104,6 +126,8 @@ export const generateReceiptPdfBlob = async (
   const companyAddress = removeDiacritics(trimOrEmpty(store.companyAddress));
   const ico = removeDiacritics(trimOrEmpty(store.ico));
 
+  const isTest = isTestSale(sale);
+  if (isTest) estimatedHeight += LINE_HEIGHT * 1.5;
   addTextBlockHeight(companyName, 10);
   addTextBlockHeight(companyAddress, 8.4);
   addTextBlockHeight(ico ? `IC: ${ico}` : '', 8.4);
@@ -170,6 +194,10 @@ export const generateReceiptPdfBlob = async (
     y += DIVIDER_PADDING;
   };
 
+  if (isTest) {
+    drawCentered(removeDiacritics(TEST_RECEIPT_WATERMARK).replace('–', '-'), 8.5, true);
+    y += LINE_HEIGHT * 0.5;
+  }
   if (companyName) drawCentered(companyName, 10, true);
   if (companyAddress) {
     doc.setFont('helvetica', 'normal');
@@ -261,6 +289,8 @@ export const generateReceiptPdfBlob = async (
   doc.setFontSize(9);
   doc.text('Dekujeme za vas nakup', CENTER_X, y, { align: 'center' });
 
+  if (isTest) drawTestWatermark(doc, pageWidth, doc.internal.pageSize.getHeight());
+
   return doc.output('blob');
 };
 
@@ -294,8 +324,10 @@ const czkEquivalent = (sale: Sale): number => {
 export const generateDailySalesReportPdfBlob = async (
   sales: Sale[],
   store: ReceiptStoreData,
-  reportDate: Date
+  reportDate: Date,
+  options: { includeTest?: boolean } = {}
 ): Promise<Blob> => {
+  const includeTest = options.includeTest === true;
   const { default: jsPDF } = await import('jspdf');
 
   const doc = new jsPDF({
@@ -381,9 +413,14 @@ export const generateDailySalesReportPdfBlob = async (
   divider(3);
 
   // ---- Souhrn ----
-  const sorted = [...sales].sort(
+  const allSorted = [...sales].sort(
     (a, b) => toDate(a.createdAt).getTime() - toDate(b.createdAt).getTime()
   );
+  // Souhrn počítá testovací prodeje jen po výslovném zahrnutí; v seznamu jsou vždy zvlášť.
+  const sorted = filterSales(allSorted, includeTest);
+  const realSorted = allSorted.filter((sale) => !isTestSale(sale));
+  const testSorted = allSorted.filter(isTestSale);
+  const testTotalCzk = testSorted.reduce((sum, sale) => sum + saleAmountCzk(sale), 0);
 
   const totalCount = sorted.length;
   let czkTotal = 0;
@@ -431,6 +468,15 @@ export const generateDailySalesReportPdfBlob = async (
   if (tipTotalCzk > 0) summaryRow('Spropitne celkem', formatCZKAmount(tipTotalCzk));
   if (eurTotal !== 0) summaryRow('Trzby v EUR', `${eurTotal.toFixed(2)} EUR`);
   summaryRow('Trzba celkem', formatCZKAmount(czkTotal), true);
+  if (testSorted.length > 0) {
+    const n = testSorted.length;
+    summaryRow(
+      includeTest
+        ? `vcetne ${n} ${n === 1 ? 'testovaciho prodeje' : 'testovacich prodeju'}`
+        : `Testovaci prodeje (nezapocteny): ${n}`,
+      formatCZKAmount(testTotalCzk)
+    );
+  }
 
   divider(3);
 
@@ -441,14 +487,14 @@ export const generateDailySalesReportPdfBlob = async (
   doc.text('Doklady', leftX, y);
   y += 6;
 
-  if (sorted.length === 0) {
+  if (realSorted.length === 0) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text('Za tento den nejsou zadne doklady.', leftX, y);
     y += 6;
   }
 
-  sorted.forEach((sale, index) => {
+  const drawSale = (sale: Sale, index: number) => {
     const createdAt = toDate(sale.createdAt);
 
     // Odhad výšky bloku dokladu, aby se nezalomil uprostřed
@@ -493,6 +539,7 @@ export const generateDailySalesReportPdfBlob = async (
     if (sale.currency === 'EUR') metaParts.push('EUR');
     if (sale.customerName) metaParts.push(`Jmeno: ${sale.customerName}`);
     if (sale.isRefund) metaParts.push('VRATKA');
+    if (isTestSale(sale)) metaParts.push('TESTOVACI DOKLAD');
     if (sale.paymentMethod === 'card' && sale.sumUpData?.sumUpTxCode) {
       metaParts.push(`SumUp: ${sale.sumUpData.sumUpTxCode}`);
     }
@@ -576,7 +623,21 @@ export const generateDailySalesReportPdfBlob = async (
     y += 4.5;
 
     divider(2.5);
-  });
+  };
+
+  realSorted.forEach(drawSale);
+
+  if (includeTest && testSorted.length > 0) {
+    ensureSpace(14);
+    y += 2;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(194, 65, 12);
+    doc.text(`Testovaci doklady (${testSorted.length})`, leftX, y);
+    doc.setTextColor(0);
+    y += 6;
+    testSorted.forEach(drawSale);
+  }
 
   // ---- Číslování stránek ----
   const pageCount = doc.getNumberOfPages();

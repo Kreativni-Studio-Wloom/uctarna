@@ -14,6 +14,7 @@ import nodemailer from 'nodemailer';
 import { getSmtpConfig } from '@/lib/smtp-config';
 import { buildEmailReportData, generateEmailContent } from '@/lib/email';
 import { saleTipInCzk } from '@/lib/saleTip';
+import { filterSales, isTestSale, summarizeTestSales, type TestSalesSummary } from '@/lib/testSales';
 import { adminDb, saveChat } from '@/lib/firebase-admin';
 
 const anthropic = createAnthropic({
@@ -22,6 +23,9 @@ const anthropic = createAnthropic({
 
 const SYSTEM_PROMPT =
   'You are a helpful AI assistant for a premium POS system. You have access to sales analytics and the full POS database. Use getTopProducts to identify best-selling items when the user asks about product performance. Use getProductsCatalog for catalog, prices, and availability. Use getInvoices for recent transactions and documents. Use getClosures for financial closure reports (uzávěrky) for a given date. If the user asks for a specific invoice at a certain time/date, use the getInvoiceByDetails tool to find matching documents. When searching for invoices, if multiple documents match the time window, always list them all so the user can choose the correct one. You can send closures using the sendClosure tool. Always require an eventName and always ask for confirmation of the calculated summary before finalizing the send. If the user asks about the cost price or margin of a drink, use the getProductCost tool. If the user asks for profitability, use both getProductCost and the sales data to calculate the margin. You can update product name, price, or cost using updateProduct. Always call updateProduct first with confirmed=false to preview planned changes and ask the user to confirm. Only call updateProduct with confirmed=true after the user explicitly approves (for example "Yes" or "Proceed"). Never apply product updates without explicit user confirmation. You can create new products using the createProduct tool. Always verify the details with the user before committing to the database. Always call createProduct first with confirmed=false to show a summary and ask for confirmation. Only call createProduct with confirmed=true after the user explicitly approves. You can manage pinned items in the POS menu using the togglePinnedItem tool. Always confirm the action with the user. Always call togglePinnedItem first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can manage extras using the addExtra tool. Always confirm details before saving. Always call addExtra first with confirmed=false to show a summary and ask for confirmation. Only call addExtra with confirmed=true after the user explicitly approves. You are now an administrator of the system. You can update configuration parameters like exchange rates, billing details, and payment settings via the updateSettings tool. ALWAYS confirm significant changes like IBAN or company details with the user. Always call updateSettings first with confirmed=false, then call again with confirmed=true only after explicit user approval. You can distinguish transactions by payment method: every invoice has a paymentMethod of cash (hotovost), card (karta), or qr. Use the paymentMethod filter of getInvoices to list only cash or card transactions when the user asks (for example "kolik dokladů bylo placeno kartou"). Card payments processed through SumUp also include a sumUpTxCode (SumUp transaction code) and sumUpStatus; report the SumUp code when the user asks about it. You can permanently delete an invoice using the deleteInvoice tool. Deleting an invoice also decreases the sold counts of the products on that document and cannot be undone. Always identify the correct invoice first (using getInvoices or getInvoiceByDetails), then call deleteInvoice with confirmed=false to show the invoice details and ask for explicit confirmation. Only call deleteInvoice with confirmed=true after the user clearly approves the deletion. Never delete an invoice without explicit user confirmation.';
+
+const TEST_SALES_PROMPT =
+  'Sales with isTest=true are test/training sales: they are not real revenue and are never sent to EET. Closures, revenue, profit and top-product statistics exclude them by default; pass includeTest=true only when the user explicitly asks to include test sales, and then say clearly how many test sales and what amount were included.';
 
 const STORE_TIMEZONE = 'Europe/Prague';
 
@@ -45,7 +49,7 @@ function buildSystemPrompt(now = new Date()): string {
     timeZone: STORE_TIMEZONE,
   }).format(now);
 
-  return `${SYSTEM_PROMPT}\n\nCurrent date and time in store timezone (${STORE_TIMEZONE}): ${currentDateTime} (calendar date ${calendarDate}). Treat this as authoritative "now" when the user asks about today, yesterday, this week, or the current time.`;
+  return `${SYSTEM_PROMPT} ${TEST_SALES_PROMPT}\n\nCurrent date and time in store timezone (${STORE_TIMEZONE}): ${currentDateTime} (calendar date ${calendarDate}). Treat this as authoritative "now" when the user asks about today, yesterday, this week, or the current time.`;
 }
 
 export const maxDuration = 300;
@@ -91,6 +95,7 @@ type InvoiceSummary = {
   isRefund: boolean;
   sumUpTxCode: string | null;
   sumUpStatus: string | null;
+  isTest: boolean;
 };
 
 type InvoiceDetail = {
@@ -109,6 +114,7 @@ type InvoiceDetail = {
   finalAmount: number | null;
   sumUpTxCode: string | null;
   sumUpStatus: string | null;
+  isTest: boolean;
 };
 
 type InvoiceByDetailsResult = {
@@ -130,6 +136,9 @@ type ClosureReport = {
   totalProfit: number | null;
   totalDiscounts: number;
   totalTips: number;
+  /** Jen u výpočtu z prodejů: testovací prodeje v daném dni (započtené jen při includeTest). */
+  testSales?: TestSalesSummary;
+  includesTestSales?: boolean;
 };
 
 function storeRef(userId: string, storeId: string) {
@@ -280,13 +289,15 @@ function saleAmountInCzk(sale: FirebaseFirestore.DocumentData): number {
 async function fetchTopProductsFromSales(
   userId: string,
   storeId: string,
-  limit: number
+  limit: number,
+  includeTest = false
 ): Promise<TopProduct[]> {
   const salesSnapshot = await storeRef(userId, storeId).collection('sales').get();
 
   const quantityByProduct = new Map<string, TopProduct>();
 
   for (const saleDoc of salesSnapshot.docs) {
+    if (!includeTest && isTestSale(saleDoc.data())) continue;
     const items = (saleDoc.data().items ?? []) as Array<{
       productId?: string;
       productName?: string;
@@ -1144,6 +1155,7 @@ async function fetchInvoices(
       isRefund: Boolean(data.isRefund),
       sumUpTxCode,
       sumUpStatus,
+      isTest: isTestSale(data),
     };
   });
 
@@ -1185,6 +1197,7 @@ function mapSaleDocToInvoiceDetail(
     finalAmount: (data.finalAmount as number | undefined) ?? null,
     sumUpTxCode,
     sumUpStatus,
+    isTest: isTestSale(data),
   };
 }
 
@@ -1431,7 +1444,8 @@ async function fetchSavedClosure(
 async function computeClosureFromSales(
   userId: string,
   storeId: string,
-  date: Date
+  date: Date,
+  includeTest = false
 ): Promise<ClosureReport> {
   const rangeStart = startOfDay(date);
   const rangeEnd = endOfDay(date);
@@ -1457,8 +1471,10 @@ async function computeClosureFromSales(
   let totalDiscounts = 0;
   let totalTips = 0;
 
-  for (const saleDoc of salesSnapshot.docs) {
-    const sale = saleDoc.data();
+  const allSales = salesSnapshot.docs.map((saleDoc) => saleDoc.data());
+  const countedSales = filterSales(allSales, includeTest);
+
+  for (const sale of countedSales) {
     const amount = saleAmountInCzk(sale);
     totalSales += amount;
     totalDiscounts += (sale.discountAmount as number) ?? 0;
@@ -1485,30 +1501,36 @@ async function computeClosureFromSales(
     cashSales,
     cardSales,
     qrSales,
-    customerCount: salesSnapshot.size,
+    customerCount: countedSales.length,
     totalCosts,
     totalProfit: totalSales - totalCosts,
     totalDiscounts,
     totalTips,
+    testSales: summarizeTestSales(allSales),
+    includesTestSales: includeTest,
   };
 }
 
 async function fetchClosure(
   userId: string,
   storeId: string,
-  date?: string
+  date?: string,
+  includeTest = false
 ): Promise<{ closure: ClosureReport | null; error?: string }> {
   const parsedDate = parseRequestedDate(date);
   if (!parsedDate) {
     return { closure: null, error: 'Invalid date format. Use YYYY-MM-DD or D.M.YYYY.' };
   }
 
-  const saved = await fetchSavedClosure(userId, storeId, parsedDate);
-  if (saved) {
-    return { closure: saved };
+  // Uložené reporty o testovacích prodejích nevědí; s includeTest se počítá z prodejů.
+  if (!includeTest) {
+    const saved = await fetchSavedClosure(userId, storeId, parsedDate);
+    if (saved) {
+      return { closure: saved };
+    }
   }
 
-  const computed = await computeClosureFromSales(userId, storeId, parsedDate);
+  const computed = await computeClosureFromSales(userId, storeId, parsedDate, includeTest);
   return { closure: computed };
 }
 
@@ -1523,6 +1545,7 @@ type SendClosureParams = {
   endTime?: string;
   eventName: string;
   confirmed?: boolean;
+  includeTest?: boolean;
 };
 
 type ClosureSummaryPreview = {
@@ -1536,6 +1559,9 @@ type ClosureSummaryPreview = {
   cardSales: number;
   qrSales: number;
   totalProfit: number;
+  includesTestSales?: boolean;
+  testSalesCount?: number;
+  testSalesAmount?: number;
 };
 
 const EVENT_NAME_REQUIRED_MESSAGE =
@@ -1838,7 +1864,16 @@ async function executeSendClosure(
     };
   }
 
-  if (periodData.sales.length === 0) {
+  const includeTest = params.includeTest === true;
+  const testSummary = summarizeTestSales(periodData.sales);
+  const closureSales = filterSales(periodData.sales, includeTest);
+  const testInfo = {
+    includesTestSales: includeTest,
+    testSalesCount: testSummary.count,
+    testSalesAmount: testSummary.amount,
+  };
+
+  if (closureSales.length === 0) {
     return {
       sent: false,
       requiresConfirmation: false,
@@ -1854,6 +1889,7 @@ async function executeSendClosure(
         cardSales: 0,
         qrSales: 0,
         totalProfit: 0,
+        ...testInfo,
       } satisfies ClosureSummaryPreview,
     };
   }
@@ -1864,7 +1900,7 @@ async function executeSendClosure(
     fetchUserEmail(userId),
   ]);
 
-  const totals = computeClosureTotals(periodData.sales, products);
+  const totals = computeClosureTotals(closureSales, products);
   const summary: ClosureSummaryPreview = {
     eventName,
     period: periodData.period,
@@ -1876,9 +1912,15 @@ async function executeSendClosure(
     cardSales: totals.cardSales,
     qrSales: totals.qrSales,
     totalProfit: totals.totalProfit,
+    ...testInfo,
   };
 
-  const previewMessage = `Closure preview for "${eventName}" (${summary.period}, ${summary.startDate}${summary.startDate !== summary.endDate ? ` - ${summary.endDate}` : ''}): total ${summary.totalSales.toLocaleString('cs-CZ')} CZK across ${summary.customerCount} transactions. Ask the user to confirm before sending.`;
+  const testNote = testSummary.count === 0
+    ? ''
+    : includeTest
+      ? ` This total INCLUDES ${testSummary.count} test sales worth ${testSummary.amount.toLocaleString('cs-CZ')} CZK.`
+      : ` ${testSummary.count} test sales worth ${testSummary.amount.toLocaleString('cs-CZ')} CZK are excluded.`;
+  const previewMessage = `Closure preview for "${eventName}" (${summary.period}, ${summary.startDate}${summary.startDate !== summary.endDate ? ` - ${summary.endDate}` : ''}): total ${summary.totalSales.toLocaleString('cs-CZ')} CZK across ${summary.customerCount} transactions.${testNote} Ask the user to confirm before sending.`;
 
   if (!params.confirmed) {
     return {
@@ -1907,7 +1949,7 @@ async function executeSendClosure(
       endDate: periodData.endDate,
     },
     totals,
-    periodData.sales as Array<{
+    closureSales as Array<{
       items?: Array<{
         productId: string;
         productName: string;
@@ -1917,7 +1959,8 @@ async function executeSendClosure(
       }>;
       paymentMethod: string;
     }>,
-    products
+    products,
+    { includeTest }
   );
 
   await sendClosureReportEmail(userEmail, emailPayload, eventName);
@@ -1959,14 +2002,18 @@ export async function POST(req: Request) {
               .max(50)
               .default(5)
               .describe('Number of top products to return'),
+            includeTest: z
+              .boolean()
+              .default(false)
+              .describe('Include test sales (isTest). Default false; set true only when the user explicitly asks.'),
           }),
-          execute: async ({ limit }) => {
+          execute: async ({ limit, includeTest }) => {
             if (!context.storeId || !context.userId) {
               return { error: missingContextError(), products: [] as TopProduct[] };
             }
 
             try {
-              const fromSales = await fetchTopProductsFromSales(context.userId, context.storeId, limit);
+              const fromSales = await fetchTopProductsFromSales(context.userId, context.storeId, limit, includeTest);
               if (fromSales.length > 0) {
                 return { products: fromSales, source: 'sales' as const };
               }
@@ -2106,14 +2153,18 @@ export async function POST(req: Request) {
               .string()
               .optional()
               .describe('Optional date for the closure report in YYYY-MM-DD or D.M.YYYY format. Defaults to today.'),
+            includeTest: z
+              .boolean()
+              .default(false)
+              .describe('Include test sales (isTest) in the totals. Default false; set true only when the user explicitly asks.'),
           }),
-          execute: async ({ date }) => {
+          execute: async ({ date, includeTest }) => {
             if (!context.storeId || !context.userId) {
               return { error: missingContextError(), closure: null };
             }
 
             try {
-              return await fetchClosure(context.userId, context.storeId, date);
+              return await fetchClosure(context.userId, context.storeId, date, includeTest);
             } catch (error) {
               console.error('❌ getClosures tool error:', error);
               return { error: 'Failed to load closure report from Firebase.', closure: null };
@@ -2152,8 +2203,12 @@ export async function POST(req: Request) {
               .boolean()
               .default(false)
               .describe('Must be false for preview. Set true only after the user explicitly confirms sending.'),
+            includeTest: z
+              .boolean()
+              .default(false)
+              .describe('Include test sales (isTest) in the closure. Default false; set true only when the user explicitly asks. The email then states how many test sales were included and lists them separately.'),
           }),
-          execute: async ({ type, date, startDate, endDate, startTime, endTime, eventName, confirmed }) => {
+          execute: async ({ type, date, startDate, endDate, startTime, endTime, eventName, confirmed, includeTest }) => {
             if (!context.storeId || !context.userId) {
               return { error: missingContextError(), sent: false };
             }
@@ -2168,6 +2223,7 @@ export async function POST(req: Request) {
                 endTime,
                 eventName,
                 confirmed,
+                includeTest,
               });
             } catch (error) {
               console.error('❌ sendClosure tool error:', error);

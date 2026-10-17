@@ -13,6 +13,8 @@ import { FileText, Calendar, TrendingDown, DollarSign, Users, CreditCard, Bankno
 import { generateEmailContent, EmailReportData, buildEmailReportData } from '@/lib/email';
 import { ProfitPrivacy, PrivateProfit } from '@/components/pos/ProfitPrivacy';
 import { useStore } from '@/contexts/StoreContext';
+import { TestSalesReportControls } from '@/components/pos/TestSalesReportControls';
+import { filterSales, isTestSale, summarizeTestSales, testSalesUiEnabled } from '@/lib/testSales';
 
 // Rozšířený User interface s prodejnami
 interface ExtendedUser {
@@ -107,6 +109,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
   const [actionName, setActionName] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successCountdown, setSuccessCountdown] = useState(5);
+  // Testovací prodeje se do uzávěrky (obrazovka i e-mail) počítají jen po zaškrtnutí.
+  const [includeTestSales, setIncludeTestSales] = useState(false);
 
   // Cast user na ExtendedUser
   const extendedUser = user as ExtendedUser | null;
@@ -207,8 +211,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     setSelectedPeriod(period);
   };
 
-  // Prodeje už filtruje Firestore dotaz; klient jen vrátí načtená data.
-  const getFilteredSales = () => sales;
+  // Období filtruje Firestore dotaz; klient jen vynechá testovací prodeje (pokud nejsou zahrnuty).
+  const getFilteredSales = () => filterSales(sales, includeTestSales);
+  const testSalesSummary = useMemo(() => summarizeTestSales(sales), [sales]);
+  const showTestSalesControls = testSalesUiEnabled(storeDoc) || testSalesSummary.count > 0;
 
   const getReportData = () => {
     const filteredSales = getFilteredSales();
@@ -320,7 +326,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
   const reportData = useMemo(
     () => getReportData(),
-    [sales, products, selectedPeriod, selectedDate, customStartDate, customEndDate, extendedUser]
+    [sales, products, selectedPeriod, selectedDate, customStartDate, customEndDate, extendedUser, includeTestSales]
   );
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const soldProductsSummary = useMemo(
@@ -421,7 +427,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
         totalTips: reportData.totalTips,
       },
       reportData.sales,
-      products.map((product) => ({ id: product.id, cost: product.cost }))
+      products.map((product) => ({ id: product.id, cost: product.cost })),
+      { includeTest: includeTestSales }
     );
   };
 
@@ -728,6 +735,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
       )}
 
       {reportReady && <>
+      {showTestSalesControls && (
+        <TestSalesReportControls
+          includeTest={includeTestSales}
+          onIncludeTestChange={setIncludeTestSales}
+          summary={testSalesSummary}
+          testSales={sales.filter(isTestSale)}
+        />
+      )}
+
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {/* celkova trzba */}
@@ -1000,6 +1016,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       {sale.items.length} položek
                     </span>
+                    {isTestSale(sale) && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300">
+                        TEST
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-3">
                     <span className="text-sm text-gray-500 dark:text-gray-400">

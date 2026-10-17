@@ -33,6 +33,8 @@ import {
   CalendarRange,
 } from 'lucide-react';
 import { AddProductModal } from './AddProductModal';
+import { useStore } from '@/contexts/StoreContext';
+import { testSalesUiEnabled } from '@/lib/testSales';
 
 interface CatalogViewProps {
   storeId: string;
@@ -44,6 +46,7 @@ interface SaleForStats {
   items: CartItem[];
   createdAt: Date;
   isRefund?: boolean;
+  isTest?: boolean;
 }
 
 interface TopProductEntry {
@@ -69,6 +72,8 @@ function aggregateTopProducts(sales: SaleForStats[], since: Date): TopProductEnt
   const map = new Map<string, TopProductEntry>();
   for (const sale of sales) {
     if (sale.isRefund) continue;
+    // Testovací doklady se do žebříčků nepočítají
+    if (sale.isTest) continue;
     if (sale.createdAt < since) continue;
     for (const item of sale.items || []) {
       // Extras (položky s parentItemId) do žebříčku hlavních produktů nepatří
@@ -176,11 +181,13 @@ interface EditState {
   name: string;
   price: string;
   cost: string;
+  isTestProduct: boolean;
 }
 
 interface CatalogTableProps {
   items: Product[];
   showCategory: boolean;
+  showTestToggle: boolean;
   editing: EditState | null;
   saving: boolean;
   onStartEdit: (p: Product) => void;
@@ -194,6 +201,7 @@ interface CatalogTableProps {
 function CatalogTable({
   items,
   showCategory,
+  showTestToggle,
   editing,
   saving,
   onStartEdit,
@@ -257,15 +265,35 @@ function CatalogTable({
                   >
                     <td className="py-2.5 px-4 text-gray-900 dark:text-white font-medium">
                       {isEditing ? (
-                        <input
-                          value={editing.name}
-                          onChange={(e) => onEditChange({ name: e.target.value })}
-                          onKeyDown={handleKeyDown}
-                          className={inputClass}
-                          autoFocus
-                        />
+                        <>
+                          <input
+                            value={editing.name}
+                            onChange={(e) => onEditChange({ name: e.target.value })}
+                            onKeyDown={handleKeyDown}
+                            className={inputClass}
+                            autoFocus
+                          />
+                          {(showTestToggle || product.isTestProduct) && (
+                            <label className="mt-1.5 flex items-center gap-2 text-xs font-normal text-gray-600 dark:text-gray-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editing.isTestProduct}
+                                onChange={(e) => onEditChange({ isTestProduct: e.target.checked })}
+                                className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                              />
+                              Testovací produkt
+                            </label>
+                          )}
+                        </>
                       ) : (
-                        product.name
+                        <>
+                          {product.name}
+                          {product.isTestProduct && (
+                            <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 align-middle">
+                              TEST
+                            </span>
+                          )}
+                        </>
                       )}
                     </td>
                     {showCategory && (
@@ -369,6 +397,8 @@ function CatalogTable({
 
 export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
   const { user } = useAuth();
+  const storeDoc = useStore();
+  const showTestToggle = testSalesUiEnabled(storeDoc);
 
   const [activeTab, setActiveTab] = useState<TabType>('products');
 
@@ -409,6 +439,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
           createdAt: v.createdAt?.toDate?.() || new Date(),
           updatedAt: v.updatedAt?.toDate?.() || new Date(),
           isExtra: v.isExtra === true,
+          isTestProduct: v.isTestProduct === true,
         };
       });
       setAllProducts(data.sort((a, b) => a.name.localeCompare(b.name, 'cs')));
@@ -434,6 +465,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
           items: (v.items || []) as CartItem[],
           createdAt: v.createdAt?.toDate?.() || new Date(),
           isRefund: v.isRefund === true,
+          isTest: v.isTest === true,
         };
       });
       setSales(data);
@@ -483,6 +515,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
       name: p.name,
       price: String(p.price),
       cost: typeof p.cost === 'number' ? String(p.cost) : '',
+      isTestProduct: p.isTestProduct === true,
     });
   };
 
@@ -497,6 +530,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
           name: editing.name.trim(),
           price: Number(editing.price) || 0,
           cost: parsedCost !== null && Number.isFinite(parsedCost) ? parsedCost : null,
+          // Příznak se zapisuje jen při změně, jinak zůstává uložení produktu stejné jako dřív.
+          ...(editing.isTestProduct !== (allProducts.find((p) => p.id === editing.id)?.isTestProduct === true)
+            ? { isTestProduct: editing.isTestProduct }
+            : {}),
           updatedAt: serverTimestamp(),
         }
       );
@@ -658,6 +695,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                   <CatalogTable
                     items={filteredProducts}
                     showCategory
+                    showTestToggle={showTestToggle}
                     editing={editing}
                     saving={saving}
                     onStartEdit={startEdit}
@@ -711,6 +749,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({ storeId }) => {
                   <CatalogTable
                     items={filteredExtras}
                     showCategory={false}
+                    showTestToggle={false}
                     editing={editing}
                     saving={saving}
                     onStartEdit={startEdit}

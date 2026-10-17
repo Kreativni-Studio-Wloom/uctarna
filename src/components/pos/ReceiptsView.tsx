@@ -9,6 +9,7 @@ import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc
 import { db } from '@/lib/firebase';
 import { generateReceiptPdfBlob, generateDailySalesReportPdfBlob } from '@/lib/pdfGenerator';
 import { useStore } from '@/contexts/StoreContext';
+import { isTestSale, testSalesUiEnabled } from '@/lib/testSales';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { cs } from 'date-fns/locale';
 
@@ -17,6 +18,14 @@ interface ReceiptsViewProps {
 }
 
 const SEARCH_DEBOUNCE_MS = 400;
+
+type TestFilter = 'all' | 'real' | 'test';
+
+const TestBadge: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 ${className}`}>
+    TEST
+  </span>
+);
 
 const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
   const q = queryText.toLowerCase();
@@ -181,6 +190,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [dayLoading, setDayLoading] = useState(false);
   const [generatingDayPdf, setGeneratingDayPdf] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [testFilter, setTestFilter] = useState<TestFilter>('all');
+  const [includeTestInDayPdf, setIncludeTestInDayPdf] = useState(false);
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -393,7 +404,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     : [];
 
   const searchTotalPages = Math.max(1, Math.ceil(searchResults.length / ITEMS_PER_PAGE));
-  const displaySales = isSearchMode
+  const loadedSales = isSearchMode
     ? searchResults.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
@@ -401,6 +412,13 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     : isDayMode
       ? daySales
       : pageSales;
+  // Filtr testovacích dokladů je jen v rámci načtené stránky/dne/hledání.
+  const displaySales =
+    testFilter === 'all'
+      ? loadedSales
+      : loadedSales.filter((sale) => isTestSale(sale) === (testFilter === 'test'));
+  const showTestFilter = testSalesUiEnabled(storeDoc) || testFilter !== 'all' || loadedSales.some(isTestSale);
+  const dayHasTestSales = daySales.some(isTestSale);
 
   const canGoNext = isSearchMode
     ? currentPage < searchTotalPages
@@ -499,7 +517,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           ico: storeDoc?.ico,
           companyAddress: storeDoc?.companyAddress,
         },
-        filterDate
+        filterDate,
+        { includeTest: includeTestInDayPdf }
       );
 
       const objectUrl = URL.createObjectURL(pdfBlob);
@@ -608,6 +627,20 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       <span>{generatingDayPdf ? 'Generuji PDF…' : 'Stáhnout seznam dokladů (PDF)'}</span>
                     </button>
 
+                    {isDayMode && dayHasTestSales && (
+                      <label className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <span className="w-8 flex items-center justify-center flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={includeTestInDayPdf}
+                            onChange={(e) => setIncludeTestInDayPdf(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                          />
+                        </span>
+                        <span>Zahrnout i testovací prodeje</span>
+                      </label>
+                    )}
+
                     {isDayMode && (
                       <button
                         type="button"
@@ -635,6 +668,18 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           placeholder="Hledat podle čísla dokladu, ID nebo SumUp kódu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
+        {showTestFilter && (
+          <select
+            value={testFilter}
+            onChange={(e) => setTestFilter(e.target.value as TestFilter)}
+            aria-label="Filtr testovacích dokladů"
+            className="shrink-0 px-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="all">Všechny doklady</option>
+            <option value="real">Jen reálné</option>
+            <option value="test">Jen testovací</option>
+          </select>
+        )}
       </div>
 
       {(searchLoading && isSearchMode) || (dayLoading && isDayMode) ? (
@@ -681,6 +726,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
                       {sale.documentId || `#${sale.id.slice(-8)}`}
                     </span>
+                    {isTestSale(sale) && <TestBadge className="ml-2" />}
                   </div>
                   <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <div className={getPaymentColor(sale.paymentMethod)}>
@@ -817,6 +863,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">
                     Detail dokladu
+                    {isTestSale(selectedSale) && <TestBadge className="ml-2 align-middle" />}
                   </h3>
                   <button
                     onClick={() => setSelectedSale(null)}

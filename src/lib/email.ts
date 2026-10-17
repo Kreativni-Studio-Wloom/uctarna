@@ -1,5 +1,14 @@
 // Tento modul poskytuje pouze generování obsahu e-mailu pro uzávěrky.
 
+import {
+  filterSales,
+  formatCzk,
+  formatIncludedTestSalesNote,
+  isTestSale,
+  saleAmountCzk,
+  summarizeTestSales,
+} from '@/lib/testSales';
+
 export interface ProductSummaryRow {
   name: string;
   quantity: number;
@@ -30,6 +39,23 @@ export interface EmailReportData {
   numQrSales: number;
   totalItemsSold: number;
   productSummary: ProductSummaryRow[];
+  /** Jen pokud uzávěrka výslovně zahrnuje testovací prodeje a nějaké v období jsou. */
+  testSales?: TestSalesReport;
+}
+
+export interface TestSaleRow {
+  documentId: string;
+  time: string;
+  paymentMethod: string;
+  amount: number;
+}
+
+export interface TestSalesReport {
+  count: number;
+  amount: number;
+  /** „včetně N testovacích prodejů za X Kč“ */
+  note: string;
+  rows: TestSaleRow[];
 }
 
 type SaleItemForEmail = {
@@ -43,7 +69,50 @@ type SaleItemForEmail = {
 type SaleForEmail = {
   items?: SaleItemForEmail[];
   paymentMethod: string;
+  isTest?: boolean;
+  totalAmount?: number;
+  currency?: string;
+  eurRate?: number | null;
+  documentId?: string | null;
+  createdAt?: unknown;
 };
+
+function saleDateForEmail(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  return null;
+}
+
+const PAYMENT_LABELS: Record<string, string> = { cash: 'Hotovost', card: 'Karta', qr: 'QR kód' };
+
+function buildTestSalesReport(sales: SaleForEmail[]): TestSalesReport | undefined {
+  const testSales = sales.filter(isTestSale);
+  if (testSales.length === 0) return undefined;
+  const summary = summarizeTestSales(testSales);
+  return {
+    ...summary,
+    note: formatIncludedTestSalesNote(summary),
+    rows: testSales.map((sale) => {
+      const date = saleDateForEmail(sale.createdAt);
+      return {
+        documentId: sale.documentId || '—',
+        time: date
+          ? new Intl.DateTimeFormat('cs-CZ', {
+              day: 'numeric',
+              month: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Europe/Prague',
+            }).format(date)
+          : '',
+        paymentMethod: PAYMENT_LABELS[sale.paymentMethod] ?? sale.paymentMethod,
+        amount: saleAmountCzk(sale),
+      };
+    }),
+  };
+}
 
 type ProductCostLookup = {
   id: string;
@@ -67,9 +136,14 @@ export function buildEmailReportData(
     | 'salesWithDiscount'
     | 'totalTips'
   >,
-  sales: SaleForEmail[],
-  products: ProductCostLookup[]
+  allSales: SaleForEmail[],
+  products: ProductCostLookup[],
+  options: { includeTest?: boolean } = {}
 ): EmailReportData {
+  // Součty (totals) počítá volající ze stejně filtrovaných prodejů.
+  const includeTest = options.includeTest === true;
+  const sales = filterSales(allSales, includeTest);
+  const testSales = includeTest ? buildTestSalesReport(sales) : undefined;
   const productMap = new Map(products.map((product) => [product.id, product]));
   const summaryMap = new Map<string, ProductSummaryRow>();
 
@@ -112,6 +186,7 @@ export function buildEmailReportData(
     numQrSales: sales.filter((sale) => sale.paymentMethod === 'qr').length,
     totalItemsSold,
     productSummary: Array.from(summaryMap.values()).sort((a, b) => b.totalPrice - a.totalPrice),
+    ...(testSales ? { testSales } : {}),
   };
 }
 
@@ -128,8 +203,31 @@ function formatPeriodLabel(reportData: EmailReportData) {
   return `Celková uzávěrka od ${reportData.startDate} do ${reportData.endDate}`;
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!);
+}
+
+// Bez testovacích prodejů vrací prázdné řetězce, takže e-mail zůstane stejný jako dřív.
+function testSalesEmailParts(reportData: EmailReportData) {
+  const t = reportData.testSales;
+  if (!t || t.count === 0) return { headerHtml: '', sectionHtml: '', headerText: '', sectionText: '' };
+  const note = `Uzávěrka je ${t.note}.`;
+  const rowsHtml = t.rows
+    .map((row) => `<tr><td style="padding: 8px; border-bottom: 1px solid #fde68a;">${escapeHtml(row.documentId)}</td><td style="padding: 8px; border-bottom: 1px solid #fde68a;">${escapeHtml(row.time)}</td><td style="padding: 8px; border-bottom: 1px solid #fde68a;">${escapeHtml(row.paymentMethod)}</td><td style="padding: 8px; border-bottom: 1px solid #fde68a; text-align: right;">${formatCzk(row.amount)}</td></tr>`)
+    .join('');
+  return {
+    headerHtml: `<p style="margin: 12px auto 0; display: inline-block; background: #f97316; color: white; padding: 6px 12px; border-radius: 6px; font-weight: bold;">🧪 ${escapeHtml(note)}</p>`,
+    sectionHtml: `<h3>🧪 Testovací prodeje (${t.count})</h3><p style="color: #92400e;">${escapeHtml(note)} Testovací doklady nejsou reálné tržby.</p><table style="background: #fffbeb;"><thead><tr><th>Doklad</th><th>Čas</th><th>Platba</th><th style="text-align: right;">Částka</th></tr></thead><tbody>${rowsHtml}</tbody></table>`,
+    headerText: `\n🧪 ${note}\n`,
+    sectionText: `\n🧪 TESTOVACÍ PRODEJE (${t.count}) – nejsou reálné tržby:\n${t.rows
+      .map((row) => `${row.documentId} ${row.time} ${row.paymentMethod} – ${formatCzk(row.amount)}`)
+      .join('\n')}\n`,
+  };
+}
+
 export function generateEmailContent(reportData: EmailReportData, actionName?: string) {
   const periodLabel = formatPeriodLabel(reportData);
+  const testParts = testSalesEmailParts(reportData);
   const uniqueProductCount = reportData.productSummary.length;
 
   const productSummaryRows = reportData.productSummary
@@ -175,7 +273,7 @@ export function generateEmailContent(reportData: EmailReportData, actionName?: s
         <div class="container">
           <div class="header">
             <h1>${reportData.storeName}${actionName ? ` - ${actionName}` : ''}</h1>
-            <p>${periodLabel}</p>
+            <p>${periodLabel}</p>${testParts.headerHtml}
           </div>
           
           <div class="content">
@@ -271,7 +369,7 @@ export function generateEmailContent(reportData: EmailReportData, actionName?: s
               <p><strong>Koruny (po vrácení):</strong> ${reportData.salesInCZK.toLocaleString('cs-CZ')} Kč</p>
               <p><strong>Prodané položky celkem:</strong> ${reportData.totalItemsSold.toLocaleString('cs-CZ')} ks</p>
               <p><strong>Počet různých produktů:</strong> ${uniqueProductCount}</p>
-            </div>
+            </div>${testParts.sectionHtml}
           </div>
           
           <div class="footer">
@@ -285,7 +383,7 @@ export function generateEmailContent(reportData: EmailReportData, actionName?: s
     text: `
 ${reportData.period} uzávěrka - ${reportData.storeName}${actionName ? ` - ${actionName}` : ''}
 
-Období: ${periodLabel}
+Období: ${periodLabel}${testParts.headerText}
 
 📊 STATISTIKY:
 - Celková tržba: ${reportData.totalSales.toLocaleString('cs-CZ')} Kč
@@ -302,7 +400,7 @@ Období: ${periodLabel}
 
 📋 SOUHRN PRODANÝCH POLOŽEK:
 ${productSummaryText}
-
+${testParts.sectionText}
 ---
 Uzávěrka vygenerována automaticky dne ${new Date().toLocaleDateString('cs-CZ')}
 Účtárna - Profesionální prodejní systém
