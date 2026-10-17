@@ -98,7 +98,7 @@ export const retryMyEetQueue = (storeId: string) =>
   });
 
 export const verifyEetConnection = (storeId: string) =>
-  call<{ ok: boolean; classification: string; message: string; code?: number; ms: number; env: string }>('/api/eet/verify', {
+  call<{ ok: boolean; classification: string; message: string; code?: number; ms: number; env: string; region?: string | null }>('/api/eet/verify', {
     method: 'POST',
     json: { storeId },
   });

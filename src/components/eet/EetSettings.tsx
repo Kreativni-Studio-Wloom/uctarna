@@ -126,7 +126,7 @@ export const EetSettings: React.FC<EetSettingsProps> = ({ storeId }) => {
     setVerify({ state: 'running' });
     try {
       const r = await verifyEetConnection(storeId);
-      setVerify({ state: r.ok ? 'ok' : 'fail', message: `${r.message} (${(r.ms / 1000).toFixed(1)} s)` });
+      setVerify({ state: r.ok ? 'ok' : 'fail', message: `${r.message} (${(r.ms / 1000).toFixed(1)} s${r.region ? `, server ${r.region}` : ''})` });
     } catch (e) {
       setVerify({ state: 'fail', message: (e as Error).message });
     }

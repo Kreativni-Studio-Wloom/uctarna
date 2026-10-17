@@ -52,5 +52,7 @@ export async function verifyConnection(
     code: a.result.kind === 'error' ? a.result.code : undefined,
     ms: a.result.ms,
     env: settings.environment,
+    // Region serverové funkce (Vercel), kvůli dohledání problémů se spojením do EET.
+    region: process.env.VERCEL_REGION ?? null,
   };
 }
