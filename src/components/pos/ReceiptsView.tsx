@@ -482,8 +482,9 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
     // EET: reálný doklad se nemaže, jen stornuje (pojistka i mimo tlačítko).
-    if (saleRemovalPolicy(storeDoc, sale).action !== 'delete') {
-      alert('Doklad u prodejny se zapnutým EET nejde smazat. Použijte Stornovat.');
+    const removal = saleRemovalPolicy(storeDoc, sale);
+    if (removal.action !== 'delete') {
+      alert(removal.reason ?? 'Doklad nejde smazat. Použijte Stornovat.');
       throw new Error('delete_blocked');
     }
 

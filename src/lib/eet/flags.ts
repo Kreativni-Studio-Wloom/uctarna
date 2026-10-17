@@ -50,5 +50,16 @@ export function decideSaleSavePath(store: StoreLike): SaleSavePath {
   return isEetEnabled(store) ? 'finalize' : 'legacy';
 }
 
+/**
+ * Doklad má EET identitu: číslo z řady (`receiptNo`) nebo stav EET (kromě testovacího).
+ * Takový doklad se nesmí smazat (jen stornovat) ani zkopírovat jako „živý“, i když je EET
+ * u prodejny zrovna vypnuté (nouzová brzda nesmí otevřít cestu k mazání evidovaných tržeb).
+ */
+export function hasEetIdentity(sale: { isTest?: unknown; receiptNo?: unknown; eet?: { status?: unknown } | null } | null | undefined): boolean {
+  if (!sale || sale.isTest === true) return false;
+  if (typeof sale.receiptNo === 'string' && sale.receiptNo !== '') return true;
+  return !!sale.eet && typeof sale.eet === 'object' && sale.eet.status !== 'test';
+}
+
 /** Stavy, které ještě čekají na odeslání (fronta). */
 export const EET_OPEN_STATUSES = ['pending', 'queued'] as const;

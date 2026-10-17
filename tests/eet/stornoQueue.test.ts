@@ -5,7 +5,7 @@ import { clearCredentialsCache, encryptCredentials, getStoreCredentials, invalid
 import { finalizeInputSchema, finalizeSale } from '@/lib/eet/finalize';
 import { retryDueAll, retryDueForStore } from '@/lib/eet/queue';
 import { NON_CASH_REFUND_REASON, stornoSale } from '@/lib/eet/storno';
-import { STORE, STORE_PATH, UID, attrs, cashDraft, creds, eetFetch, loadCredentials, okBody, salePath, setup } from './fixturesC';
+import { STORE, STORE_PATH, UID, attrs, cashDraft, creds, eetFetch, eetSettings, loadCredentials, okBody, salePath, setup } from './fixturesC';
 import { playgroundP12, playgroundPassword } from './helpers';
 import { asDb } from './firestoreMock';
 
@@ -58,8 +58,20 @@ describe('storno', () => {
     const r = await stornoSale(s.db, UID, STORE, 'orig000001', { now: s.now, registerNow: false });
     await expect(stornoSale(s.db, UID, STORE, r.saleId, { now: s.now })).rejects.toMatchObject({ code: 'is_storno' });
 
+    // Doklad bez EET identity (z doby před EET) při vypnutém EET: 409 jako dřív.
+    s.mock.seed(salePath('legacy0001'), { ...cashDraft(), createdAt: Timestamp.fromDate(new Date('2026-10-01T10:00:00Z')) });
     s.mock.seed(STORE_PATH, { eet: { enabled: false } });
-    await expect(stornoSale(s.db, UID, STORE, 'orig000001', { now: s.now })).rejects.toMatchObject({ status: 409 });
+    await expect(stornoSale(s.db, UID, STORE, 'legacy0001', { now: s.now })).rejects.toMatchObject({ status: 409, code: 'eet_disabled' });
+  });
+
+  it('vypnuté EET: doklad s EET identitou jde stornovat, storno čeká (neodešle se) a dostane další číslo', async () => {
+    const s = await withSale();
+    s.mock.seed(STORE_PATH, { name: 'Test', eet: { ...eetSettings, enabled: false } });
+    const { calls, fetchImpl } = eetFetch(okBody);
+    const r = await stornoSale(s.db, UID, STORE, 'orig000001', { now: s.now, registerOptions: { fetchImpl, loadCredentials, now: s.now } });
+    expect(r).toMatchObject({ receiptNo: '2026-000002', duplicate: false, eet: { status: 'pending' } });
+    expect(calls).toHaveLength(0);
+    expect(s.mock.read(salePath('orig000001'))!.storno).toMatchObject({ saleId: r.saleId });
   });
 });
 

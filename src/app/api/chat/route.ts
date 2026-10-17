@@ -1358,7 +1358,7 @@ async function executeDeleteInvoice(userId: string, storeId: string, params: Del
 
   const data = saleDoc.data()!;
 
-  // EET 2.0: u prodejny se zapnutým EET jde smazat jen testovací doklad, reálný se stornuje v historii.
+  // EET 2.0: doklad v EET (číslo z řady / eet) se nikdy nemaže, ani při vypnutém EET; se zapnutým EET jen testovací. Storno v historii.
   const storeSnap = await storeRef(userId, storeId).get();
   const removal = saleRemovalPolicy(storeSnap.data() as Pick<Store, 'eet'> | undefined, data);
   if (removal.action !== 'delete') {

@@ -23,6 +23,8 @@ type SaleRecord = {
   sumUpTxCode?: string;
   /** EET 2.0: pole rozhodující o tom, zda doklad jde smazat (`canDeleteSale`). */
   isTest?: boolean;
+  receiptNo?: string;
+  eet?: { status?: string } | null;
   stornoOf?: string;
   storno?: { saleId?: string } | null;
 };
@@ -31,7 +33,7 @@ type DuplicateGroup = {
   key: string;
   keep: SaleRecord;
   remove: SaleRecord[];
-  /** Duplicity, které u prodejny se zapnutým EET nejde smazat (jen stornovat v historii). */
+  /** Duplicity, které nejde smazat (doklady v EET / s číslem z řady) (jen stornovat v historii). */
   blocked: SaleRecord[];
 };
 
@@ -148,6 +150,8 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
               ? sumUpData.sumUpTxCode
               : undefined,
           isTest: data.isTest === true,
+          receiptNo: typeof data.receiptNo === 'string' ? data.receiptNo : undefined,
+          eet: data.eet && typeof data.eet === 'object' ? { status: (data.eet as { status?: string }).status } : null,
           stornoOf: typeof data.stornoOf === 'string' ? data.stornoOf : undefined,
           storno: (data.storno as SaleRecord['storno']) ?? null,
         };
@@ -225,7 +229,7 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
         if (recs.length < 2) continue;
         const keep = pickKeeper(recs);
         const others = recs.filter((r) => r.id !== keep.id);
-        // EET: reálné doklady se nemažou (jen storno), bez EET platí canDeleteSale vždy.
+        // EET: doklady s EET identitou se nemažou (jen storno), i při vypnutém EET; ostatní jako dřív.
         const remove = others.filter((r) => canDeleteSale(storeDoc, r));
         const blocked = others.filter((r) => !canDeleteSale(storeDoc, r));
         const key = keep.documentId || keep.sumUpTxCode || `group:${root}`;
@@ -356,7 +360,7 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
         <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-sm">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
-            {totalBlocked} duplicitních dokladů nejde smazat, protože prodejna má zapnuté EET. Stornujte je v historii dokladů.
+            {totalBlocked} duplicitních dokladů nejde smazat, protože jsou evidované v EET (mají číslo z řady) nebo má prodejna zapnuté EET. Stornujte je v historii dokladů.
           </span>
         </div>
       )}

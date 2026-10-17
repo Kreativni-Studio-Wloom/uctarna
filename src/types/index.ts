@@ -224,6 +224,8 @@ export interface Sale {
   stornoOf?: string;
   /** U původního dokladu po stornu. */
   storno?: { by: string; at: FirestoreTime; saleId: string };
+  /** Kopie dokladu z „Duplikovat prodejnu“: odkud pochází (kopie nemá receiptNo ani eet). */
+  copiedFrom?: { storeId: string; saleId: string; receiptNo?: string };
 }
 
 export interface SumUpTransactionData {

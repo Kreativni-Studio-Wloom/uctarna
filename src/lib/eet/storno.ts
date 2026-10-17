@@ -1,7 +1,7 @@
 import 'server-only';
 import { HttpError, compact, newDocumentId, paths, ts, type Db } from './db';
 import { incrementSoldCounts, prepareNewSaleEet } from './finalize';
-import { isEetEnabled } from './flags';
+import { hasEetIdentity, isEetEnabled } from './flags';
 import { registerSale, type RegisterOptions, type RegisterOutcome } from './register';
 import type { CartItem, Sale, SaleEet, Store } from '@/types';
 
@@ -73,11 +73,13 @@ export async function stornoSale(
     const storeSnap = await tx.get(storeRef);
     if (!storeSnap.exists) throw new HttpError(404, 'store_not_found', 'Prodejna nenalezena');
     const store = storeSnap.data() as Pick<Store, 'eet'>;
-    if (!isEetEnabled(store)) throw new HttpError(409, 'eet_disabled', 'EET není u prodejny zapnuté');
 
     const origSnap = await tx.get(originalRef);
     if (!origSnap.exists) throw new HttpError(404, 'sale_not_found', 'Doklad nenalezen');
     const original = origSnap.data() as Partial<Sale>;
+    // Doklad s EET identitou se stornuje i při vypnutém EET (smazat ho nejde, viz saleRemovalPolicy).
+    // Storno pak dostane číslo a zůstane 'pending'; fronta ho odešle až po opětovném zapnutí.
+    if (!isEetEnabled(store) && !hasEetIdentity(original)) throw new HttpError(409, 'eet_disabled', 'EET není u prodejny zapnuté');
     if (original.storno?.saleId) {
       const prev = await tx.get(db.doc(paths.sale(uid, storeId, original.storno.saleId)));
       const d = prev.data() as Partial<Sale> | undefined;

@@ -32,7 +32,24 @@ describe('saleRemovalPolicy: kdo smí mazat / stornovat', () => {
     expect(saleRemovalPolicy(OFF, {})).toEqual({ action: 'delete' });
     expect(saleRemovalPolicy(undefined, {})).toEqual({ action: 'delete' });
     expect(saleRemovalPolicy({ eet: { enabled: 'true' as unknown as boolean } }, {}).action).toBe('delete');
-    expect(canDeleteSale({}, { eet: { status: 'sent' } })).toBe(true);
+  });
+  it('doklad s EET identitou jen stornovat, i když je EET vypnuté (nouzová brzda)', () => {
+    for (const store of [OFF, undefined, {}]) {
+      expect(saleRemovalPolicy(store, { eet: { status: 'sent' } }).action).toBe('storno');
+      expect(saleRemovalPolicy(store, { receiptNo: '2026-000001' }).action).toBe('storno');
+      expect(saleRemovalPolicy(store, { pendingNumber: true, eet: { status: 'queued' } }).action).toBe('storno');
+      expect(saleRemovalPolicy(store, { receiptNo: '2026-000002', eet: { status: 'not_required' } }).action).toBe('storno');
+      expect(canDeleteSale(store, { eet: { status: 'failed_permanent' } })).toBe(false);
+      expect(saleRemovalPolicy(store, { receiptNo: '2026-000003', stornoOf: 'x' }).action).toBe('none');
+      expect(saleRemovalPolicy(store, { receiptNo: '2026-000001', storno: { saleId: 'y' } }).action).toBe('none');
+    }
+  });
+  it('testovací doklad (i s číslem a eet.status test) jde smazat vždy', () => {
+    expect(saleRemovalPolicy(OFF, { isTest: true, receiptNo: '2026-000004', eet: { status: 'test' } }).action).toBe('delete');
+    expect(saleRemovalPolicy(ON, { isTest: true, receiptNo: '2026-000004', eet: { status: 'test' } }).action).toBe('delete');
+    // eet.status 'test' bez čísla není EET identita
+    expect(saleRemovalPolicy(OFF, { eet: { status: 'test' } }).action).toBe('delete');
+    expect(saleRemovalPolicy(OFF, { receiptNo: '' }).action).toBe('delete');
   });
   it('s EET: testovací doklad jde smazat, reálný jen stornovat', () => {
     expect(saleRemovalPolicy(ON, { isTest: true }).action).toBe('delete');

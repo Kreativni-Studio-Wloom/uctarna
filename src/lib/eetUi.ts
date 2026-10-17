@@ -2,7 +2,7 @@
 // Bez Firebase a bez 'server-only', aby šla testovat a importovat z komponent.
 // Vše se používá jen u prodejny se zapnutým EET (`isEetEnabled`), mimo nastavení.
 
-import { isEetEnabled, resolveEetSettings } from '@/lib/eet/flags';
+import { hasEetIdentity, isEetEnabled, resolveEetSettings } from '@/lib/eet/flags';
 import { RE_EIC, RE_ID_JEDNOTKY, RE_ID_POKL } from '@/lib/eet/patterns';
 import { formatReceiptNo, pragueYear } from '@/lib/eet/receiptNo';
 import { isTestSale, saleAmountCzk } from '@/lib/testSales';
@@ -60,16 +60,19 @@ export interface SaleRemovalPolicy {
   reason?: string;
 }
 
-export const DELETE_BLOCKED_REASON = 'Doklad u prodejny se zapnutým EET nejde smazat. Použijte Stornovat.';
+export const DELETE_BLOCKED_REASON = 'Doklad evidovaný v EET (s číslem z řady) nejde smazat. Použijte Stornovat.';
 
 /**
- * Co jde s dokladem udělat místo / kromě smazání (kap. 6.4):
- * - bez EET jako dřív: smazat,
- * - s EET: testovací doklad smazat, reálný jen stornovat; storno a už stornovaný doklad nic.
+ * Co jde s dokladem udělat místo / kromě smazání (kap. 6.4). Platí pro historii, čistič duplicit i AI:
+ * - testovací doklad: smazat,
+ * - doklad s EET identitou (`receiptNo` nebo `eet` mimo 'test', viz `hasEetIdentity`): jen stornovat,
+ *   a to i při vypnutém EET (vypnutí je nouzová brzda, ne cesta ke smazání evidovaných dokladů);
+ *   storno a už stornovaný doklad nic,
+ * - ostatní (doklady bez EET): bez EET jako dřív smazat; se zapnutým EET stornovat.
  */
 export function saleRemovalPolicy(store: StoreLike, sale: EetSaleLike): SaleRemovalPolicy {
-  if (!isEetEnabled(store)) return { action: 'delete' };
   if (isTestSale(sale)) return { action: 'delete' };
+  if (!hasEetIdentity(sale) && !isEetEnabled(store)) return { action: 'delete' };
   if (sale.stornoOf) return { action: 'none', reason: 'Storno dokladu nejde smazat ani znovu stornovat.' };
   if (sale.storno?.saleId) return { action: 'none', reason: 'Doklad je už stornovaný.' };
   return { action: 'storno', reason: DELETE_BLOCKED_REASON };
