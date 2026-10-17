@@ -223,6 +223,8 @@ describe('nastavení', () => {
     const c = checkEetSettings(form({ eic: 'CZ1', unitId: '0', registerId: 'Pokladna č.1', receiptPrefix: 'Á-' }), cert, NOW);
     expect(Object.keys(c.fieldErrors).sort()).toEqual(['eic', 'receiptPrefix', 'registerId', 'unitId']);
     expect(checkEetSettings(form({ unitId: '305' }), cert, NOW).warnings.join()).toMatch(/1–4/);
+    expect(checkEetSettings(form({ unitId: '1' }), cert, NOW).warnings.join()).toMatch(/varování 6/);
+    expect(checkEetSettings(form({ unitId: '303' }), cert, NOW).warnings.join()).not.toMatch(/varování 6/);
     expect(checkEetSettings(form(), { ...cert, validTo: new Date(NOW.getTime() + 10 * 86_400_000) }, NOW).warnings.join()).toMatch(/vyprší za 10 dní/);
   });
 });

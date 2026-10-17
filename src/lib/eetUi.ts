@@ -442,8 +442,11 @@ export function checkEetSettings(f: EetSettingsForm, cert: CertificateMeta | nul
 
   if (!RE_EIC.test(eic)) fieldErrors.eic = 'DIČ musí být ve tvaru CZ a 8–10 číslic.';
   if (!RE_ID_JEDNOTKY.test(f.unitId.trim())) fieldErrors.unitId = 'Číslo evidenční jednotky je 1 až 9 číslic, nezačíná nulou.';
-  else if (!/[1-4]$/.test(f.unitId.trim()))
-    warnings.push('Číslo evidenční jednotky obvykle končí číslicí 1–4 (kontrolní číslice z DIS+). Zkontrolujte ho.');
+  // Propustná kontrola EET (varování 6): aspoň 2 číslice a poslední 1–4 (tvar přidělovaný v DIS+).
+  else if (!/^\d{2,}$/.test(f.unitId.trim()) || !/[1-4]$/.test(f.unitId.trim()))
+    warnings.push(
+      'Číslo evidenční jednotky z DIS+ má aspoň 2 číslice a končí číslicí 1–4. EET tržbu přijme, ale vrátí varování 6. Zkontrolujte ho (na Playgroundu např. 303).'
+    );
   if (!RE_ID_POKL.test(f.registerId.trim())) fieldErrors.registerId = 'Označení pokladny: 1–20 znaků (písmena bez diakritiky, číslice, . , : ; / # - _ mezera).';
   if (!(f.sendTimeoutMs >= 2000)) fieldErrors.sendTimeoutMs = 'Mezní doba odezvy musí být nejméně 2 s.';
 
