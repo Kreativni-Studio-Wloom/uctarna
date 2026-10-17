@@ -12,6 +12,7 @@ import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin
 import { DiscountModal } from './DiscountModal';
 import { isEetEnabled } from '@/lib/eet/flags';
 import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
+import { saveEetFallbackSale } from '@/lib/sumupFallback';
 import { EetQueueBanner } from '@/components/eet/EetQueueBanner';
 import { EetCertificateBanner } from '@/components/eet/EetCertificateBanner';
 import { EetResultHost, type EetResultSource } from '@/components/eet/EetResultHost';
@@ -236,9 +237,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // Volá se, když návratová stránka SumUp poslala PAYMENT_SUCCESS s pendingSave
   // (duplicitní tab se zavřel dřív, než stihl prodej uložit sám).
   const finishSumUpCheckout = useCallback(async (txCode: string | null, foreignTxId: string | null) => {
+    // EET 2.0: data platby pro záložní uložení, když server prodej neuloží (jen při zapnutém EET).
+    let eetPaymentData: Record<string, unknown> | null = null;
     try {
       const raw = localStorage.getItem('uctarna_payment_data');
       if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed?.eet === true) eetPaymentData = parsed;
       const {
         storeId: paymentStoreId,
         userId,
@@ -252,7 +257,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         customerName,
         tipAmount: storedTip,
         eet: eetMode
-      } = JSON.parse(raw);
+      } = parsed;
 
       if (!paymentStoreId || !userId || !Array.isArray(cartItems) || cartItems.length === 0) {
         console.error('❌ Chybí data pro dokončení prodeje v localStorage');
@@ -293,11 +298,22 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
       if (response.ok) {
         console.log('✅ Prodej uložen z původního okna (SumUp návrat)');
-      } else {
-        console.error('❌ Chyba při ukládání prodeje:', response.status, await response.text());
+        return;
       }
+      console.error('❌ Chyba při ukládání prodeje:', response.status, await response.text());
     } catch (error) {
       console.error('❌ Chyba při dokončování SumUp platby:', error);
+    }
+    // EET 2.0: platba proběhla, ale server doklad neuložil (např. přihlášení se po návratu
+    // ze SumUp ještě neobnovilo). Uložíme ho z prohlížeče; číslo a EET dodělá fronta.
+    if (eetPaymentData) {
+      const foreign = (foreignTxId || (eetPaymentData.foreignTxId as string) || (eetPaymentData.documentId as string)) ?? '';
+      try {
+        const r = await saveEetFallbackSale(eetPaymentData, foreign, txCode);
+        console.log('ℹ️ EET: záložní uložení SumUp dokladu:', r);
+      } catch (e) {
+        console.error('❌ EET: záložní uložení SumUp dokladu selhalo:', e);
+      }
     }
   }, []);
 

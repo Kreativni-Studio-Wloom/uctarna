@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { resolveEetSettings } from '@/lib/eet/flags';
 import { sendSaleToEet } from '@/lib/eetClient';
 import type { EetSaveResult } from '@/lib/eetCheckout';
-import { autoCloseSeconds, eetResultView, shouldShowEetResult, type EetSaleLike } from '@/lib/eetUi';
+import { EET_RESULT_STALL_MS, autoCloseSeconds, eetResultView, shouldShowEetResult, stalledEetResultView, type EetSaleLike } from '@/lib/eetUi';
 import type { Store } from '@/types';
 import { EetResultModal } from './EetResultModal';
 
@@ -38,6 +38,8 @@ export const EetResultHost: React.FC<EetResultHostProps> = ({ uid, storeId, stor
       ? { receiptNo: source.save.result.receiptNo, eet: source.save.result.eet ?? null }
       : null;
   const [sale, setSale] = useState<EetSaleLike | null>(initial);
+  // Pojistka proti nekonečnému „Ukládám / Odesílám…“ (např. SumUp návrat, kdy server doklad neuložil).
+  const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     return onSnapshot(
@@ -51,13 +53,23 @@ export const EetResultHost: React.FC<EetResultHostProps> = ({ uid, storeId, stor
 
   const settings = resolveEetSettings(store?.eet);
   const offline = source.kind === 'checkout' && source.save.kind === 'offline' && !sale?.receiptNo && !sale?.eet?.pok;
-  const view = eetResultView({
+  const baseView = eetResultView({
     eet: sale?.eet,
     receiptNo: sale?.receiptNo,
     isTest: source.kind === 'checkout' ? source.isTest || sale?.isTest === true : sale?.isTest === true,
     offline,
     timeoutMs: settings.sendTimeoutMs,
   });
+  const isPending = baseView.tone === 'pending';
+  useEffect(() => {
+    if (!isPending) {
+      setStalled(false);
+      return;
+    }
+    const t = window.setTimeout(() => setStalled(true), EET_RESULT_STALL_MS);
+    return () => window.clearTimeout(t);
+  }, [isPending]);
+  const view = stalled ? stalledEetResultView(baseView, sale !== null) : baseView;
   const paymentConfirmed = source.kind === 'sumup';
   const visible = paymentConfirmed || (view.tone !== 'pending' && shouldShowEetResult(view, store?.eet?.showResultModal));
 

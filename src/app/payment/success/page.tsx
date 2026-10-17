@@ -7,49 +7,8 @@ import { CheckCircle, ArrowLeft, Receipt, Home } from 'lucide-react';
 import { SumUpCallbackParams } from '@/lib/sumup';
 import { doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { withOfflineEet } from '@/lib/checkoutSale';
+import { buildFallbackSale, saveEetFallbackSale } from '@/lib/sumupFallback';
 import { eetAuthHeaders } from '@/lib/eetClient';
-
-/** Záložní zápis SumUp prodeje z klienta (stejný objekt jako dřív). */
-function buildFallbackSale(paymentData: any, foreignTxId: string, txCode: string | null) {
-  const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName, tipAmount: rawTip } = paymentData;
-  const tipAmountFallback = typeof rawTip === 'number' && rawTip > 0 ? rawTip : null;
-  return {
-    items: cartItems,
-    totalAmount: totalAmount || 0,
-    paymentMethod: 'card',
-    documentId: documentId || foreignTxId,
-    createdAt: serverTimestamp(),
-    storeId,
-    userId,
-    customerName: customerName || null,
-    isRefund: false,
-    refundAmount: null,
-    served: false,
-    discount: discount || null,
-    discountAmount: discountAmount || 0,
-    finalAmount: finalAmount || totalAmount || 0,
-    tipAmount: tipAmountFallback,
-    sumUpData: {
-      foreignTxId: foreignTxId,
-      sumUpTxCode: txCode,
-      status: 'success',
-      callbackReceived: true,
-      callbackTimestamp: new Date()
-    }
-  };
-}
-
-/**
- * EET 2.0 (jen `eet: true` v payment datech): když server prodej neuložil, uložíme ho z klienta
- * s `pendingNumber`; číslo dokladu a odeslání do EET dodělá serverová fronta.
- */
-async function saveEetFallbackSale(paymentData: any, foreignTxId: string, txCode: string | null) {
-  const { storeId, userId, documentId } = paymentData;
-  if (!storeId || !userId || !Array.isArray(paymentData.cartItems)) return;
-  const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
-  await setDoc(saleRef, withOfflineEet(buildFallbackSale(paymentData, foreignTxId, txCode), new Date()), { merge: true });
-}
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -307,9 +266,10 @@ function PaymentSuccessContent() {
         if (!storeId || !userId || !Array.isArray(cartItems)) return;
 
         const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
-        const fallbackSale = buildFallbackSale(paymentData, foreignTxId, txCode);
-        // EET 2.0: u prodejny se zapnutým EET doplní číslo a odeslání serverová fronta.
-        await setDoc(saleRef, paymentData.eet === true ? withOfflineEet(fallbackSale, new Date()) : fallbackSale, { merge: true });
+        // EET 2.0: u prodejny se zapnutým EET jen založí chybějící doklad (číslo a odeslání dodělá
+        // serverová fronta); bez EET přesně jako dřív.
+        if (paymentData.eet === true) await saveEetFallbackSale(paymentData, foreignTxId, txCode);
+        else await setDoc(saleRef, buildFallbackSale(paymentData, foreignTxId, txCode), { merge: true });
 
         try {
           for (const item of cartItems) {

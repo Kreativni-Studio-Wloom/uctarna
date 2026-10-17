@@ -314,6 +314,36 @@ export function eetResultView(input: EetResultInput): EetResultView {
 }
 
 /** Režim „jen při chybě“ ukáže okno jen u chyby a fronty. */
+/** Po kolika ms přestane okno výsledku „točit“ a řekne, jak to s dokladem je. */
+export const EET_RESULT_STALL_MS = 20_000;
+
+/**
+ * Okno výsledku čeká déle než EET_RESULT_STALL_MS (doklad se neobjevil nebo zůstal „odesílám“).
+ * Místo nekonečného načítání: doklad chybí → chyba s pokynem zkontrolovat Doklady;
+ * doklad je uložen → čeká ve frontě, odešle se sám (a jde Odeslat znovu).
+ */
+export function stalledEetResultView(view: EetResultView, saleExists: boolean): EetResultView {
+  if (view.tone !== 'pending') return view;
+  if (!saleExists) {
+    return {
+      ...view,
+      tone: 'error',
+      canRetry: false,
+      title: 'Doklad se zatím nepotvrdil',
+      message: 'Platba proběhla, ale uložení dokladu se nepodařilo ověřit.',
+      hint: 'Zkontrolujte Doklady. Pokud tam prodej není, zapište ho znovu jako platbu kartou bez přesměrování na SumUp (platba už proběhla).',
+    };
+  }
+  return {
+    ...view,
+    tone: 'timeout',
+    canRetry: true,
+    title: 'Odeslání do EET trvá déle',
+    message: 'Doklad je uložen a čeká ve frontě EET.',
+    hint: EET_AUTO_RETRY_HINT,
+  };
+}
+
 export function shouldShowEetResult(view: EetResultView, mode: StoreEetSettings['showResultModal']): boolean {
   if (mode !== 'errorsOnly') return true;
   return view.tone === 'error' || view.tone === 'timeout';

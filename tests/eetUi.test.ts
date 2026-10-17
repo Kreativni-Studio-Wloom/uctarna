@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  stalledEetResultView,
   composeReceiptPrefix,
   maxReceiptLabelLength,
   parseReceiptPrefix,
@@ -290,5 +291,25 @@ describe('číselná řada: skládání prefixu', () => {
   it('ukázka čísel', () => {
     expect(previewReceiptNumbers('P1-{YYYY}-', true, now)).toEqual(['P1-2026-000001', 'P1-2026-000002']);
     expect(previewReceiptNumbers('', false, now)).toEqual(['000001', '000002']);
+  });
+});
+
+describe('okno výsledku EET: pojistka proti nekonečnému načítání', () => {
+  const pending = eetResultView({ eet: undefined });
+
+  it('doklad se neobjevil → chyba s pokynem zkontrolovat Doklady, bez Odeslat znovu', () => {
+    const v = stalledEetResultView(pending, false);
+    expect(v).toMatchObject({ tone: 'error', canRetry: false });
+    expect(v.hint).toMatch(/Doklady/);
+  });
+
+  it('doklad je uložen, ale pořád „odesílám“ → fronta s Odeslat znovu', () => {
+    const v = stalledEetResultView(eetResultView({ eet: { status: 'pending' } as never }), true);
+    expect(v).toMatchObject({ tone: 'timeout', canRetry: true });
+  });
+
+  it('hotový výsledek nemění', () => {
+    const ok = eetResultView({ eet: { status: 'sent', pok: 'abc' } as never });
+    expect(stalledEetResultView(ok, true)).toBe(ok);
   });
 });
