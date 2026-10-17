@@ -32,7 +32,8 @@ export async function saveSaleWithEet(p: {
   const offline = async (error?: string): Promise<EetSaveResult> => {
     const ref = doc(db, 'users', p.uid, 'stores', p.storeId, 'sales', p.draft.documentId);
     const data = withOfflineEet(withTestFlag({ ...p.draft, createdAt: serverTimestamp() }, p.isTest), new Date(), exemptReason);
-    // merge: kdyby server doklad už uložil (ztracená odpověď), nepřepíše receiptNo/POK; register to srovná.
+    // Kdyby server doklad už uložil (ztracená odpověď), firestore.rules tento zápis odmítnou
+    // (receiptNo / eet mění jen server), takže serverový doklad zůstane, jak je.
     const write = setDoc(ref, data, { merge: true });
     // Offline se promise vyřeší až po spojení; zápis je ale už v lokální frontě Firestore.
     await Promise.race([write, new Promise((r) => setTimeout(r, OFFLINE_WRITE_WAIT_MS))]);

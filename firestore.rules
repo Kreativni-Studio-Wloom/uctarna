@@ -1,52 +1,122 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // ---------------------------------------------------------------------
+    // EET 2.0 (fáze E). Číslo dokladu (`receiptNo`) a stav EET (`eet.*`)
+    // zapisuje jen server (Admin SDK, pravidla obchází). Klient smí jediné:
+    // offline zálohu dokladu bez čísla (CheckoutModal / payment/success,
+    // `withOfflineEet` v src/lib/checkoutSale.ts):
+    //   pendingNumber: true, eet: {status: 'queued', saleAt, nextRetryAt[, exemptReason]}
+    // Doklady bez EET polí (prodejny bez EET) se chovají přesně jako dřív.
+    // ---------------------------------------------------------------------
+
+    // Tvar `eet` v offline záloze z klienta.
+    function isOfflineEet(eet) {
+      return eet is map
+        && eet.keys().hasAll(['status', 'saleAt', 'nextRetryAt'])
+        && eet.keys().hasOnly(['status', 'saleAt', 'nextRetryAt', 'exemptReason'])
+        && eet.status == 'queued'
+        && eet.saleAt is string && eet.saleAt.size() <= 40
+        && eet.nextRetryAt is timestamp
+        && (!('exemptReason' in eet)
+            || (eet.exemptReason is string && eet.exemptReason.size() > 0 && eet.exemptReason.size() <= 200));
+    }
+
+    // Celý doklad je offline záloha (bez čísla, s pendingNumber a frontovým eet).
+    function isOfflineSale(d) {
+      return !('receiptNo' in d)
+        && d.get('pendingNumber', false) == true
+        && 'eet' in d && isOfflineEet(d.eet);
+    }
+
+    // Doklad bez jakéhokoli EET pole (dnešní doklad / prodejna bez EET).
+    function hasNoEetFields(d) {
+      return !('receiptNo' in d) && !('eet' in d) && !('pendingNumber' in d);
+    }
+
+    // Doklad nese EET identitu (číslo z řady nebo stav EET).
+    function hasEetIdentity(d) {
+      return 'receiptNo' in d || 'eet' in d;
+    }
+
+    // Metadata certifikátu na prodejně (zapisuje jen /api/eet/certificate).
+    function eetCertificate(d) {
+      return d.get('eet', null) is map ? d.eet.get('certificate', null) : null;
+    }
+
     // Uživatelé mohou číst a zapisovat pouze své vlastní dokumenty
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
+      allow read, write: if isOwner(userId);
+
       // Prodejny uživatele
       match /stores/{storeId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        
-        // Produkty prodejny
+        allow read, delete: if isOwner(userId);
+        // eet.certificate klient nezakládá ani nemění (Duplikovat prodejnu ho vynechává).
+        allow create: if isOwner(userId) && eetCertificate(request.resource.data) == null;
+        allow update: if isOwner(userId)
+          && eetCertificate(request.resource.data) == eetCertificate(resource.data);
+
+        // Číselná řada dokladů a šifrovaný certifikát: jen server (Admin SDK).
+        match /counters/{docId} {
+          allow read, write: if false;
+        }
+        match /private/{docId} {
+          allow read, write: if false;
+        }
+
+        // Produkty prodejny (výjimka pro nepřihlášené úpravy soldCount odstraněna:
+        // SumUp callback zapisuje přes Admin SDK).
         match /products/{productId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
-          // Povolit aktualizaci soldCount z server-side API pro SumUp callback
-          allow update: if request.auth == null && 
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['soldCount', 'updatedAt']) &&
-            request.resource.data.soldCount is number;
+          allow read, write: if isOwner(userId);
         }
-        
-        // Prodeje prodejny - povolit server-side zápis pro SumUp callback
+
+        // Prodeje prodejny (výjimka pro nepřihlášený zápis kartového prodeje odstraněna:
+        // SumUp callback zapisuje přes Admin SDK, záloha v payment/success běží přihlášená).
         match /sales/{saleId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
-          // Povolit zápis z server-side API (bez auth) pro SumUp callback
-          allow write: if request.auth == null && 
-            resource == null && // Pouze nové dokumenty
-            request.resource.data.keys().hasAll(['items', 'totalAmount', 'paymentMethod', 'storeId', 'userId']) &&
-            request.resource.data.paymentMethod == 'card' &&
-            request.resource.data.storeId == storeId &&
-            request.resource.data.userId == userId;
+          allow read: if isOwner(userId);
+
+          allow create: if isOwner(userId)
+            && (hasNoEetFields(request.resource.data) || isOfflineSale(request.resource.data));
+
+          allow update: if isOwner(userId) && (
+            // běžná úprava (served, prepared, items/costs…): EET pole a vazby storna beze změny,
+            // u dokladu s EET identitou ani isTest (jinak by šel „přeznačit“ a smazat)
+            (!request.resource.data.diff(resource.data).affectedKeys()
+                .hasAny(['receiptNo', 'eet', 'pendingNumber', 'storno', 'stornoOf'])
+              && (!hasEetIdentity(resource.data)
+                  || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isTest'])))
+            // opakovaná offline záloha přes doklad, který je pořád jen offline záloha
+            || (isOfflineSale(resource.data) && isOfflineSale(request.resource.data)
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['storno', 'stornoOf', 'isTest']))
+          );
+
+          // Doklad bez čísla a EET se maže jako dřív; s nimi jen testovací (jinak storno přes server).
+          allow delete: if isOwner(userId)
+            && (!hasEetIdentity(resource.data) || resource.data.get('isTest', false) == true);
         }
-        
+
         // Reporty prodejny
         match /reports/{reportId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isOwner(userId);
         }
-        
+
         // Stav košíku a odložené nákupy
         match /state/{document=**} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isOwner(userId);
         }
-        
+
         // Odložené nákupy
         match /pendingPurchases/{purchaseId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isOwner(userId);
         }
       }
     }
-    
+
     // Globální kolekce (pokud budou potřeba)
     match /global/{document=**} {
       allow read: if request.auth != null;
