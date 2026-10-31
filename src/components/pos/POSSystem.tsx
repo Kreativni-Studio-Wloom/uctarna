@@ -6,7 +6,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useStore } from '@/contexts/StoreContext';
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Product, CartItem, PendingPurchase } from '@/types';
+import { Product, CartItem, PendingPurchase, Sale } from '@/types';
+import { autoPrintReceipt, printReceipt, PRINT_ERROR_EVENT } from '@/lib/receiptPrinter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
@@ -85,6 +86,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [addedHighlight, setAddedHighlight] = useState<AddedProductHighlight | null>(null);
   /** Odpočet popupu úspěšné platby; null = popup skrytý */
   const [successPopupCountdown, setSuccessPopupCountdown] = useState<number | null>(null);
+  const [failedPrint, setFailedPrint] = useState<{ sale: Sale; message: string } | null>(null);
+  const [retryingPrint, setRetryingPrint] = useState(false);
+  const storeDocRef = useRef(storeDoc);
+  storeDocRef.current = storeDoc;
   /** Čas posledního zpracovaného PAYMENT_SUCCESS – deduplikace zpráv z více kanálů */
   const paymentSuccessHandledAtRef = useRef(0);
   const highlightTimerRef = useRef<number | null>(null);
@@ -280,6 +285,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
 
       if (response.ok) {
         console.log('✅ Prodej uložen z původního okna (SumUp návrat)');
+        const finalTotal = finalAmount || totalAmount;
+        autoPrintReceipt(
+          {
+            id: documentId || foreignTxId || storedForeign || '',
+            documentId: documentId || foreignTxId || storedForeign,
+            items: cartItems,
+            totalAmount: finalTotal,
+            finalAmount: finalTotal,
+            paymentMethod: 'card',
+            currency: 'CZK',
+            discount: storedDiscount || null,
+            discountAmount: discountAmount || 0,
+            tipAmount: appTip ?? undefined,
+            createdAt: new Date(),
+            storeId: paymentStoreId,
+            userId,
+          },
+          storeDocRef.current
+        );
       } else {
         console.error('❌ Chyba při ukládání prodeje:', response.status, await response.text());
       }
@@ -287,6 +311,32 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       console.error('❌ Chyba při dokončování SumUp platby:', error);
     }
   }, []);
+
+  // Neúspěšný automatický tisk → lišta s možností tisk zopakovat (kliknutí umožní znovu spárovat tiskárnu)
+  useEffect(() => {
+    const onPrintError = (event: Event) => {
+      const detail = (event as CustomEvent<{ sale: Sale; message: string }>).detail;
+      if (detail?.sale) setFailedPrint({ sale: detail.sale, message: detail.message });
+    };
+    window.addEventListener(PRINT_ERROR_EVENT, onPrintError);
+    return () => window.removeEventListener(PRINT_ERROR_EVENT, onPrintError);
+  }, []);
+
+  const retryFailedPrint = async () => {
+    if (!failedPrint) return;
+    setRetryingPrint(true);
+    try {
+      await printReceipt(failedPrint.sale, storeDoc ?? {}, { allowPicker: true });
+      setFailedPrint(null);
+    } catch (error) {
+      setFailedPrint({
+        sale: failedPrint.sale,
+        message: error instanceof Error ? error.message : 'Tisk se nezdařil',
+      });
+    } finally {
+      setRetryingPrint(false);
+    }
+  };
 
   // Automatické zavření popupu úspěšné platby po odpočtu
   useEffect(() => {
@@ -1395,6 +1445,32 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           )}
         </div>
       </div>
+
+      {failedPrint && (
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-50 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 shadow-xl rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900 dark:text-white">Doklad se nevytiskl</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 break-words">{failedPrint.message}</div>
+            <button
+              type="button"
+              onClick={retryFailedPrint}
+              disabled={retryingPrint}
+              className="mt-2 bg-brand-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
+            >
+              {retryingPrint ? 'Tisknu…' : 'Vytisknout znovu'}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFailedPrint(null)}
+            aria-label="Zavřít"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Modals */}
       <AnimatePresence>

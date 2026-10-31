@@ -11,6 +11,7 @@ import { applyStoreBrandColor, DEFAULT_BRAND_HUE, DEFAULT_BRAND_SHADE, resolveBr
 import { ColorWheelPicker } from '@/components/pos/ColorWheelPicker';
 import { ProfitProtectionSettings } from '@/components/pos/ProfitProtectionSettings';
 import { DuplicateSalesCleaner } from '@/components/pos/DuplicateSalesCleaner';
+import { ReceiptPrinterSettings } from '@/components/pos/ReceiptPrinterSettings';
 
 interface SettingsViewProps {
   storeId: string;
@@ -381,6 +382,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ storeId }) => {
               </label>
             </div>
           </motion.div>
+
+          <ReceiptPrinterSettings
+            store={{ companyName: companyName.trim(), ico: ico.trim(), companyAddress: companyAddress.trim() }}
+          />
 
           {storeDoc?.type === 'bistro' && (
             <motion.div

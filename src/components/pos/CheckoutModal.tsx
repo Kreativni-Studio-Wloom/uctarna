@@ -10,6 +10,8 @@ import { addDoc, collection, serverTimestamp, doc, updateDoc, increment } from '
 import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 import QRCode from 'react-qr-code';
+import { autoPrintReceipt } from '@/lib/receiptPrinter';
+import type { Sale } from '@/types';
 
 interface CheckoutModalProps {
   onClose: () => void;
@@ -278,7 +280,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           served: false,
         };
 
-        await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+        const saleRef = await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+        autoPrintReceipt({ ...sale, id: saleRef.id, createdAt: new Date() } as unknown as Sale, storeDoc);
 
         for (const item of cart) {
           const productRef = doc(db, 'users', user.uid, 'stores', storeId, 'products', item.productId);
@@ -376,7 +379,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         served: false,
       };
 
-      await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+      const saleRef = await addDoc(collection(db, 'users', user.uid, 'stores', storeId, 'sales'), sale);
+      // Tisk běží na pozadí – pokladna nečeká na tiskárnu.
+      autoPrintReceipt({ ...sale, id: saleRef.id, createdAt: new Date() } as unknown as Sale, storeDoc);
 
       // Aktualizuj počet prodaných kusů pro každý produkt (vratky se odečítají)
       for (const item of cart) {
