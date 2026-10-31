@@ -9,6 +9,12 @@ const config: Config = {
   darkMode: 'media', // Automaticky podle nastavení zařízení
   theme: {
     extend: {
+      screens: {
+        // Vysoké displeje (tablet na výšku, desktop) – vzdušnější rozvržení checkoutu
+        tall: { raw: '(min-height: 880px)' },
+        // Nízké displeje (notebook) – checkout se musí vejít bez scrollu
+        short: { raw: '(max-height: 759px)' },
+      },
       colors: {
         brand: {
           50: 'rgb(var(--brand-50) / <alpha-value>)',

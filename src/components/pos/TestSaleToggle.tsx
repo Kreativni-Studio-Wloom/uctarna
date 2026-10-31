@@ -15,7 +15,7 @@ export const TestSaleToggle: React.FC<TestSaleToggleProps> = ({ checked, locked,
   const isOn = locked || checked;
   return (
     <div
-      className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg border ${
+      className={`flex items-center justify-between gap-3 px-4 py-2.5 short:py-2 tall:py-3 rounded-xl border ${
         isOn
           ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700'
           : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'

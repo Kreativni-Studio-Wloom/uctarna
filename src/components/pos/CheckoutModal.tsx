@@ -436,10 +436,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-brand-500 to-brand-700 px-4 py-2.5 shrink-0">
+          <div className="bg-gradient-to-r from-brand-500 to-brand-700 px-5 py-3 short:py-2.5 sm:px-6 tall:py-4 shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <CreditCard className="h-5 w-5 text-white mr-2.5" />
+                <CreditCard className="h-5 w-5 text-white mr-3" />
                 <h2 className="text-lg font-semibold text-white">
                   Dokončit nákup
                 </h2>
@@ -454,13 +454,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="px-4 py-3 flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3">
+          <div className="px-5 py-4 short:py-3 sm:px-6 tall:py-5 flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3.5 short:space-y-2.5 tall:space-y-5">
             {/* Cart Summary */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+              <h3 className="hidden tall:block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2.5">
                 Přehled nákupu
               </h3>
-              <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                 {cart.map((item) => (
                   <div key={item.productId} className="flex justify-between items-center gap-3 text-sm">
                     <span className="text-gray-700 dark:text-gray-300 truncate">
@@ -476,13 +476,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {/* Jméno zákazníka (bistro) + spropitné vedle sebe */}
               {(collectCustomerName || (tipsEnabled && !isRefund)) && (
                 <div
-                  className={`grid gap-2 mt-2.5 ${
+                  className={`grid gap-3 mt-3 tall:mt-4 ${
                     collectCustomerName && tipsEnabled && !isRefund ? 'grid-cols-[3fr_2fr]' : 'grid-cols-1'
                   }`}
                 >
                   {collectCustomerName && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                         Jméno
                       </label>
                       <input
@@ -490,13 +490,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
                         placeholder="Jméno zákazníka"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 tall:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
                   )}
                   {tipsEnabled && !isRefund && (
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
                         {payInEUR ? 'Spropitné (€)' : 'Spropitné (Kč)'}
                       </label>
                       <input
@@ -505,14 +505,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         value={tipInput}
                         onChange={(e) => setTipInput(e.target.value)}
                         placeholder="0"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="w-full px-3 py-2 tall:py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2.5">
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 tall:mt-4">
                 <div className="flex justify-between items-baseline text-lg font-bold text-gray-900 dark:text-white">
                   <span>{tipsEnabled && !isRefund && tipParsed > 0 ? 'K úhradě:' : 'Celkem:'}</span>
                   <span>
@@ -528,7 +528,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                 </div>
                 {((tipsEnabled && !isRefund && tipParsed > 0) || payInEUR) && (
-                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <span>
                       {tipsEnabled && !isRefund && tipParsed > 0 && (
                         <>
@@ -572,15 +572,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Payment Method – všechny volby v jedné řadě */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+              <h3 className="hidden tall:block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2.5">
                 Způsob platby
               </h3>
-              <div className={`grid gap-2 ${hasIban && !isRefund ? 'grid-cols-4' : 'grid-cols-3'}`}>
+              <div className={`grid gap-2.5 sm:gap-3 ${hasIban && !isRefund ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <button
                   onClick={() => setPaymentMethod('card')}
                   disabled={!canUseCard}
                   title={!canUseCard ? 'Karta je u vratky nedostupná' : undefined}
-                  className={`py-2 px-1 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center gap-0.5 ${
+                  className={`py-2.5 short:py-2 tall:py-3 px-1 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
                     paymentMethod === 'card'
                       ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                       : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
@@ -594,7 +594,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <button
                   onClick={() => { setPaymentMethod('cash'); setPayInEUR(false); }}
-                  className={`py-2 px-1 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center gap-0.5 ${
+                  className={`py-2.5 short:py-2 tall:py-3 px-1 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
                     paymentMethod === 'cash' && !payInEUR
                       ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                       : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
@@ -606,7 +606,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <button
                   onClick={() => { setPaymentMethod('cash'); setPayInEUR(!(payInEUR && paymentMethod === 'cash')); }}
-                  className={`py-2 px-1 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center gap-0.5 ${
+                  className={`py-2.5 short:py-2 tall:py-3 px-1 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
                     payInEUR
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
@@ -619,7 +619,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {hasIban && !isRefund && (
                   <button
                     onClick={() => { setPayInEUR(false); setPaymentMethod('qr'); }}
-                    className={`py-2 px-1 rounded-lg border-2 transition-all duration-200 flex flex-col items-center justify-center gap-0.5 ${
+                    className={`py-2.5 short:py-2 tall:py-3 px-1 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center gap-1 ${
                       paymentMethod === 'qr'
                         ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20'
                         : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
@@ -634,10 +634,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
             {/* Zaplaceno / Vrátit - pouze při platbě hotovostí */}
             {paymentMethod === 'cash' && (
-              <div className="p-3 bg-gradient-to-r from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-800/20 rounded-xl border border-brand-200 dark:border-brand-700">
-                <div className="grid grid-cols-2 gap-3 items-end">
+              <div className="p-3.5 short:p-3 tall:p-4 bg-gradient-to-r from-brand-50 to-brand-100 dark:from-brand-900/20 dark:to-brand-800/20 rounded-xl border border-brand-200 dark:border-brand-700">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 items-end">
                   <div>
-                    <label className="block text-xs font-semibold text-brand-700 dark:text-brand-300 mb-1">
+                    <label className="block text-xs font-semibold text-brand-700 dark:text-brand-300 mb-1.5">
                       Zaplaceno
                     </label>
                     <div className="relative">
@@ -651,7 +651,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           setPaidAmount(digitsOnly ? parseInt(digitsOnly, 10) : 0);
                         }}
                         placeholder="0"
-                        className="w-full pl-3 pr-9 py-2 border border-brand-300 dark:border-brand-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full pl-3 pr-9 py-2 tall:py-2.5 border border-brand-300 dark:border-brand-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-lg font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 dark:text-gray-400 pointer-events-none">
                         {payInEUR || paidCurrency === 'EUR' ? '€' : 'Kč'}
@@ -660,10 +660,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
 
                   <div>
-                    <span className="block text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                    <span className="block text-xs font-semibold text-green-600 dark:text-green-400 mb-1.5">
                       Vrátit
                     </span>
-                    <div className="h-[46px] px-3 bg-white dark:bg-gray-800 rounded-lg border border-brand-200 dark:border-brand-600 flex items-center justify-end">
+                    <div className="h-[46px] tall:h-[50px] px-3 bg-white dark:bg-gray-800 rounded-lg border border-brand-200 dark:border-brand-600 flex items-center justify-end">
                       <span className="text-lg font-bold text-green-600 dark:text-green-400 whitespace-nowrap">
                         {paidAmount <= 0 ? (
                           '—'
@@ -698,24 +698,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
-            {/* QR kód */}
+            {/* QR kód – vedle textu, aby se vešel i na nižší displeje */}
             {paymentMethod === 'qr' && hasIban && !isRefund && (
               <button
                 type="button"
                 onClick={() => setQrFullscreen(true)}
-                className="group relative w-full bg-white px-3 py-3 rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm flex flex-col items-center gap-2 transition-all duration-200 hover:border-brand-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                className="group w-full p-3 short:p-2 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 flex items-center gap-4 text-left transition-all duration-200 hover:border-brand-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
                 aria-label="Zvětšit QR kód na celou obrazovku"
               >
-                <QRCode
-                  value={getSpaydString()}
-                  size={150}
-                  className="block"
-                  style={{ display: 'block', height: 'auto', maxWidth: 'min(150px, 22dvh)', width: '100%' }}
-                  viewBox="0 0 256 256"
-                />
-                <span className="text-xs leading-none text-gray-500 group-hover:text-brand-700 transition-colors">
-                  Klepněte pro zvětšení
-                </span>
+                <div className="shrink-0 bg-white p-2 rounded-lg w-[clamp(88px,calc(100dvh_-_664px),168px)] tall:w-[clamp(104px,calc(100dvh_-_764px),168px)]">
+                  <QRCode
+                    value={getSpaydString()}
+                    size={168}
+                    className="block"
+                    style={{ display: 'block', height: 'auto', maxWidth: '100%', width: '100%' }}
+                    viewBox="0 0 256 256"
+                  />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-300">Naskenujte v bankovní aplikaci</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{actualTotalAmount.toFixed(2)} Kč</p>
+                  <p className="text-xs text-brand-600 dark:text-brand-300 group-hover:underline">Klepněte pro zvětšení</p>
+                </div>
               </button>
             )}
 
@@ -791,7 +795,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           {/* Action Buttons – vždy viditelné dole */}
-          <div className="shrink-0 flex gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <div className="shrink-0 flex gap-3 px-5 py-3.5 short:py-3 sm:px-6 tall:py-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
