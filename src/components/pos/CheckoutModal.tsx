@@ -415,6 +415,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   return (
     <AnimatePresence>
       <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4"
+        onClick={() => {
+          if (qrFullscreen) {
+            setQrFullscreen(false);
+            return;
+          }
+          onClose();
+        }}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -534,6 +546,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             </div>
 
+            {eetEvidence && <EetEvidenceRow evidence={eetEvidence} choice={eetChoice} onChange={setEetChoice} />}
+
+            {!eetEvidence && showTestSaleToggle && (
+              <TestSaleToggle
+                checked={isTestSale}
+                locked={storeDoc?.testMode === true}
+                onChange={setTestSaleToggle}
+              />
+            )}
+
             {/* Informace o vratce */}
             {isRefund && (
               <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
@@ -637,10 +659,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="h-[46px] px-3 bg-white dark:bg-gray-800 rounded-lg border border-brand-200 dark:border-brand-600 flex flex-col justify-center">
-                    <div className="flex justify-between items-baseline">
-                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">Vrátit</span>
-                      <span className="text-lg font-bold text-green-600 dark:text-green-400">
+                  <div>
+                    <span className="block text-xs font-semibold text-green-600 dark:text-green-400 mb-1">
+                      Vrátit
+                    </span>
+                    <div className="h-[46px] px-3 bg-white dark:bg-gray-800 rounded-lg border border-brand-200 dark:border-brand-600 flex items-center justify-end">
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400 whitespace-nowrap">
                         {paidAmount <= 0 ? (
                           '—'
                         ) : payInEUR ? (
@@ -684,9 +708,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               >
                 <QRCode
                   value={getSpaydString()}
-                  size={180}
+                  size={150}
                   className="block"
-                  style={{ display: 'block', height: 'auto', maxWidth: 'min(180px, 28dvh)', width: '100%' }}
+                  style={{ display: 'block', height: 'auto', maxWidth: 'min(150px, 22dvh)', width: '100%' }}
                   viewBox="0 0 256 256"
                 />
                 <span className="text-xs leading-none text-gray-500 group-hover:text-brand-700 transition-colors">
@@ -696,25 +720,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             )}
 
             {/* SumUp info - pouze při platbě kartou */}
-            {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && (
+            {requiresSumUpRedirect && (
               <div className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg">
                 <div className="flex items-center text-xs text-blue-700 dark:text-blue-300">
                   <CreditCard className="h-4 w-4 mr-2 shrink-0" />
                   <span>
-                    Po kliknutí na „Zaplatit" se otevře SumUp s předvyplněnou částkou {actualTotalAmount.toFixed(2)} Kč.
+                    Po kliknutí na „Zaplatit“ se otevře SumUp s předvyplněnou částkou {actualTotalAmount.toFixed(2)} Kč.
                   </span>
                 </div>
               </div>
             )}
 
             {/* Chybějící affiliate key - může způsobit chybu při volbě terminálu */}
-            {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && !sumUpAffiliateKeyConfigured && (
+            {requiresSumUpRedirect && !sumUpAffiliateKeyConfigured && (
               <div className="px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
                 <div className="flex items-center text-xs text-red-700 dark:text-red-300">
                   <CreditCard className="h-4 w-4 mr-2 shrink-0" />
                   <span>
                     Chybí SumUp affiliate key. Tap to Pay může fungovat, ale platba přes terminál často selže chybou připojení k serveru.
                   </span>
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'card' && sumUpAvailable && redirectToSumUp && isTestSale && (
+              <div className="px-3 py-2 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-700 rounded-lg">
+                <div className="flex items-center text-xs text-orange-700 dark:text-orange-300">
+                  <CreditCard className="h-4 w-4 mr-2 shrink-0" />
+                  <span>Testovací prodej kartou se neodesílá do SumUp. Uloží se jen testovací doklad.</span>
                 </div>
               </div>
             )}
@@ -792,36 +825,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     `Zaplatit ${displayAmount.toFixed(2)} Kč`
               )}
             </motion.button>
-          </div>
-        </motion.div>
-                onClick={onClose}
-                className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200"
-              >
-                Zrušit
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handlePayment}
-                disabled={loading || (paymentMethod === 'card' && !canProceedWithCard)}
-                className="flex-1 bg-gradient-to-r from-brand-500 to-brand-700 text-white px-4 py-3 rounded-lg font-medium hover:from-brand-600 hover:to-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {loading ? (
-                  <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Zpracování...
-                  </div>
-                ) : (
-                  isRefund ? 
-                    (displayCurrency === 'EUR'
-                      ? `Vrátit zákazníkovi ${displayAmount.toFixed(2)} €`
-                      : `Vrátit zákazníkovi ${refundAmount} Kč`) : 
-                    displayCurrency === 'EUR' ? 
-                      `Zaplatit ${displayAmount.toFixed(2)} €` : 
-                      `Zaplatit ${displayAmount.toFixed(2)} Kč`
-                )}
-              </motion.button>
-            </div>
           </div>
         </motion.div>
 

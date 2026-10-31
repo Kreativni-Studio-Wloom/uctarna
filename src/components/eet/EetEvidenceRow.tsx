@@ -48,7 +48,7 @@ export const EetEvidenceRow: React.FC<EetEvidenceRowProps> = ({ evidence, choice
   return (
     <>
       <div
-        className={`mb-6 flex items-center justify-between gap-4 p-4 rounded-lg border ${
+        className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg border ${
           send ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700'
         }`}
       >
