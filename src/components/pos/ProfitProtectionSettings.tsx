@@ -6,6 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { profitProtectionRequest } from '@/lib/profit-protection-client';
 import { Lock } from 'lucide-react';
 
+function errorMessage(e: unknown) {
+  const code = (e as { code?: string }).code;
+  return code?.startsWith('auth/') ? 'Heslo se nepodařilo ověřit. Zkontrolujte ho a zkuste to znovu.' : e instanceof Error ? e.message : 'Uložení se nepodařilo.';
+}
+
 export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
   const { firebaseUser } = useAuth();
   const [enabled, setEnabled] = useState<boolean | null>(null);
@@ -37,7 +42,7 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       setHideProfit(result.hideProfit === true);
       setMessage(next ? 'Skrývání zisku je zapnuté.' : 'Skrývání zisku je vypnuté.');
       clear();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Uložení se nepodařilo.'); setPassword(''); }
+    } catch (e) { setError(errorMessage(e)); setPassword(''); }
     finally { setBusy(false); }
   };
   const save = async (event: React.FormEvent) => {
@@ -55,15 +60,14 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
       setMessage(action === 'enable' ? (hideProfit ? 'PIN byl uložen. Zisk je chráněný.' : 'PIN byl uložen. Pro ochranu zisku zapněte také jeho skrývání.') : (hideProfit ? 'Ochrana PINem je vypnutá. Zisk zůstává skrytý do kliknutí.' : 'Ochrana PINem je vypnutá.'));
       clear();
     } catch (e) {
-      const code = (e as { code?: string }).code;
-      setError(code?.startsWith('auth/') ? 'Heslo se nepodařilo ověřit. Zkontrolujte ho a zkuste to znovu.' : e instanceof Error ? e.message : 'Uložení se nepodařilo.');
+      setError(errorMessage(e));
       setPassword('');
     } finally { setBusy(false); }
   };
   const inputClass = 'mt-1 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-500))] focus:border-[rgb(var(--brand-500))]';
   return <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-lg">
     <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white"><Lock className="h-5 w-5 text-brand-600" /> Soukromí zisku</h3>
-    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Nejdříve zvolte, zda se má zisk skrývat. PIN pak může chránit jeho odkrytí.</p>
+    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Po zapnutí skrývání můžete odkrytí zisku chránit PINem.</p>
     {hideProfit !== null && <div className="mt-4 rounded-lg bg-gray-50 dark:bg-gray-700/60 p-4">
       <div className="flex items-center justify-between gap-4"><div><p className="font-medium text-gray-900 dark:text-white">Skrývat zisk</p><p className="text-xs text-gray-500 dark:text-gray-400">Zisk bude rozmazaný do kliknutí.</p></div>
         <label className="relative inline-flex items-center cursor-pointer shrink-0">
@@ -72,11 +76,12 @@ export function ProfitProtectionSettings({ storeId }: { storeId: string }) {
         </label>
       </div>
     </div>}
-    <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null ? (error ? 'Ochrana zisku není dostupná' : 'Načítám nastavení…') : enabled ? 'Ochrana PINem je zapnutá' : 'Ochrana PINem je vypnutá'}</p>
+    {/* PIN má smysl jen u skrytého zisku; uložený PIN se při vypnutí skrývání zachová. */}
+    {hideProfit !== false && <p className="mt-3 text-sm font-medium text-gray-900 dark:text-white">{enabled === null || hideProfit === null ? (error ? 'Ochrana zisku není dostupná' : 'Načítám nastavení…') : enabled ? 'Ochrana PINem je zapnutá' : 'Odkrytí zisku nevyžaduje PIN'}</p>}
     {error && <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
     {message && <p role="status" className="mt-3 text-sm text-green-600 dark:text-green-400">{message}</p>}
     {enabled === null && error && <button onClick={() => setRetry(v => v + 1)} className="mt-3 text-sm text-brand-600">Zkusit znovu</button>}
-    {enabled !== null && !action && <div className="mt-4 flex flex-wrap gap-3">
+    {enabled !== null && hideProfit === true && !action && <div className="mt-4 flex flex-wrap gap-3">
       <button onClick={() => { setAction('enable'); setMessage(''); setError(''); }} className="rounded-lg bg-brand-600 px-4 py-2 text-sm text-white">{enabled ? 'Změnit / resetovat PIN' : 'Zapnout ochranu PINem'}</button>
       {enabled && <button onClick={() => { setAction('disable'); setMessage(''); setError(''); }} className="rounded-lg bg-gray-100 dark:bg-gray-700 px-4 py-2 text-sm text-gray-700 dark:text-gray-200">Vypnout ochranu</button>}
     </div>}

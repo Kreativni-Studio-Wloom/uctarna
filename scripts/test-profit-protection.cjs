@@ -136,7 +136,8 @@ test('first provider render never exposes profit before settings load', () => {
   const html = renderToStaticMarkup(React.createElement(ProfitPrivacy, { storeId: 'store1' },
     React.createElement(PrivateProfit, { value: 123456789 })));
   assert.ok(!html.includes('123') && !html.includes('456') && !html.includes('789'));
-  assert.ok(html.includes('blur(4px)'));
+  // Než je nastavení známé, nezobrazí se ani blur (skrývání může být vypnuté).
+  assert.ok(!html.includes('blur(') && html.includes('Načítám zisk'));
 });
 test('partial settings responses cannot silently disable hiding or PIN', async () => {
   for (const data of [{ enabled: false }, { hideProfit: false }]) {

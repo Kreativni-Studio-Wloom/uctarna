@@ -37,6 +37,14 @@ interface ReportsViewProps {
   storeId: string;
 }
 
+// Prázdné nebo nedokončené pole (např. smazané datum) se ignoruje, jinak by
+// neplatné datum shodilo formátování i dotaz na tržby.
+function parseDateInput(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+}
+const isTimeInput = (value: string) => /^\d{2}:\d{2}$/.test(value);
+
 function combineDateAndTime(date: Date, time: string): Date {
   const [hours, minutes] = time.split(':').map(Number);
   const combined = startOfDay(date);
@@ -152,29 +160,35 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
     if (!uid || !storeId || invalidRange) return;
     let active = true;
     setSalesStatus({ key: rangeKey, ready: false, error: false });
-    const salesRef = collection(db, 'users', uid, 'stores', storeId, 'sales');
-    const salesQuery = range
-      ? query(salesRef,
-          where('createdAt', '>=', Timestamp.fromDate(range[0])),
-          where('createdAt', '<=', Timestamp.fromDate(range[1])),
-          orderBy('createdAt', 'desc'))
-      : query(salesRef, orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(salesQuery, { includeMetadataChanges: true }, (snapshot) => {
-      if (!active) return;
-      // Lokální cache může obsahovat jen část období. Metadata zachytí i potvrzení beze změny dat.
-      const ready = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
-      if (ready) {
-        setSales(snapshot.docs.map(doc => ({
-          ...doc.data(), id: doc.id,
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-        } as Sale)));
-      }
-      setSalesStatus({ key: rangeKey, ready, error: false });
-    }, () => {
-      if (active) setSalesStatus({ key: rangeKey, ready: false, error: true });
-    });
-    return () => { active = false; unsubscribe(); };
-  }, [uid, storeId, range, rangeKey, invalidRange]);
+    let unsubscribe = () => {};
+    // U vlastního období se data i čas mění po krocích; odběr spustíme až po krátké pauze,
+    // aby každé kliknutí v kalendáři nezakládalo nový dotaz na server.
+    const timer = setTimeout(() => {
+      const salesRef = collection(db, 'users', uid, 'stores', storeId, 'sales');
+      const salesQuery = range
+        ? query(salesRef,
+            where('createdAt', '>=', Timestamp.fromDate(range[0])),
+            where('createdAt', '<=', Timestamp.fromDate(range[1])),
+            orderBy('createdAt', 'desc'))
+        : query(salesRef, orderBy('createdAt', 'desc'));
+      unsubscribe = onSnapshot(salesQuery, { includeMetadataChanges: true }, (snapshot) => {
+        if (!active) return;
+        // Lokální cache může obsahovat jen část období. Metadata zachytí i potvrzení beze změny dat.
+        const ready = !snapshot.metadata.fromCache && !snapshot.metadata.hasPendingWrites;
+        if (ready) {
+          setSales(snapshot.docs.map(doc => {
+            const data = doc.data();
+            return { ...data, id: doc.id, createdAt: data.createdAt?.toDate() || new Date() } as Sale;
+          }));
+        }
+        // Změny jen v metadatech nemají překreslovat celý přehled.
+        setSalesStatus(prev => prev.key === rangeKey && prev.ready === ready && !prev.error ? prev : { key: rangeKey, ready, error: false });
+      }, () => {
+        if (active) setSalesStatus({ key: rangeKey, ready: false, error: true });
+      });
+    }, selectedPeriod === 'custom' ? 350 : 0);
+    return () => { active = false; clearTimeout(timer); unsubscribe(); };
+  }, [uid, storeId, range, rangeKey, invalidRange, selectedPeriod]);
 
   // Produkty nezávisí na období; při změně období není třeba obnovovat jejich odběr.
   useEffect(() => {
@@ -194,7 +208,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
             updatedAt: doc.data().updatedAt?.toDate() || new Date(),
           } as Product)));
         }
-        setProductsStatus({ key: storeKey, ready, error: false });
+        setProductsStatus(prev => prev.key === storeKey && prev.ready === ready && !prev.error ? prev : { key: storeKey, ready, error: false });
       },
       () => {
         if (active) setProductsStatus({ key: storeKey, ready: false, error: true });
@@ -320,7 +334,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
 
   const reportData = useMemo(
     () => getReportData(),
-    [sales, products, selectedPeriod, selectedDate, customStartDate, customEndDate, extendedUser]
+    [sales, products]
   );
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products]);
   const soldProductsSummary = useMemo(
@@ -648,13 +662,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                       <input
                         type="date"
                         value={format(customStartDate, 'yyyy-MM-dd')}
-                        onChange={(e) => setCustomStartDate(new Date(e.target.value))}
+                        onChange={(e) => { const date = parseDateInput(e.target.value); if (date) setCustomStartDate(date); }}
                         className={`${periodInputClassName} flex-1 min-w-0`}
                       />
                       <input
                         type="time"
                         value={customStartTime}
-                        onChange={(e) => setCustomStartTime(e.target.value)}
+                        onChange={(e) => { if (isTimeInput(e.target.value)) setCustomStartTime(e.target.value); }}
                         className={`${periodInputClassName} w-[7.5rem] shrink-0`}
                         title="Čas od kterého platí první den období"
                       />
@@ -668,13 +682,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
                       <input
                         type="date"
                         value={format(customEndDate, 'yyyy-MM-dd')}
-                        onChange={(e) => setCustomEndDate(new Date(e.target.value))}
+                        onChange={(e) => { const date = parseDateInput(e.target.value); if (date) setCustomEndDate(date); }}
                         className={`${periodInputClassName} flex-1 min-w-0`}
                       />
                       <input
                         type="time"
                         value={customEndTime}
-                        onChange={(e) => setCustomEndTime(e.target.value)}
+                        onChange={(e) => { if (isTimeInput(e.target.value)) setCustomEndTime(e.target.value); }}
                         className={`${periodInputClassName} w-[7.5rem] shrink-0`}
                         title="Čas do kterého platí poslední den období"
                       />
@@ -689,7 +703,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ storeId }) => {
               <input
                 type="date"
                 value={format(selectedDate, 'yyyy-MM-dd')}
-                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                onChange={(e) => { const date = parseDateInput(e.target.value); if (date) setSelectedDate(date); }}
                 className={periodInputClassName}
               />
             )}

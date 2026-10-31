@@ -7,10 +7,12 @@ import { hashProfitPin, matchesProfitPin, validProfitPin } from '@/lib/profit-pi
 export const runtime = 'nodejs';
 const reply = (body: object, status = 200) => NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 
-async function authenticate(request: Request) {
+// Kontrola odvolaných tokenů stojí další síťový dotaz; čtení stavu (jen dvě hodnoty
+// bez citlivých dat) ji nepotřebuje, změny a ověření PINu ano.
+async function authenticate(request: Request, checkRevoked = true) {
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
   if (!token) return null;
-  try { return await getAuth().verifyIdToken(token, true); } catch { return null; }
+  try { return await getAuth().verifyIdToken(token, checkRevoked); } catch { return null; }
 }
 function storeRef(userId: string, request: Request, body?: { storeId?: string }) {
   const storeId = request.headers.get('x-store-id') || body?.storeId;
@@ -19,7 +21,7 @@ function storeRef(userId: string, request: Request, body?: { storeId?: string })
 }
 
 export async function GET(request: Request) {
-  const user = await authenticate(request);
+  const user = await authenticate(request, false);
   if (!user) return reply({ error: 'Přihlaste se znovu.' }, 401);
   try {
     const ref = storeRef(user.uid, request);

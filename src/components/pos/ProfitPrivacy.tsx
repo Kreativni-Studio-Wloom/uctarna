@@ -4,7 +4,9 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { motion, useReducedMotion } from 'framer-motion';
 import { profitProtectionRequest } from '@/lib/profit-protection-client';
 
-const Privacy = createContext({ revealed: false, hideProfit: true, busy: false, reveal: () => {}, hide: () => {} });
+// hideProfit: null = nastavení se ještě načítá (nezobrazí se ani zisk, ani blur).
+const Privacy = createContext<{ revealed: boolean; hideProfit: boolean | null; busy: boolean; reveal: () => void; hide: () => void }>(
+  { revealed: false, hideProfit: true, busy: false, reveal: () => {}, hide: () => {} });
 
 export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode; storeId: string }) {
   return <ProfitPrivacyState key={storeId} storeId={storeId}>{children}</ProfitPrivacyState>;
@@ -12,7 +14,7 @@ export function ProfitPrivacy({ children, storeId }: { children: React.ReactNode
 
 function ProfitPrivacyState({ children, storeId }: { children: React.ReactNode; storeId: string }) {
   const [revealed, setRevealed] = useState(false);
-  const [hideProfit, setHideProfit] = useState(true);
+  const [hideProfit, setHideProfit] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [needsPin, setNeedsPin] = useState(false);
   const [pin, setPin] = useState('');
@@ -43,7 +45,8 @@ function ProfitPrivacyState({ children, storeId }: { children: React.ReactNode; 
       setHideProfit(status.hideProfit === true);
       setProtectionLoaded(true);
     }).catch(() => {
-      // Bez ověřeného nastavení zůstává zisk skrytý; kliknutí načtení zopakuje.
+      // Bez ověřeného nastavení zůstává zisk skrytý (blur); kliknutí načtení zopakuje.
+      if (active) setHideProfit(current => current ?? true);
     });
     return () => { active = false; };
   }, [storeId]);
@@ -54,7 +57,7 @@ function ProfitPrivacyState({ children, storeId }: { children: React.ReactNode; 
     setError('');
     setNeedsPin(false);
     try {
-      let hidden = hideProfit;
+      let hidden = hideProfit !== false;
       let protectedByPin = protectionEnabled;
       if (!protectionLoaded) {
         const status = await profitProtectionRequest(storeId);
@@ -120,17 +123,22 @@ function ProfitPrivacyState({ children, storeId }: { children: React.ReactNode; 
 export function PrivateProfit({ value }: { value: number }) {
   const { revealed, hideProfit, busy, reveal, hide } = useContext(Privacy);
   const reduceMotion = useReducedMotion();
-  if (!hideProfit) return <span>{value.toLocaleString('cs-CZ')} Kč</span>;
+  const formatted = `${value.toLocaleString('cs-CZ')} Kč`;
+  if (hideProfit === false) return <span>{formatted}</span>;
+  // Dokud nevíme, zda se zisk skrývá, ukážeme jen neutrální zástupný prvek bez čísel.
+  if (hideProfit === null) return <span role="status" aria-label="Načítám zisk"
+    className="inline-block h-[1em] w-20 max-w-full rounded bg-gray-200 dark:bg-gray-700 align-middle animate-pulse motion-reduce:animate-none" />;
   return <button type="button" onClick={revealed ? hide : reveal} disabled={busy} aria-busy={busy}
-    aria-label={revealed ? `Zisk ${value.toLocaleString('cs-CZ')} Kč. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
-    className="inline-block !min-h-0 !min-w-0 overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-baseline leading-[inherit] disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+    aria-label={revealed ? `Zisk ${formatted}. Kliknutím skrýt.` : 'Zobrazit zisk'} aria-expanded={revealed}
+    title={revealed ? 'Skrýt zisk' : 'Zobrazit zisk'}
+    className="inline-block !min-h-0 !min-w-0 cursor-pointer overflow-visible whitespace-nowrap rounded border-0 p-0 text-left align-baseline leading-[inherit] disabled:cursor-wait focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
     onCopy={event => { if (!revealed) event.preventDefault(); }}>
     <motion.span key={revealed ? 'visible' : 'hidden'} aria-hidden={!revealed}
       initial={revealed ? { filter: 'blur(4px)', opacity: 0.65 } : false}
       animate={{ filter: revealed ? 'blur(0px)' : 'blur(4px)', opacity: revealed ? 1 : 0.65 }}
       transition={{ duration: reduceMotion ? 0 : 0.22 }}
       className={revealed ? 'inline-block' : 'inline-block select-none pointer-events-none'}>
-      {revealed ? `${value.toLocaleString('cs-CZ')} Kč` : '88 888 Kč'}
+      {revealed ? formatted : '88 888 Kč'}
     </motion.span>
   </button>;
 }
