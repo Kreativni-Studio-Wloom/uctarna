@@ -2,13 +2,22 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Download, X } from 'lucide-react';
+import { Receipt, Calendar, Eye, DollarSign, CreditCard, QrCode, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Loader2, Download, X, RotateCcw } from 'lucide-react';
 import { Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, orderBy, limit, startAfter, onSnapshot, getDocs, doc, deleteDoc, updateDoc, increment, where, Timestamp, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { generateReceiptPdfBlob, generateDailySalesReportPdfBlob } from '@/lib/pdfGenerator';
 import { useStore } from '@/contexts/StoreContext';
+import { isTestSale, testSalesUiEnabled } from '@/lib/testSales';
+import { isEetEnabled } from '@/lib/eet/flags';
+import { sendSaleToEet, stornoSaleRequest } from '@/lib/eetClient';
+import { isEetUnsent, saleRemovalPolicy, toDateLoose } from '@/lib/eetUi';
+import { EetBadge } from '@/components/eet/EetBadge';
+import { EetQueueBanner } from '@/components/eet/EetQueueBanner';
+import { EetSaleDetail } from '@/components/eet/EetSaleDetail';
+import { StornoSaleModal } from '@/components/eet/StornoSaleModal';
+import { useEetQueue, useMinuteTick } from '@/components/eet/useEetQueue';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { cs } from 'date-fns/locale';
 
@@ -18,15 +27,25 @@ interface ReceiptsViewProps {
 
 const SEARCH_DEBOUNCE_MS = 400;
 
+type TestFilter = 'all' | 'real' | 'test';
+
+const TestBadge: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 ${className}`}>
+    TEST
+  </span>
+);
+
 const matchesSaleSearch = (sale: Sale, queryText: string): boolean => {
   const q = queryText.toLowerCase();
   const docId = (sale.documentId || '').toString().toLowerCase();
+  const receiptNo = (sale.receiptNo || '').toString().toLowerCase();
   const vs = ((sale as any).variableSymbol || '').toString().toLowerCase();
   const id = (sale.id || '').toString().toLowerCase();
   const sumUpTxCode = (sale.sumUpData?.sumUpTxCode || '').toString().toLowerCase();
   const sumUpForeignId = (sale.sumUpData?.foreignTxId || '').toString().toLowerCase();
   return (
     docId.includes(q) ||
+    receiptNo.includes(q) ||
     vs.includes(q) ||
     id.includes(q) ||
     sumUpTxCode.includes(q) ||
@@ -181,7 +200,15 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
   const [dayLoading, setDayLoading] = useState(false);
   const [generatingDayPdf, setGeneratingDayPdf] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [testFilter, setTestFilter] = useState<TestFilter>('all');
+  const [includeTestInDayPdf, setIncludeTestInDayPdf] = useState(false);
   const pageCursorsRef = useRef<(QueryDocumentSnapshot<DocumentData> | null)[]>([]);
+  // EET 2.0 (jen při zapnutém EET): fronta neodeslaných dokladů, filtr chyb, storno místo mazání.
+  const eetEnabled = isEetEnabled(storeDoc);
+  const eetQueue = useEetQueue<Sale>(user?.uid, storeId, eetEnabled);
+  const minuteNow = useMinuteTick(eetEnabled);
+  const [eetErrorsOnly, setEetErrorsOnly] = useState(false);
+  const [saleToStorno, setSaleToStorno] = useState<Sale | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const menuDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -393,7 +420,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     : [];
 
   const searchTotalPages = Math.max(1, Math.ceil(searchResults.length / ITEMS_PER_PAGE));
-  const displaySales = isSearchMode
+  const loadedSales = isSearchMode
     ? searchResults.slice(
         (currentPage - 1) * ITEMS_PER_PAGE,
         currentPage * ITEMS_PER_PAGE
@@ -401,6 +428,25 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     : isDayMode
       ? daySales
       : pageSales;
+  // Filtr testovacích dokladů je jen v rámci načtené stránky/dne/hledání.
+  const eetErrorsMode = eetEnabled && eetErrorsOnly;
+  // Filtr „chyby EET“ bere doklady z fronty (napříč historií), ne jen z načtené stránky.
+  const eetErrorSales = eetErrorsMode
+    ? eetQueue
+        .filter((sale) => isEetUnsent(sale, minuteNow))
+        .sort((a, b) => (toDateLoose(b.createdAt)?.getTime() ?? 0) - (toDateLoose(a.createdAt)?.getTime() ?? 0))
+    : [];
+  const baseSales = eetErrorsMode ? eetErrorSales : loadedSales;
+  const displaySales =
+    testFilter === 'all'
+      ? baseSales
+      : baseSales.filter((sale) => isTestSale(sale) === (testFilter === 'test'));
+  // Detail se aktualizuje živě (Odeslat znovu, storno).
+  const liveSelectedSale = selectedSale
+    ? [...loadedSales, ...eetQueue].find((sale) => sale.id === selectedSale.id) ?? selectedSale
+    : null;
+  const showTestFilter = testSalesUiEnabled(storeDoc) || testFilter !== 'all' || loadedSales.some(isTestSale);
+  const dayHasTestSales = daySales.some(isTestSale);
 
   const canGoNext = isSearchMode
     ? currentPage < searchTotalPages
@@ -435,6 +481,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
 
   const handleDeleteSale = async (sale: Sale) => {
     if (!user || !storeId) return;
+    // EET: reálný doklad se nemaže, jen stornuje (pojistka i mimo tlačítko).
+    const removal = saleRemovalPolicy(storeDoc, sale);
+    if (removal.action !== 'delete') {
+      alert(removal.reason ?? 'Doklad nejde smazat. Použijte Stornovat.');
+      throw new Error('delete_blocked');
+    }
 
     try {
       const saleRef = doc(db, 'users', user.uid, 'stores', storeId, 'sales', sale.id);
@@ -455,6 +507,17 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
     }
   };
 
+  const handleResendEet = async (saleId: string) => {
+    const r = await sendSaleToEet(storeId, saleId);
+    setSelectedSale((current) =>
+      current && current.id === saleId ? { ...current, receiptNo: r.receiptNo ?? current.receiptNo, eet: (r.eet as Sale['eet']) ?? current.eet } : current
+    );
+  };
+
+  const handleStornoSale = async (sale: Sale) => {
+    await stornoSaleRequest(storeId, sale.id);
+  };
+
   const handleOpenReceiptPdf = async (sale: Sale) => {
     if (generatingPdfForSaleId) return;
     setGeneratingPdfForSaleId(sale.id);
@@ -463,6 +526,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         companyName: storeDoc?.companyName,
         ico: storeDoc?.ico,
         companyAddress: storeDoc?.companyAddress,
+        dic: storeDoc?.dic,
+        eet: storeDoc?.eet,
       });
 
       const objectUrl = URL.createObjectURL(pdfBlob);
@@ -470,7 +535,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
       if (!openedWindow) {
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
-        anchor.download = `doklad-${sale.documentId || sale.id}.pdf`;
+        anchor.download = `doklad-${sale.receiptNo || sale.documentId || sale.id}.pdf`;
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
@@ -499,7 +564,8 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
           ico: storeDoc?.ico,
           companyAddress: storeDoc?.companyAddress,
         },
-        filterDate
+        filterDate,
+        { includeTest: includeTestInDayPdf }
       );
 
       const objectUrl = URL.createObjectURL(pdfBlob);
@@ -608,6 +674,20 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       <span>{generatingDayPdf ? 'Generuji PDF…' : 'Stáhnout seznam dokladů (PDF)'}</span>
                     </button>
 
+                    {isDayMode && dayHasTestSales && (
+                      <label className="w-full px-3 py-2 rounded-lg flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <span className="w-8 flex items-center justify-center flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={includeTestInDayPdf}
+                            onChange={(e) => setIncludeTestInDayPdf(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                          />
+                        </span>
+                        <span>Zahrnout i testovací prodeje</span>
+                      </label>
+                    )}
+
                     {isDayMode && (
                       <button
                         type="button"
@@ -628,14 +708,68 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row md:items-center gap-3">
         <input
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Hledat podle čísla dokladu, ID nebo SumUp kódu"
           className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
         />
+        {(showTestFilter || eetEnabled) && (
+          <div className="flex flex-wrap items-center gap-2 md:flex-nowrap md:shrink-0">
+            {showTestFilter && (
+              <div
+                role="radiogroup"
+                aria-label="Filtr testovacích dokladů"
+                className="flex flex-1 md:flex-none p-1 gap-1 rounded-lg bg-gray-100 dark:bg-gray-700"
+              >
+                {(
+                  [
+                    ['all', 'Všechny'],
+                    ['real', 'Reálné'],
+                    ['test', 'Testovací'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={testFilter === value}
+                    onClick={() => setTestFilter(value)}
+                    className={`flex-1 md:flex-none px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                      testFilter === value
+                        ? value === 'test'
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'bg-brand-600 text-white shadow-sm'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {eetEnabled && (
+              <button
+                type="button"
+                onClick={() => setEetErrorsOnly((v) => !v)}
+                aria-pressed={eetErrorsOnly}
+                className={`shrink-0 px-3 py-3 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors ${
+                  eetErrorsOnly
+                    ? 'bg-red-600 border-red-600 text-white'
+                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                Chyby EET
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {eetEnabled && !eetErrorsOnly && (
+        <EetQueueBanner sales={eetQueue} now={minuteNow} onShow={() => setEetErrorsOnly(true)} />
+      )}
 
       {(searchLoading && isSearchMode) || (dayLoading && isDayMode) ? (
         <div className="flex items-center justify-center py-12">
@@ -679,8 +813,9 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                   <div className="flex items-center">
                     <Receipt className="h-5 w-5 text-brand-600 mr-2" />
                     <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                      {sale.documentId || `#${sale.id.slice(-8)}`}
+                      {(eetEnabled && sale.receiptNo) || sale.documentId || `#${sale.id.slice(-8)}`}
                     </span>
+                    {eetEnabled ? <EetBadge sale={sale} className="ml-2" /> : isTestSale(sale) && <TestBadge className="ml-2" />}
                   </div>
                   <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
                     <div className={getPaymentColor(sale.paymentMethod)}>
@@ -753,12 +888,30 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                     <Eye className="h-4 w-4 mr-2" />
                     Detail
                   </button>
-                  <button
-                    onClick={() => setSaleToDelete(sale)}
-                    className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 py-2 px-4 rounded-lg font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {(() => {
+                    const removal = saleRemovalPolicy(storeDoc, sale);
+                    if (removal.action === 'storno') {
+                      return (
+                        <button
+                          onClick={() => setSaleToStorno(sale)}
+                          title="Stornovat"
+                          aria-label="Stornovat"
+                          className="bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 py-2 px-4 rounded-lg font-medium hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors flex items-center justify-center"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                      );
+                    }
+                    if (removal.action === 'none') return null;
+                    return (
+                      <button
+                        onClick={() => setSaleToDelete(sale)}
+                        className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 py-2 px-4 rounded-lg font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex items-center justify-center"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    );
+                  })()}
                 </div>
               </motion.div>
             ))}
@@ -817,6 +970,7 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                 <div className="flex items-center justify-between">
                   <h3 className="text-xl font-semibold text-white">
                     Detail dokladu
+                    {isTestSale(selectedSale) && <TestBadge className="ml-2 align-middle" />}
                   </h3>
                   <button
                     onClick={() => setSelectedSale(null)}
@@ -829,6 +983,12 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
 
               <div className="p-6">
                 <div className="space-y-4">
+                  {eetEnabled && selectedSale.receiptNo && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">Číslo dokladu:</span>
+                      <span className="font-mono font-medium text-gray-900 dark:text-white">{selectedSale.receiptNo}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600 dark:text-gray-400">Datum:</span>
                     <span className="font-medium text-gray-900 dark:text-white">{formatDate(selectedSale.createdAt)}</span>
@@ -905,10 +1065,13 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
                       </span>
                     </div>
                   </div>
+                  {eetEnabled && liveSelectedSale && (
+                    <EetSaleDetail sale={liveSelectedSale} store={storeDoc} onResend={handleResendEet} />
+                  )}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                     <div className="flex space-x-2">
                       <button
-                        onClick={() => handleOpenReceiptPdf(selectedSale)}
+                        onClick={() => handleOpenReceiptPdf(liveSelectedSale ?? selectedSale)}
                         disabled={generatingPdfForSaleId === selectedSale.id}
                         className="w-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 py-2.5 px-4 rounded-lg font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                       >
@@ -938,6 +1101,19 @@ export const ReceiptsView: React.FC<ReceiptsViewProps> = ({ storeId }) => {
             sale={saleToDelete}
             onClose={() => setSaleToDelete(null)}
             onDelete={handleDeleteSale}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {saleToStorno && (
+          <StornoSaleModal
+            key={saleToStorno.id}
+            receiptLabel={saleToStorno.receiptNo || saleToStorno.documentId || saleToStorno.id}
+            amountLabel={saleToStorno.currency === 'EUR' ? `${saleToStorno.totalAmount.toFixed(2)} €` : `${saleToStorno.totalAmount} Kč`}
+            isCash={saleToStorno.paymentMethod === 'cash'}
+            onClose={() => setSaleToStorno(null)}
+            onStorno={() => handleStornoSale(saleToStorno)}
           />
         )}
       </AnimatePresence>

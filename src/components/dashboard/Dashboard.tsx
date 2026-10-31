@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, deleteDoc, updateDoc, getDocs, writeBatch, getDoc } from 'firebase/firestore';
+import { duplicateSaleData, duplicateStoreData } from '@/lib/storeDuplicate';
 import { db } from '@/lib/firebase';
 import { Store } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -222,7 +223,8 @@ export const Dashboard: React.FC = () => {
       });
 
       const newStoreData: Record<string, unknown> = {
-        ...storeData,
+        // EET 2.0: kopie má EET vypnuté, bez certifikátu a evidenční jednotky (viz storeDuplicate.ts).
+        ...duplicateStoreData(storeData),
         name: `${storeToDuplicate.name} 2`,
         type: storeData.type || storeToDuplicate.type || 'prodejna',
         createdAt: serverTimestamp(),
@@ -241,26 +243,27 @@ export const Dashboard: React.FC = () => {
         data: newStoreData,
       });
 
+      // Nová id dokladů předem, aby šla přemapovat vazba storno ↔ původní doklad.
+      const saleIdMap = new Map<string, string>();
+      const newSaleRefs = new Map<string, ReturnType<typeof doc>>();
       salesSnapshot?.forEach((saleDoc) => {
-        const saleData = saleDoc.data();
         const newSaleRef = doc(collection(db, 'users', user.uid, 'stores', newStoreRef.id, 'sales'));
-        const items = Array.isArray(saleData.items)
-          ? saleData.items.map((item: { productId?: string }) => ({
-              ...item,
-              productId: item.productId
-                ? productIdMap.get(item.productId) || item.productId
-                : item.productId,
-            }))
-          : saleData.items;
+        saleIdMap.set(saleDoc.id, newSaleRef.id);
+        newSaleRefs.set(saleDoc.id, newSaleRef);
+      });
 
+      salesSnapshot?.forEach((saleDoc) => {
         writes.push({
-          ref: newSaleRef,
-          data: {
-            ...saleData,
-            items,
-            storeId: newStoreRef.id,
+          ref: newSaleRefs.get(saleDoc.id)!,
+          // EET 2.0: kopie dokladu bez receiptNo / eet / pendingNumber (neodešle se podruhé).
+          data: duplicateSaleData(saleDoc.data(), {
+            sourceStoreId: storeToDuplicate.id,
+            sourceSaleId: saleDoc.id,
+            newStoreId: newStoreRef.id,
             userId: user.uid,
-          },
+            productIdMap,
+            saleIdMap,
+          }),
         });
       });
 

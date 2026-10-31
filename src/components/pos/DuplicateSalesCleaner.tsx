@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { Copy, AlertTriangle, Check, Trash2, Search, ClipboardCopy } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { useStore } from '@/contexts/StoreContext';
+import { canDeleteSale } from '@/lib/eetUi';
 
 interface DuplicateSalesCleanerProps {
   storeId: string;
@@ -19,12 +21,20 @@ type SaleRecord = {
   tipAmount?: number | null;
   createdAtMs: number;
   sumUpTxCode?: string;
+  /** EET 2.0: pole rozhodující o tom, zda doklad jde smazat (`canDeleteSale`). */
+  isTest?: boolean;
+  receiptNo?: string;
+  eet?: { status?: string } | null;
+  stornoOf?: string;
+  storno?: { saleId?: string } | null;
 };
 
 type DuplicateGroup = {
   key: string;
   keep: SaleRecord;
   remove: SaleRecord[];
+  /** Duplicity, které nejde smazat (doklady v EET / s číslem z řady) (jen stornovat v historii). */
+  blocked: SaleRecord[];
 };
 
 function toMillis(createdAt: unknown): number {
@@ -71,6 +81,7 @@ function pickKeeper(records: SaleRecord[]): SaleRecord {
 
 export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ storeId }) => {
   const { user } = useAuth();
+  const storeDoc = useStore();
   const [scanning, setScanning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [scanned, setScanned] = useState(false);
@@ -80,6 +91,7 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
   const [copied, setCopied] = useState(false);
 
   const totalToRemove = groups.reduce((sum, g) => sum + g.remove.length, 0);
+  const totalBlocked = groups.reduce((sum, g) => sum + g.blocked.length, 0);
 
   const buildReportText = (): string => {
     const lines: string[] = [];
@@ -137,6 +149,11 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
             sumUpData && typeof sumUpData.sumUpTxCode === 'string'
               ? sumUpData.sumUpTxCode
               : undefined,
+          isTest: data.isTest === true,
+          receiptNo: typeof data.receiptNo === 'string' ? data.receiptNo : undefined,
+          eet: data.eet && typeof data.eet === 'object' ? { status: (data.eet as { status?: string }).status } : null,
+          stornoOf: typeof data.stornoOf === 'string' ? data.stornoOf : undefined,
+          storno: (data.storno as SaleRecord['storno']) ?? null,
         };
       });
 
@@ -211,9 +228,12 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
       for (const [root, recs] of byRoot.entries()) {
         if (recs.length < 2) continue;
         const keep = pickKeeper(recs);
-        const remove = recs.filter((r) => r.id !== keep.id);
+        const others = recs.filter((r) => r.id !== keep.id);
+        // EET: doklady s EET identitou se nemažou (jen storno), i při vypnutém EET; ostatní jako dřív.
+        const remove = others.filter((r) => canDeleteSale(storeDoc, r));
+        const blocked = others.filter((r) => !canDeleteSale(storeDoc, r));
         const key = keep.documentId || keep.sumUpTxCode || `group:${root}`;
-        dupGroups.push({ key, keep, remove });
+        dupGroups.push({ key, keep, remove, blocked });
       }
 
       dupGroups.sort((a, b) => b.remove.length - a.remove.length);
@@ -240,6 +260,7 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
       let removed = 0;
       for (const group of groups) {
         for (const rec of group.remove) {
+          if (!canDeleteSale(storeDoc, rec)) continue;
           await deleteDoc(doc(db, 'users', user.uid, 'stores', storeId, 'sales', rec.id));
           removed += 1;
         }
@@ -335,7 +356,16 @@ export const DuplicateSalesCleaner: React.FC<DuplicateSalesCleanerProps> = ({ st
         </div>
       )}
 
-      {scanned && totalToRemove === 0 && !doneMessage && (
+      {scanned && totalBlocked > 0 && (
+        <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-800 dark:text-orange-200 text-sm">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            {totalBlocked} duplicitních dokladů nejde smazat, protože jsou evidované v EET (mají číslo z řady) nebo má prodejna zapnuté EET. Stornujte je v historii dokladů.
+          </span>
+        </div>
+      )}
+
+      {scanned && totalToRemove === 0 && totalBlocked === 0 && !doneMessage && (
         <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 text-sm">
           <Check className="w-4 h-4 mt-0.5 shrink-0" />
           <span>Žádné duplicitní doklady nenalezeny.</span>

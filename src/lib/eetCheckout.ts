@@ -1,0 +1,64 @@
+// Uložení prodeje z checkoutu u prodejny se ZAPNUTÝM EET (klient).
+// Bez EET se tato funkce nevolá a CheckoutModal ukládá postaru (addDoc).
+
+import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { withOfflineEet, type SaleDraftObject } from '@/lib/checkoutSale';
+import { EetApiError, finalizeSaleRequest, type FinalizeResponse } from '@/lib/eetClient';
+import { withTestFlag } from '@/lib/testSales';
+
+export type EetSaveResult =
+  | { kind: 'finalized'; result: FinalizeResponse }
+  /** Server mezitím EET vypnul → uloženo postaru */
+  | { kind: 'legacy' }
+  /** Offline / chyba serveru → uloženo z klienta s pendingNumber, dokončí fronta */
+  | { kind: 'offline'; error?: string };
+
+const OFFLINE_WRITE_WAIT_MS = 3000;
+
+export async function saveSaleWithEet(p: {
+  uid: string;
+  storeId: string;
+  draft: SaleDraftObject;
+  isTest: boolean;
+  /** Výjimka z evidence (checkout „Platba nepodléhá evidenci“): doklad se uloží, ale do EET neodešle. */
+  nonEvidenceReason?: string;
+  /** Dnešní uložení (addDoc + soldCount), použije se při 409 eet_disabled */
+  legacySave: () => Promise<void>;
+}): Promise<EetSaveResult> {
+  const exemptReason = !p.isTest && p.nonEvidenceReason ? p.nonEvidenceReason : undefined;
+  const offline = async (error?: string): Promise<EetSaveResult> => {
+    const ref = doc(db, 'users', p.uid, 'stores', p.storeId, 'sales', p.draft.documentId);
+    const data = withOfflineEet(withTestFlag({ ...p.draft, createdAt: serverTimestamp() }, p.isTest), new Date(), exemptReason);
+    // Kdyby server doklad už uložil (ztracená odpověď), firestore.rules tento zápis odmítnou
+    // (receiptNo / eet mění jen server), takže serverový doklad zůstane, jak je.
+    const write = setDoc(ref, data, { merge: true }).catch((e) => {
+      console.warn('EET: offline záloha odmítnuta (doklad je nejspíš už uložený na serveru):', (e as { code?: string })?.code ?? e);
+    });
+    // Offline se promise vyřeší až po spojení; zápis je ale už v lokální frontě Firestore.
+    await Promise.race([write, new Promise((r) => setTimeout(r, OFFLINE_WRITE_WAIT_MS))]);
+    // soldCount u offline zálohy NEPŘIČÍTAT: přičte ho server právě jednou, až doklad očísluje
+    // (register.ts, prepareOfflineSoldCount). Kdyby server prodej už uložil (ztracená odpověď),
+    // soldCount přičetl při uložení; opakovaná záloha tak nic nezdvojí.
+    return { kind: 'offline', error };
+  };
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return offline('offline');
+  try {
+    const result = await finalizeSaleRequest({
+      storeId: p.storeId,
+      documentId: p.draft.documentId,
+      sale: p.draft,
+      isTest: p.isTest || undefined,
+      ...(exemptReason ? { eetSend: false, nonEvidenceReason: exemptReason } : {}),
+    });
+    return { kind: 'finalized', result };
+  } catch (e) {
+    if (e instanceof EetApiError && e.code === 'eet_disabled') {
+      await p.legacySave();
+      return { kind: 'legacy' };
+    }
+    console.error('❌ /api/sales/finalize selhalo, ukládám offline:', e);
+    return offline((e as Error).message);
+  }
+}

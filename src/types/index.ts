@@ -41,6 +41,110 @@ export interface Store {
   brandHue?: number;
   /** Intenzita odstínu (0 = světlý, 100 = tmavý). */
   brandShade?: number;
+  /** Režim školení: každý prodej je testovací (`Sale.isTest`), přes POS svítí pruh. */
+  testMode?: boolean;
+  /** V reálném režimu ukáže v checkoutu přepínač „Testovací prodej“. */
+  testSalesEnabled?: boolean;
+  /** DIČ prodejny (pro EET je to EIČ). */
+  dic?: string;
+  /** EET 2.0. Chybí nebo `enabled !== true` = EET vypnuto, aplikace se chová jako dřív. */
+  eet?: StoreEetSettings;
+}
+
+export type EetEnvironmentId = 'playground' | 'production';
+
+/** Časový údaj ve Firestore (Timestamp z klientského i Admin SDK, případně Date). */
+export type FirestoreTime = Date | { toDate(): Date; toMillis(): number };
+
+/** Nastavení EET prodejny (`users/{uid}/stores/{storeId}.eet`). Vše nepovinné, výchozí hodnoty viz `src/lib/eet/flags.ts`. */
+export interface StoreEetSettings {
+  /** Hlavní vypínač. Jen `true` zapíná EET. */
+  enabled?: boolean;
+  environment?: EetEnvironmentId;
+  /** EIČ = DIČ, `CZ` + 8–10 číslic */
+  eic?: string;
+  /** Číslo evidenční jednotky z DIS+ */
+  unitId?: number;
+  /** id_pokl, výchozí 'WEB1' */
+  registerId?: string;
+  /** Zda je spropitné příjmem podniku (zahrne se do celk_trzba). Výchozí true. */
+  tipsAreBusinessIncome?: boolean;
+  /** Mezní doba odezvy, min. 2000, výchozí 4000 */
+  sendTimeoutMs?: number;
+  showResultModal?: 'always' | 'errorsOnly';
+  autoCloseSuccessSec?: number;
+  /** Jen metadata; certifikát a heslo jsou šifrovaně v `private/eet`. */
+  certificate?: {
+    subjectEic: string;
+    serial: string;
+    validFrom: FirestoreTime;
+    validTo: FirestoreTime;
+    uploadedAt: FirestoreTime;
+    env: EetEnvironmentId;
+    /** 'ca-renew' = automatická obnova přes API CA EET (fáze E), jinak ruční nahrání. */
+    source?: 'ca-renew';
+  };
+  /** Stav automatické obnovy certifikátu (zapisuje jen server, bez tajných dat). */
+  certificateRenewal?: StoreEetCertificateRenewal;
+  /** Číselná řada. `{YYYY}` v prefixu se nahradí rokem. Výchozí `{ prefix: '{YYYY}-', resetYearly: true }`. */
+  receiptSeries?: { prefix: string; resetYearly: boolean };
+}
+
+export interface StoreEetCertificateRenewal {
+  state: 'in_process' | 'renewed' | 'rejected' | 'failed';
+  at: FirestoreTime;
+  message?: string;
+}
+
+export type SaleEetStatus = 'test' | 'not_required' | 'pending' | 'sent' | 'queued' | 'failed_permanent';
+
+export interface SaleEetAttempt {
+  uuid: string;
+  sentAt: string;
+  first: boolean;
+  result: 'ok' | 'error' | 'timeout' | 'network';
+  code?: number;
+  text?: string;
+  xGlobalTransactionId?: string;
+  ms: number;
+}
+
+/** Stav EET na dokladu (`sale.eet`). Zapisuje jen server. */
+export interface SaleEet {
+  status: SaleEetStatus;
+  env?: EetEnvironmentId;
+  verify?: boolean;
+  /** Sekce Data, zmrazená při 1. pokusu; při opakování se nemění. */
+  data?: {
+    eic: string;
+    unitId: number;
+    registerId: string;
+    porad_cis: string;
+    dat_trzby: string;
+    celk_trzba: string;
+  };
+  pok?: string;
+  /** dat_prij */
+  receivedAt?: string;
+  warnings?: { code: number; text: string }[];
+  attempts?: SaleEetAttempt[];
+  nextRetryAt?: FirestoreTime | null;
+  /** Kvůli lhůtě 48 h. Nastaví se těsně před 1. odesláním. */
+  firstAttemptAt?: FirestoreTime;
+  /** U 'not_required' (např. bezhotovostní vratka) */
+  reason?: string;
+  /** Offline záloha z checkoutu s výjimkou z evidence: server doklad očísluje a nastaví 'not_required' s tímto důvodem. */
+  exemptReason?: string;
+  /** Okamžik tržby (ISO), zdroj pro dat_trzby, dokud nejsou data zmrazená. */
+  saleAt?: string;
+  /** Poslední zpráva pro obsluhu (česky). */
+  message?: string;
+  /** Uplynulo 48 h od 1. pokusu a doklad stále není zaevidován. */
+  overdue?: boolean;
+  /** Kolikrát přišla chyba 8 (po 3. je trvalá). */
+  code8Count?: number;
+  /** Zámek proti souběžnému odeslání (idempotence). */
+  lockUntil?: FirestoreTime | null;
 }
 
 export interface Product {
@@ -55,6 +159,8 @@ export interface Product {
   updatedAt: Date;
   // Produkt může být označen jako extra (doplněk k hlavní položce)
   isExtra?: boolean;
+  /** Testovací produkt: doklad jen s takovými produkty se v checkoutu sám označí jako testovací. */
+  isTestProduct?: boolean;
 }
 
 export interface CartItem {
@@ -116,6 +222,20 @@ export interface Sale {
   preparedAt?: Date;
   served?: boolean;
   servedAt?: Date;
+  /** Testovací doklad: nepočítá se do tržeb, neodesílá se do EET. Chybí = reálný doklad. */
+  isTest?: boolean;
+  /** EET 2.0: pořadové číslo dokladu (= porad_cis), přiděluje server. */
+  receiptNo?: string;
+  /** EET 2.0: doklad uložený offline, číslo přidělí server dodatečně. */
+  pendingNumber?: boolean;
+  /** EET 2.0: stav evidence. Chybí u prodejen bez EET a u starých dokladů. */
+  eet?: SaleEet;
+  /** U storna (záporného dokladu): id původního dokladu. */
+  stornoOf?: string;
+  /** U původního dokladu po stornu. */
+  storno?: { by: string; at: FirestoreTime; saleId: string };
+  /** Kopie dokladu z „Duplikovat prodejnu“: odkud pochází (kopie nemá receiptNo ani eet). */
+  copiedFrom?: { storeId: string; saleId: string; receiptNo?: string };
 }
 
 export interface SumUpTransactionData {

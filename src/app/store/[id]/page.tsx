@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginRequiredModal } from '@/components/auth/LoginRequiredModal';
 import { StoreProvider } from '@/contexts/StoreContext';
+import { TestModeBanner } from '@/components/pos/TestModeBanner';
 import { BrandColorProvider } from '@/components/BrandColorProvider';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -219,6 +220,8 @@ export default function StorePage() {
             </div>
           </div>
         </nav>
+
+        <TestModeBanner />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <AnimatePresence mode="wait">

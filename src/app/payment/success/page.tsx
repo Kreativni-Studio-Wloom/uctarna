@@ -7,6 +7,8 @@ import { CheckCircle, ArrowLeft, Receipt, Home } from 'lucide-react';
 import { SumUpCallbackParams } from '@/lib/sumup';
 import { doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { buildFallbackSale, saveEetFallbackSale } from '@/lib/sumupFallback';
+import { eetAuthHeaders } from '@/lib/eetClient';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -116,7 +118,8 @@ function PaymentSuccessContent() {
         return;
       }
       
-      const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName, tipAmount: storedTip } = JSON.parse(paymentData);
+      const parsedPaymentData = JSON.parse(paymentData);
+      const { storeId, userId, cartItems, totalAmount, documentId, foreignTxId: storedForeign, discount, discountAmount, finalAmount, customerName, tipAmount: storedTip, eet: eetMode } = parsedPaymentData;
       const appTip = typeof storedTip === 'number' && storedTip > 0 ? storedTip : null;
       
       console.log('📋 Data z localStorage:', {
@@ -166,11 +169,12 @@ function PaymentSuccessContent() {
         tipAmount: appTip
       });
 
+      // EET 2.0: token jen u prodejny se zapnutým EET (server pak přidělí číslo a odešle tržbu).
       const response = await fetch('/api/sumup-callback', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: eetMode === true
+          ? { 'Content-Type': 'application/json', ...(await eetAuthHeaders()) }
+          : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status,
           txCode,
@@ -203,6 +207,13 @@ function PaymentSuccessContent() {
         } else {
           const text = await response.text();
           console.error('❌ Chyba při ukládání prodeje:', response.status, text);
+          if (eetMode === true) {
+            try {
+              await saveEetFallbackSale(parsedPaymentData, foreignTxId || storedForeign, txCode);
+            } catch (e) {
+              console.error('❌ EET záložní uložení selhalo:', e);
+            }
+          }
           try {
             const errorData = JSON.parse(text);
             console.error('❌ Detail chyby:', errorData);
@@ -251,35 +262,14 @@ function PaymentSuccessContent() {
         const paymentDataRaw = localStorage.getItem('uctarna_payment_data');
         if (!paymentDataRaw) return;
         const paymentData = JSON.parse(paymentDataRaw);
-        const { storeId, userId, cartItems, totalAmount, documentId, discount, discountAmount, finalAmount, customerName, tipAmount: rawTip } = paymentData;
-        const tipAmountFallback = typeof rawTip === 'number' && rawTip > 0 ? rawTip : null;
+        const { storeId, userId, cartItems, documentId } = paymentData;
         if (!storeId || !userId || !Array.isArray(cartItems)) return;
 
         const saleRef = doc(db, 'users', userId, 'stores', storeId, 'sales', documentId || foreignTxId);
-        await setDoc(saleRef, {
-          items: cartItems,
-          totalAmount: totalAmount || 0,
-          paymentMethod: 'card',
-          documentId: documentId || foreignTxId,
-          createdAt: serverTimestamp(),
-          storeId,
-          userId,
-          customerName: customerName || null,
-          isRefund: false,
-          refundAmount: null,
-          served: false,
-          discount: discount || null,
-          discountAmount: discountAmount || 0,
-          finalAmount: finalAmount || totalAmount || 0,
-          tipAmount: tipAmountFallback,
-          sumUpData: {
-            foreignTxId: foreignTxId,
-            sumUpTxCode: txCode,
-            status: 'success',
-            callbackReceived: true,
-            callbackTimestamp: new Date()
-          }
-        }, { merge: true });
+        // EET 2.0: u prodejny se zapnutým EET jen založí chybějící doklad (číslo a odeslání dodělá
+        // serverová fronta); bez EET přesně jako dřív.
+        if (paymentData.eet === true) await saveEetFallbackSale(paymentData, foreignTxId, txCode);
+        else await setDoc(saleRef, buildFallbackSale(paymentData, foreignTxId, txCode), { merge: true });
 
         try {
           for (const item of cartItems) {
