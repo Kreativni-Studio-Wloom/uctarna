@@ -1,3 +1,5 @@
+import { wrapReturnUrl } from './browserReturn';
+
 export interface SumUpPaymentParams {
   amount: number;
   currency: string;
@@ -81,8 +83,10 @@ export class SumUpService {
       url.searchParams.set('callbacksuccess', debugUrl.toString());
       url.searchParams.set('callbackfail', debugUrl.toString());
     } else {
-      url.searchParams.set('callbacksuccess', successUrl.toString());
-      url.searchParams.set('callbackfail', failUrl.toString());
+      // Na iOS zabalíme callback do schématu aktuálního prohlížeče (Bluefy/Chrome/Edge),
+      // jinak by iOS po platbě otevřelo výchozí prohlížeč (Safari).
+      url.searchParams.set('callbacksuccess', wrapReturnUrl(successUrl.toString()));
+      url.searchParams.set('callbackfail', wrapReturnUrl(failUrl.toString()));
     }
     
     return url.toString();

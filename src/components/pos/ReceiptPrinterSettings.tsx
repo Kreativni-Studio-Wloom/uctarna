@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Printer, Bluetooth } from 'lucide-react';
+import { detectBrowser, getBluefyVariant } from '@/lib/browserReturn';
 import {
   PaperWidth,
   PRINTER_STATUS_EVENT,
@@ -90,6 +91,12 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
     setPaperWidth(width);
   };
 
+  // null = nejsme v Bluefy (řádek se nezobrazí), jinak zda je návrat ze SumUp nastavený.
+  const [bluefyReturn, setBluefyReturn] = useState<boolean | null>(null);
+  useEffect(() => {
+    setBluefyReturn(detectBrowser() === 'bluefy' ? getBluefyVariant() !== null : null);
+  }, []);
+
   const statusText = !status.supported
     ? 'Tento prohlížeč neumí Bluetooth. Na iPhonu otevřete Účtenku v aplikaci Bluefy, na Androidu v Chrome.'
     : status.connected
@@ -161,6 +168,25 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
             <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
           </label>
         </div>
+
+        {bluefyReturn !== null && (
+          <div className="flex items-center justify-between gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">Návrat ze SumUp</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                {bluefyReturn
+                  ? 'Po platbě kartou se vrátíte do Bluefy.'
+                  : 'Nenastaveno – po platbě kartou vás iPhone vrátí do Safari.'}
+              </div>
+            </div>
+            <a
+              href="/sumup-navrat"
+              className="shrink-0 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+            >
+              {bluefyReturn ? 'Změnit' : 'Nastavit'}
+            </a>
+          </div>
+        )}
 
         <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
           <div className="text-sm font-medium text-gray-900 dark:text-white">Šířka papíru</div>
