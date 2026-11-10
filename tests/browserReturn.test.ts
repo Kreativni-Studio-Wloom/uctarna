@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BLUEFY_VARIANT_KEY, detectBrowser, wrapReturnUrl } from '../src/lib/browserReturn';
+import { BLUEFY_VARIANT_KEY, detectBrowser, handOffToPos, wrapReturnUrl } from '../src/lib/browserReturn';
 
 const SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const CHROME = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1';
@@ -42,5 +42,26 @@ describe('wrapReturnUrl', () => {
   it('Bluefy s ověřenou variantou zachová cestu, aby SumUp mohl přidat parametry', () => {
     setup(SAFARI, { bluetooth: true, variant: 'bluefys-host' });
     expect(wrapReturnUrl(TARGET)).toBe('bluefys://uctarna.cz/payment/success');
+  });
+});
+
+describe('handOffToPos', () => {
+  it('úspěch v Bluefy přejde do pokladny s údaji o platbě', () => {
+    setup(SAFARI, { bluetooth: true });
+    localStorage.setItem('uctarna_payment_data', JSON.stringify({ storeId: 'abc' }));
+    const replace = vi.fn();
+    vi.stubGlobal('window', { location: { replace } });
+    expect(handOffToPos({ status: 'success', txCode: 'TX1', foreignTxId: 'doc1' })).toBe(true);
+    expect(replace).toHaveBeenCalledWith('/store/abc?view=pos&sumup=success&smp-tx-code=TX1&foreign-tx-id=doc1');
+  });
+
+  it('neúspěch se vrátí do pokladny bez dalších parametrů; bez dat platby nic nedělá', () => {
+    setup(SAFARI, { bluetooth: true });
+    const replace = vi.fn();
+    vi.stubGlobal('window', { location: { replace } });
+    expect(handOffToPos({ status: 'fail' })).toBe(false);
+    localStorage.setItem('uctarna_payment_data', JSON.stringify({ storeId: 'abc' }));
+    expect(handOffToPos({ status: 'fail' })).toBe(true);
+    expect(replace).toHaveBeenCalledWith('/store/abc?view=pos');
   });
 });

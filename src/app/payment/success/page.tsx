@@ -9,6 +9,7 @@ import { doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { buildFallbackSale, saveEetFallbackSale } from '@/lib/sumupFallback';
 import { eetAuthHeaders } from '@/lib/eetClient';
+import { handOffToPos, shouldHandOffToPos } from '@/lib/browserReturn';
 
 function PaymentSuccessContent() {
   const searchParams = useSearchParams();
@@ -28,6 +29,10 @@ function PaymentSuccessContent() {
     // Pozn.: automatické přesměrování tohoto tabu do POS se ukázalo jako nespolehlivé
     // (start celé aplikace v čerstvém callback tabu na iOS zamrzal), proto tab jen zavíráme.
     if (status === 'success') {
+      // Bluefy: záložku nejde zavřít – dokončíme platbu rovnou v pokladně v této záložce.
+      // Původní okno záměrně nenotifikujeme, aby se prodej neuložil/nevytiskl dvakrát.
+      if (shouldHandOffToPos() && handOffToPos({ status: 'success', txCode, foreignTxId })) return;
+
       const payload = { type: 'PAYMENT_SUCCESS', pendingSave: true, txCode, foreignTxId };
 
       // 1) Notifikace původního okna všemi kanály (BroadcastChannel, storage event, opener)

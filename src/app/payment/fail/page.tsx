@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { XCircle, ArrowLeft, RefreshCw, Home } from 'lucide-react';
 import { SumUpCallbackParams } from '@/lib/sumup';
+import { handOffToPos, shouldHandOffToPos } from '@/lib/browserReturn';
 
 function PaymentFailContent() {
   const searchParams = useSearchParams();
@@ -13,6 +14,9 @@ function PaymentFailContent() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Bluefy: záložku nejde zavřít – vrátíme se rovnou do pokladny, košík zůstává.
+    if (shouldHandOffToPos() && handOffToPos({ status: 'fail' })) return;
+
     // Pokud se stránka otevřela v novém okně (má opener), vrať kontrolu do původního okna
     try {
       if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {

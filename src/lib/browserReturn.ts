@@ -102,3 +102,58 @@ export function wrapReturnUrl(target: string): string {
       return target;
   }
 }
+
+// ----------------------------------------------------------------------------
+// Bluefy otevře návrat ze SumUp v NOVÉ záložce a tu z JavaScriptu nejde zavřít
+// (Safari ji zavřít dovolí a dokončení převezme původní okno). V Bluefy proto
+// návratová záložka sama přejde do pokladny a platbu dokončí tam.
+// ----------------------------------------------------------------------------
+
+/** Návratová stránka má platbu dokončit přímo v pokladně (záložku nejde zavřít). */
+export function shouldHandOffToPos(): boolean {
+  return detectBrowser() === 'bluefy';
+}
+
+function readPaymentStoreId(): string | null {
+  try {
+    const raw = localStorage.getItem('uctarna_payment_data');
+    const storeId = raw ? JSON.parse(raw)?.storeId : null;
+    return typeof storeId === 'string' && storeId ? storeId : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Přejde z návratové stránky do pokladny prodejny. U úspěchu předá txCode a
+ * foreignTxId, pokladna pak prodej uloží a vytiskne. Vrací false, když nejsou
+ * data platby (pak návratová stránka pokračuje po svém).
+ */
+export function handOffToPos(
+  result: { status: 'success'; txCode: string | null; foreignTxId: string | null } | { status: 'fail' }
+): boolean {
+  const storeId = readPaymentStoreId();
+  if (!storeId) return false;
+  const params = new URLSearchParams({ view: 'pos' });
+  if (result.status === 'success') {
+    params.set('sumup', 'success');
+    if (result.txCode) params.set('smp-tx-code', result.txCode);
+    if (result.foreignTxId) params.set('foreign-tx-id', result.foreignTxId);
+  }
+  window.location.replace(`/store/${encodeURIComponent(storeId)}?${params.toString()}`);
+  return true;
+}
+
+/** Přečte a z adresy odstraní předání úspěšné platby (?sumup=success). */
+export function takeSumUpHandoff(): { txCode: string | null; foreignTxId: string | null } | null {
+  if (typeof window === 'undefined') return null;
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('sumup') !== 'success') return null;
+  const handoff = {
+    txCode: url.searchParams.get('smp-tx-code'),
+    foreignTxId: url.searchParams.get('foreign-tx-id'),
+  };
+  ['sumup', 'smp-tx-code', 'foreign-tx-id'].forEach((k) => url.searchParams.delete(k));
+  window.history.replaceState(window.history.state, '', url.toString());
+  return handoff;
+}

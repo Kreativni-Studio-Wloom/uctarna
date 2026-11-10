@@ -14,6 +14,7 @@ import { DiscountModal } from './DiscountModal';
 import { isEetEnabled } from '@/lib/eet/flags';
 import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
 import { saveEetFallbackSale } from '@/lib/sumupFallback';
+import { takeSumUpHandoff } from '@/lib/browserReturn';
 import { EetQueueBanner } from '@/components/eet/EetQueueBanner';
 import { EetCertificateBanner } from '@/components/eet/EetCertificateBanner';
 import { EetResultHost, type EetResultSource } from '@/components/eet/EetResultHost';
@@ -101,6 +102,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const [eetResultSource, setEetResultSource] = useState<EetResultSource | null>(null);
   /** Čas posledního zpracovaného PAYMENT_SUCCESS – deduplikace zpráv z více kanálů */
   const paymentSuccessHandledAtRef = useRef(0);
+  /** Zobrazení úspěchu platby (nastavuje posluchač níže) – sdílí ho i předání z Bluefy. */
+  const paymentSuccessFnRef = useRef<((saleId?: string | null) => void) | null>(null);
+  const sumUpHandoffDoneRef = useRef(false);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
   const addBurstRef = useRef<Map<string, { count: number; lastAt: number }>>(new Map());
@@ -422,6 +426,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       console.log('✅ Úspěšná platba – košík vyčištěn');
     };
 
+    paymentSuccessFnRef.current = handlePaymentSuccess;
+
     // pendingSave: prodej ještě není uložen a duplicitní tab se zavírá –
     // uložení převezme toto (původní) okno.
     const handleSuccessData = (data: { type?: string; pendingSave?: boolean; txCode?: string | null; foreignTxId?: string | null } | undefined) => {
@@ -470,6 +476,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       }
     };
   }, [clearCartState, finishSumUpCheckout]);
+
+  // Bluefy: návratová záložka ze SumUp přešla sem s ?sumup=success (záložku nejde zavřít).
+  // Počkáme na přihlášení a data prodejny (tisk dokladu), pak prodej uložíme jako v původním okně.
+  useEffect(() => {
+    if (sumUpHandoffDoneRef.current || !user || !storeDoc) return;
+    sumUpHandoffDoneRef.current = true;
+    const handoff = takeSumUpHandoff();
+    if (!handoff) return;
+    void finishSumUpCheckout(handoff.txCode, handoff.foreignTxId).then(() =>
+      paymentSuccessFnRef.current?.(handoff.foreignTxId)
+    );
+  }, [user, storeDoc, finishSumUpCheckout]);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
