@@ -27,6 +27,10 @@ const AUTO_PRINT_KEY = 'uctarna_auto_print';
 const PAPER_WIDTH_KEY = 'uctarna_printer_paper_width';
 const DEVICE_ID_KEY = 'uctarna_printer_device_id';
 const DEVICE_NAME_KEY = 'uctarna_printer_device_name';
+const STAFF_TICKET_KEY = 'uctarna_staff_ticket';
+const STAFF_TICKET_COPIES_KEY = 'uctarna_staff_ticket_copies';
+
+export const STAFF_TICKET_MAX_COPIES = 5;
 
 export const PRINT_ERROR_EVENT = 'uctarna:print-error';
 export const PRINTER_STATUS_EVENT = 'uctarna:printer-status';
@@ -106,6 +110,19 @@ export const setAutoPrintEnabled = (enabled: boolean) => safeSet(AUTO_PRINT_KEY,
 
 export const getPaperWidth = (): PaperWidth => (safeGet(PAPER_WIDTH_KEY) === '80' ? 80 : 58);
 export const setPaperWidth = (width: PaperWidth) => safeSet(PAPER_WIDTH_KEY, String(width));
+
+/** Lístek pro obsluhu (co připravit) – tiskne se automaticky spolu s dokladem. */
+export const isStaffTicketEnabled = () => safeGet(STAFF_TICKET_KEY) === '1';
+export const setStaffTicketEnabled = (enabled: boolean) => safeSet(STAFF_TICKET_KEY, enabled ? '1' : '0');
+
+const clampCopies = (value: number) =>
+  Math.min(STAFF_TICKET_MAX_COPIES, Math.max(1, Math.round(Number.isFinite(value) ? value : 1)));
+
+export const getStaffTicketCopies = () => clampCopies(Number(safeGet(STAFF_TICKET_COPIES_KEY) ?? '1'));
+export const setStaffTicketCopies = (copies: number) => safeSet(STAFF_TICKET_COPIES_KEY, String(clampCopies(copies)));
+
+/** Automatický tisk po zaplacení dělá cokoli – doklad, lístek pro obsluhu, nebo obojí. */
+const isAnyAutoPrintEnabled = () => isAutoPrintEnabled() || isStaffTicketEnabled();
 
 export const getPrinterStatus = (): PrinterStatus => ({
   supported: isBluetoothSupported(),
@@ -443,27 +460,129 @@ export const buildReceiptEscPos = (sale: Sale, store: ReceiptStoreData, paperWid
   return b.build();
 };
 
+type StaffTicketLine = { name: string; quantity: number; extras: { name: string; quantity: number }[] };
+
+/**
+ * Položky pro přípravu: hlavní položky v pořadí z košíku a pod každou její extra.
+ * Vratky (záporné množství) se nepřipravují, takže se vynechají. Extra bez
+ * nalezené hlavní položky se vytiskne samostatně, aby se neztratila.
+ */
+export const staffTicketLines = (items: Sale['items']): StaffTicketLine[] => {
+  const positive = items.filter((item) => item.quantity > 0);
+  const parentIds = new Set(positive.filter((i) => !i.parentItemId && i.itemId).map((i) => i.itemId));
+  const extrasOf = (parentId?: string) =>
+    parentId
+      ? positive
+          .filter((c) => c.parentItemId === parentId)
+          .map((c) => ({ name: c.productName || 'Extra', quantity: c.quantity }))
+      : [];
+  return positive
+    .filter((item) => !item.parentItemId || !parentIds.has(item.parentItemId))
+    .map((item) => ({
+      name: item.parentItemId ? `+ ${item.productName || 'Extra'}` : item.productName || 'Polozka',
+      quantity: item.quantity,
+      extras: item.parentItemId ? [] : extrasOf(item.itemId),
+    }));
+};
+
+/**
+ * Lístek pro obsluhu: jen co připravit – čas, jméno, položky s extra a počty.
+ * Bez hlavičky firmy, cen a patičky, s minimálním posuvem, ať šetří papír.
+ */
+export const buildStaffTicketEscPos = (sale: Sale, paperWidth: PaperWidth = 58, copies = 1) => {
+  const lines = staffTicketLines(sale.items);
+  if (lines.length === 0) return new Uint8Array();
+
+  const width = paperWidth === 80 ? 48 : 32;
+  const half = Math.floor(width / 2);
+  const time = new Intl.DateTimeFormat('cs-CZ', { hour: '2-digit', minute: '2-digit' }).format(toDate(sale.createdAt));
+  const orderNo = toAscii(sale.documentId || sale.id || '');
+  const name = toAscii(sale.customerName?.trim());
+
+  const b = new EscPosBuilder();
+  for (let copy = 0; copy < clampCopies(copies); copy++) {
+    // Čas tučně a dvojitě vysoký (šířka řádku zůstává), vpravo číslo objednávky jako na Výdeji.
+    const head = toAscii(time);
+    const ref = orderNo ? `#${orderNo}` : '';
+    b.align('left').bold(true).raw(GS, 0x21, 0x01);
+    b.line(ref && head.length + ref.length + 1 <= width ? `${head}${' '.repeat(width - head.length - ref.length)}${ref}` : head);
+    b.raw(GS, 0x21, 0x00);
+    if (name) {
+      // Jméno dvojitou velikostí, ať se dá snadno vyvolat.
+      b.size(true);
+      wrap(name, half).forEach((l) => b.line(l));
+      b.size(false);
+    }
+    b.bold(false).line('-'.repeat(width));
+
+    lines.forEach((item) => {
+      const qty = `${item.quantity}x `;
+      b.bold(true);
+      wrap(item.name, width - qty.length).forEach((l, i) => b.line(i === 0 ? `${qty}${l}` : `${' '.repeat(qty.length)}${l}`));
+      b.bold(false);
+      item.extras.forEach((extra) => {
+        const prefix = `   + ${extra.quantity}x `;
+        wrap(toAscii(extra.name), width - prefix.length).forEach((l, i) =>
+          b.line(i === 0 ? `${prefix}${l}` : `${' '.repeat(prefix.length)}${l}`)
+        );
+      });
+    });
+    b.feed(3).cut();
+  }
+  return b.build();
+};
+
+const concatBytes = (...parts: Uint8Array[]) => {
+  const out = new Uint8Array(parts.reduce((sum, p) => sum + p.length, 0));
+  let offset = 0;
+  parts.forEach((p) => {
+    out.set(p, offset);
+    offset += p.length;
+  });
+  return out;
+};
+
 const enqueue = (job: () => Promise<void>) => {
   const run = printQueue.then(job, job);
   printQueue = run.catch(() => undefined);
   return run;
 };
 
-/** Vytiskne doklad. allowPicker = true jen při volání z kliknutí (např. „Vytisknout znovu“). */
-export const printReceipt = (sale: Sale, store: ReceiptStoreData, options: { allowPicker?: boolean } = {}) =>
+type PrintOptions = {
+  allowPicker?: boolean;
+  /** Tisknout zákaznický doklad (výchozí ano). */
+  receipt?: boolean;
+  /** Přidat lístky pro obsluhu podle nastavení zařízení (výchozí ne). */
+  staffTickets?: boolean;
+};
+
+/** Vytiskne doklad (a případně lístky pro obsluhu) jednou úlohou. allowPicker = true jen při volání z kliknutí. */
+export const printReceipt = (sale: Sale, store: ReceiptStoreData, options: PrintOptions = {}) =>
   enqueue(async () => {
+    const paperWidth = getPaperWidth();
+    const parts: Uint8Array[] = [];
+    if (options.receipt !== false) parts.push(buildReceiptEscPos(sale, store, paperWidth));
+    if (options.staffTickets && isStaffTicketEnabled() && !sale.isRefund) {
+      parts.push(buildStaffTicketEscPos(sale, paperWidth, getStaffTicketCopies()));
+    }
+    const data = concatBytes(...parts);
+    if (data.length === 0) return;
     await ensureConnected(Boolean(options.allowPicker));
-    await writeBytes(buildReceiptEscPos(sale, store, getPaperWidth()));
+    await writeBytes(data);
   });
 
+/** Volby pro automatický tisk po zaplacení podle nastavení tohoto zařízení. */
+export const autoPrintOptions = (): PrintOptions => ({ receipt: isAutoPrintEnabled(), staffTickets: true });
+
 /**
- * Automatický tisk po zaplacení – neblokuje pokladnu. Chybu ohlásí událostí,
- * na kterou POS zobrazí lištu s možností tisk zopakovat.
+ * Automatický tisk po zaplacení – neblokuje pokladnu. Podle nastavení vytiskne
+ * doklad, lístky pro obsluhu, nebo obojí. Chybu ohlásí událostí, na kterou POS
+ * zobrazí lištu s možností tisk zopakovat.
  */
 export const autoPrintReceipt = (sale: Sale, store: ReceiptStoreData | null | undefined) => {
-  if (typeof window === 'undefined' || !isAutoPrintEnabled()) return;
+  if (typeof window === 'undefined' || !isAnyAutoPrintEnabled()) return;
   const storeData = store ?? {};
-  printReceipt(sale, storeData).catch((error: unknown) => {
+  printReceipt(sale, storeData, autoPrintOptions()).catch((error: unknown) => {
     console.error('❌ Automatický tisk dokladu selhal:', error);
     window.dispatchEvent(
       new CustomEvent(PRINT_ERROR_EVENT, {
@@ -483,16 +602,18 @@ export const printTestReceipt = (store: ReceiptStoreData) =>
       id: 'test',
       documentId: 'TEST',
       items: [
-        { productId: 'test-1', productName: 'Zkusebni polozka', price: 100, quantity: 1 },
-        { productId: 'test-2', productName: 'Dlouhy nazev polozky pro test zalamovani', price: 45, quantity: 2 },
+        { itemId: 't1', productId: 'test-1', productName: 'Zkusebni polozka', price: 100, quantity: 1 },
+        { itemId: 't1x', productId: 'test-x', productName: 'Extra navic', price: 20, quantity: 1, parentItemId: 't1' },
+        { itemId: 't2', productId: 'test-2', productName: 'Dlouhy nazev polozky pro test zalamovani', price: 35, quantity: 2 },
       ],
       totalAmount: 190,
       paymentMethod: 'cash',
       currency: 'CZK',
+      customerName: 'Zkouska',
       createdAt: new Date(),
       storeId: '',
       userId: '',
     },
     store,
-    { allowPicker: true }
+    { allowPicker: true, staffTickets: true }
   );

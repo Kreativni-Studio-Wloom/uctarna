@@ -8,8 +8,13 @@ import {
   PaperWidth,
   PRINTER_STATUS_EVENT,
   PrinterStatus,
+  STAFF_TICKET_MAX_COPIES,
   forgetPrinter,
   getPaperWidth,
+  getStaffTicketCopies,
+  isStaffTicketEnabled,
+  setStaffTicketCopies,
+  setStaffTicketEnabled,
   getPrinterStatus,
   hasSavedPrinter,
   isAutoPrintEnabled,
@@ -29,6 +34,8 @@ type ReceiptStoreData = {
 export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ store }) => {
   const [autoPrint, setAutoPrint] = useState(false);
   const [paperWidth, setPaperWidthState] = useState<PaperWidth>(58);
+  const [staffTicket, setStaffTicket] = useState(false);
+  const [staffCopies, setStaffCopiesState] = useState(1);
   const [status, setStatus] = useState<PrinterStatus>({ supported: true, connected: false, deviceName: null });
   const [savedPrinter, setSavedPrinter] = useState(false);
   const [busy, setBusy] = useState<null | 'pair' | 'test'>(null);
@@ -37,6 +44,8 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
   useEffect(() => {
     setAutoPrint(isAutoPrintEnabled());
     setPaperWidthState(getPaperWidth());
+    setStaffTicket(isStaffTicketEnabled());
+    setStaffCopiesState(getStaffTicketCopies());
     setStatus(getPrinterStatus());
     setSavedPrinter(hasSavedPrinter());
     const onStatus = () => {
@@ -73,7 +82,12 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
     setMessage(null);
     try {
       await printTestReceipt(store);
-      setMessage({ kind: 'ok', text: 'Zkušební doklad odeslán na tiskárnu.' });
+      setMessage({
+        kind: 'ok',
+        text: staffTicket
+          ? 'Zkušební doklad a lístek pro obsluhu odeslány na tiskárnu.'
+          : 'Zkušební doklad odeslán na tiskárnu.',
+      });
     } catch (error) {
       setMessage({ kind: 'error', text: describeError(error) });
     } finally {
@@ -84,6 +98,17 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
   const handleAutoPrint = (enabled: boolean) => {
     setAutoPrint(enabled);
     setAutoPrintEnabled(enabled);
+  };
+
+  const handleStaffTicket = (enabled: boolean) => {
+    setStaffTicket(enabled);
+    setStaffTicketEnabled(enabled);
+  };
+
+  const handleStaffCopies = (copies: number) => {
+    const next = Math.min(STAFF_TICKET_MAX_COPIES, Math.max(1, copies));
+    setStaffCopiesState(next);
+    setStaffTicketCopies(next);
   };
 
   const handlePaperWidth = (width: PaperWidth) => {
@@ -168,6 +193,59 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
             />
             <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
           </label>
+        </div>
+
+        <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">Tisk pro zaměstnance</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                {staffTicket
+                  ? autoPrint
+                    ? 'Po zaplacení se s dokladem vytiskne i lístek k přípravě – čas, jméno, položky s extra a počty, bez cen.'
+                    : 'Po zaplacení se vytiskne jen lístek k přípravě (doklad pro zákazníka se netiskne).'
+                  : 'Lístek k přípravě se netiskne.'}
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={staffTicket}
+                onChange={(e) => handleStaffTicket(e.target.checked)}
+                aria-label="Zapnout tisk lístku pro zaměstnance"
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full peer peer-checked:bg-brand-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500 peer-focus:ring-offset-2 peer-focus:ring-offset-white dark:peer-focus:ring-offset-gray-700 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+          {staffTicket && (
+            <div className="flex items-center justify-between gap-3 mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+              <div className="text-sm text-gray-900 dark:text-white">Počet lístků</div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleStaffCopies(staffCopies - 1)}
+                  disabled={staffCopies <= 1}
+                  aria-label="Méně lístků"
+                  className="w-9 h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-lg font-medium disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="w-6 text-center text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
+                  {staffCopies}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleStaffCopies(staffCopies + 1)}
+                  disabled={staffCopies >= STAFF_TICKET_MAX_COPIES}
+                  aria-label="Více lístků"
+                  className="w-9 h-9 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-lg font-medium disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {bluefyReturn !== null && (

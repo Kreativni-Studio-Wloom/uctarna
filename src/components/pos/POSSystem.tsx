@@ -7,7 +7,7 @@ import { useStore } from '@/contexts/StoreContext';
 import { collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase, Sale } from '@/types';
-import { autoPrintReceipt, printReceipt, PRINT_ERROR_EVENT } from '@/lib/receiptPrinter';
+import { autoPrintOptions, autoPrintReceipt, printReceipt, PRINT_ERROR_EVENT } from '@/lib/receiptPrinter';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown, Printer } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
@@ -342,6 +342,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             discount: storedDiscount || null,
             discountAmount: discountAmount || 0,
             tipAmount: appTip ?? undefined,
+            customerName: customerName || undefined,
             createdAt: new Date(),
             storeId: paymentStoreId,
             userId,
@@ -397,7 +398,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     if (!failedPrint) return;
     setRetryingPrint(true);
     try {
-      await printReceipt(failedPrint.sale, storeDoc ?? {}, { allowPicker: true });
+      await printReceipt(failedPrint.sale, storeDoc ?? {}, { ...autoPrintOptions(), allowPicker: true });
       setFailedPrint(null);
     } catch (error) {
       setFailedPrint({
