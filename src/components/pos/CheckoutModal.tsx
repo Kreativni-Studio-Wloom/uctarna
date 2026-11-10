@@ -11,6 +11,7 @@ import { db } from '@/lib/firebase';
 import { sumUpService, SumUpService, SumUpPaymentParams } from '@/lib/sumup';
 import QRCode from 'react-qr-code';
 import { autoPrintReceipt } from '@/lib/receiptPrinter';
+import { recordPendingSumUpPayment } from '@/lib/sumupPending';
 import type { Sale } from '@/types';
 import { TestSaleToggle } from './TestSaleToggle';
 import { defaultTestSaleState, resolveIsTestSale, testSalesUiEnabled, withTestFlag } from '@/lib/testSales';
@@ -365,6 +366,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           customerName: collectCustomerName ? (customerName || null) : null
         }, isEetEnabled(storeDoc))));
         
+        // Jistota zápisu: rozpracovaná platba i do Firestore. Kdyby se návrat ze SumUp
+        // nepovedl (zavřený prohlížeč, chyba sítě…), doklad dořeší pokladna nebo noční kontrola.
+        await recordPendingSumUpPayment(user.uid, storeId, documentId);
+
         const paymentParams: SumUpPaymentParams = {
           amount: actualTotalAmount,
           currency: 'CZK',

@@ -1,7 +1,19 @@
 {
-  "regions": ["fra1"],
+  "regions": [
+    "fra1"
+  ],
   "crons": [
-    { "path": "/api/eet/retry", "schedule": "0 5 * * *" },
-    { "path": "/api/eet/cert-renew", "schedule": "30 5 * * *" }
+    {
+      "path": "/api/eet/retry",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/eet/cert-renew",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/sumup/reconcile",
+      "schedule": "15 5 * * *"
+    }
   ]
 }

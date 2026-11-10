@@ -9,11 +9,12 @@ import { db } from '@/lib/firebase';
 import { Product, CartItem, PendingPurchase, Sale } from '@/types';
 import { autoPrintReceipt, printReceipt, PRINT_ERROR_EVENT } from '@/lib/receiptPrinter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, CreditCard, DollarSign, AlertCircle, Package, Pin, PinOff, CheckCircle, X, Plus, ChevronUp, ChevronDown, Printer } from 'lucide-react';
 import { DiscountModal } from './DiscountModal';
 import { isEetEnabled } from '@/lib/eet/flags';
 import { eetAuthHeaders, retryMyEetQueue } from '@/lib/eetClient';
 import { saveEetFallbackSale } from '@/lib/sumupFallback';
+import { reconcileSumUpPayment, sweepPendingSumUpPayments } from '@/lib/sumupPending';
 import {
   clearPendingSumUpPayment,
   readPendingSumUpPayment,
@@ -69,6 +70,17 @@ const ProductAddedBadge: React.FC<{ count: number; positionClassName?: string }>
   </motion.span>
 );
 
+/** Srozumitelná zpráva místo technické chyby Web Bluetooth (často anglicky). */
+function friendlyPrintError(message: string): string {
+  const known = [
+    'Tento prohlížeč neumí Bluetooth',
+    'Tiskárna nemá zapisovatelnou',
+  ];
+  if (known.some((k) => message.startsWith(k))) return message;
+  if (/cancel/i.test(message)) return 'Výběr tiskárny byl zrušen.';
+  return 'Tiskárna je vypnutá, mimo dosah nebo odpojená. Zapněte ji a zkuste to znovu.';
+}
+
 interface POSSystemProps {
   storeId: string;
   storeName: string;
@@ -111,6 +123,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const paymentSuccessFnRef = useRef<((saleId?: string | null) => void) | null>(null);
   const sumUpVerifyingRef = useRef(false);
   const sumUpRerunRef = useRef(false);
+  const sumUpSweepDoneRef = useRef(false);
   const verifyPendingSumUpRef = useRef<((hint?: { txCode: string | null } | null) => Promise<void>) | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
@@ -255,11 +268,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   const finishSumUpCheckout = useCallback(async (txCode: string | null, foreignTxId: string | null) => {
     // EET 2.0: data platby pro záložní uložení, když server prodej neuloží (jen při zapnutém EET).
     let eetPaymentData: Record<string, unknown> | null = null;
+    // Jistota zápisu: když /api/sumup-callback selže, doklad dořeší server z rozpracované platby.
+    let reconcileDocId: string | null = null;
+    let printReceiptNow: (() => void) | null = null;
     try {
       const raw = localStorage.getItem('uctarna_payment_data');
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed?.eet === true) eetPaymentData = parsed;
+      reconcileDocId = parsed?.documentId || parsed?.foreignTxId || foreignTxId || null;
       const {
         storeId: paymentStoreId,
         userId,
@@ -312,10 +329,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         }),
       });
 
-      if (response.ok) {
-        console.log('✅ Prodej uložen z původního okna (SumUp návrat)');
-        const finalTotal = finalAmount || totalAmount;
-        autoPrintReceipt(
+      const finalTotal = finalAmount || totalAmount;
+      printReceiptNow = () => autoPrintReceipt(
           {
             id: documentId || foreignTxId || storedForeign || '',
             documentId: documentId || foreignTxId || storedForeign,
@@ -333,11 +348,27 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
           },
           storeDocRef.current
         );
+
+      if (response.ok) {
+        console.log('✅ Prodej uložen z původního okna (SumUp návrat)');
+        printReceiptNow();
         return;
       }
       console.error('❌ Chyba při ukládání prodeje:', response.status, await response.text());
     } catch (error) {
       console.error('❌ Chyba při dokončování SumUp platby:', error);
+    }
+    if (reconcileDocId) {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        if (attempt > 0) await new Promise((r) => window.setTimeout(r, 2500));
+        const r = await reconcileSumUpPayment(storeId, reconcileDocId);
+        if (r.state === 'saved') {
+          console.log('✅ Prodej uložen přes dořešení rozpracované platby');
+          printReceiptNow?.();
+          return;
+        }
+        if (r.state === 'failed' || r.state === 'unknown') break;
+      }
     }
     // EET 2.0: platba proběhla, ale server doklad neuložil (např. přihlášení se po návratu
     // ze SumUp ještě neobnovilo). Uložíme ho z prohlížeče; číslo a EET dodělá fronta.
@@ -350,7 +381,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         console.error('❌ EET: záložní uložení SumUp dokladu selhalo:', e);
       }
     }
-  }, []);
+  }, [storeId]);
 
   // Neúspěšný automatický tisk → lišta s možností tisk zopakovat (kliknutí umožní znovu spárovat tiskárnu)
   useEffect(() => {
@@ -487,6 +518,36 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // Bluefy: po platbě se SumUp vrací do STEJNÉHO okna (jen přepne aplikaci), nebo do
   // nové záložky, která přejde sem. Výsledek platby proto neověřujeme z callback URL,
   // ale přímo u SumUp podle čísla dokladu – po návratu do okna a při načtení pokladny.
+  /** Tisk dokladu z dat rozpracované platby (localStorage) po uložení na serveru. */
+  const printPendingSumUpReceipt = useCallback((documentId: string, tipAmount: number | null) => {
+    try {
+      const raw = localStorage.getItem('uctarna_payment_data');
+      const p = raw ? JSON.parse(raw) : null;
+      if (!p || (p.documentId || p.foreignTxId) !== documentId) return;
+      const finalTotal = p.finalAmount || p.totalAmount;
+      autoPrintReceipt(
+        {
+          id: documentId,
+          documentId,
+          items: p.cartItems,
+          totalAmount: finalTotal,
+          finalAmount: finalTotal,
+          paymentMethod: 'card',
+          currency: 'CZK',
+          discount: p.discount || null,
+          discountAmount: p.discountAmount || 0,
+          tipAmount: tipAmount ?? (p.tipAmount > 0 ? p.tipAmount : undefined),
+          createdAt: new Date(),
+          storeId: p.storeId,
+          userId: p.userId,
+        },
+        storeDocRef.current
+      );
+    } catch (e) {
+      console.error('❌ Tisk dokladu po SumUp platbě selhal:', e);
+    }
+  }, []);
+
   // hint = výsledek z callback URL (nová záložka) – použije se, jen když SumUp API nejde ověřit.
   // Chová se jako Safari: žádná extra okna. Prošla → stejné potvrzení/EET jako v Safari,
   // neprošla nebo nenalezena → nic, košík zůstane, jak byl.
@@ -501,33 +562,54 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
     if (!pending) return;
     sumUpVerifyingRef.current = true;
     try {
-      // Transakce se v SumUp API objeví s malým zpožděním – zkoušíme cca 15 s.
-      for (let attempt = 0; attempt < 8; attempt++) {
+      // Server platbu ověří u SumUp a doklad rovnou uloží (z rozpracované platby ve Firestore).
+      // Transakce se v SumUp objeví s malým zpožděním – zkoušíme cca 20 s.
+      for (let attempt = 0; attempt < 10; attempt++) {
         if (attempt > 0) await new Promise((r) => window.setTimeout(r, 2000));
         // Mezitím ji mohlo dokončit jiné okno.
         if (!readPendingSumUpPayment(storeId)) return;
-        let state = 'error';
-        let txCode: string | null = null;
-        try {
-          const res = await fetch(`/api/sumup/status?foreignTxId=${encodeURIComponent(pending.documentId)}`, {
-            cache: 'no-store',
-          });
-          const data = await res.json();
-          state = data?.state ?? 'error';
-          txCode = data?.txCode ?? null;
-        } catch {
-          state = 'error';
-        }
-        if (state === 'success' || (hint && state !== 'failed' && attempt === 7)) {
-          await finishSumUpCheckout(state === 'success' ? txCode : hint?.txCode ?? null, pending.documentId);
+        const r = await reconcileSumUpPayment(storeId, pending.documentId);
+        if (r.state === 'saved') {
+          printPendingSumUpReceipt(pending.documentId, r.result?.tipAmount ?? null);
+          clearPendingSumUpPayment();
           paymentSuccessFnRef.current?.(pending.documentId);
           return;
         }
-        if (state === 'failed') {
+        if (r.state === 'failed' || r.state === 'expired') {
           clearPendingSumUpPayment();
           return;
         }
+        if (r.state === 'unknown') {
+          // Rozpracovaná platba ve Firestore chybí (zápis se nepovedl) – ověříme jen stav
+          // a uložíme klasicky přes /api/sumup-callback.
+          let state = 'error';
+          let txCode: string | null = null;
+          try {
+            const res = await fetch(`/api/sumup/status?foreignTxId=${encodeURIComponent(pending.documentId)}`, { cache: 'no-store' });
+            const data = await res.json();
+            state = data?.state ?? 'error';
+            txCode = data?.txCode ?? null;
+          } catch {
+            state = 'error';
+          }
+          if (state === 'success') {
+            await finishSumUpCheckout(txCode, pending.documentId);
+            paymentSuccessFnRef.current?.(pending.documentId);
+            return;
+          }
+          if (state === 'failed') {
+            clearPendingSumUpPayment();
+            return;
+          }
+        }
       }
+      if (hint) {
+        await finishSumUpCheckout(hint.txCode, pending.documentId);
+        paymentSuccessFnRef.current?.(pending.documentId);
+        return;
+      }
+      // Nenalezeno: košík zůstává. Rozpracovaná platba zůstává ve Firestore – kdyby
+      // přece jen prošla, doklad dořeší další návrat, načtení pokladny nebo noční kontrola.
     } finally {
       sumUpVerifyingRef.current = false;
       if (sumUpRerunRef.current) {
@@ -535,13 +617,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         void verifyPendingSumUpRef.current?.(null);
       }
     }
-  }, [storeId, finishSumUpCheckout]);
+  }, [storeId, finishSumUpCheckout, printPendingSumUpReceipt]);
   verifyPendingSumUpRef.current = verifyPendingSumUp;
 
   useEffect(() => {
     if (!user || !storeDoc) return;
     const hint = stripSumUpHandoffParams();
     void verifyPendingSumUp(hint);
+    // Jistota zápisu: dořešit starší rozpracované platby (v každém prohlížeči).
+    if (!sumUpSweepDoneRef.current) {
+      sumUpSweepDoneRef.current = true;
+      void sweepPendingSumUpPayments(user.uid, storeId, readPendingSumUpPayment(storeId)?.documentId);
+    }
     const onVisible = () => {
       if (document.visibilityState === 'visible') void verifyPendingSumUp(null);
     };
@@ -551,7 +638,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('pageshow', onVisible);
     };
-  }, [user, storeDoc, verifyPendingSumUp]);
+  }, [user, storeDoc, storeId, verifyPendingSumUp]);
 
   // Funkce pro aktivaci režimu vratky
   const activateReturnMode = () => {
@@ -1598,31 +1685,47 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         </div>
       </div>
 
-      {failedPrint && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:max-w-sm z-50 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 shadow-xl rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">Doklad se nevytiskl</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400 break-words">{failedPrint.message}</div>
-            <button
-              type="button"
-              onClick={retryFailedPrint}
-              disabled={retryingPrint}
-              className="mt-2 bg-brand-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-brand-700 disabled:opacity-50"
-            >
-              {retryingPrint ? 'Tisknu…' : 'Vytisknout znovu'}
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFailedPrint(null)}
-            aria-label="Zavřít"
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+      {/* Doklad se nevytiskl – karta ve stylu ostatních oken, nad potvrzením platby */}
+      <AnimatePresence>
+        {failedPrint && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            className="fixed inset-x-0 bottom-0 z-[70] flex justify-center p-4 pointer-events-none"
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+            <div className="pointer-events-auto w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/20 flex items-center justify-center">
+                  <Printer className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white">Doklad se nevytiskl</h3>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{friendlyPrintError(failedPrint.message)}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFailedPrint(null)}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Zavřít
+                </button>
+                <button
+                  type="button"
+                  onClick={retryFailedPrint}
+                  disabled={retryingPrint}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {retryingPrint ? 'Tisknu…' : 'Vytisknout znovu'}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modals */}
       <AnimatePresence>
