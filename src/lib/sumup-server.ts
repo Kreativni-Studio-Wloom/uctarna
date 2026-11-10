@@ -251,13 +251,25 @@ async function fetchTransactionByQuery(
 
   let lastError: string | undefined;
 
-  for (const path of paths) {
+  for (const [index, path] of paths.entries()) {
     const response = await sumUpFetch(path, token);
     if (response.ok) {
       const data = await response.json();
       const tx = normalizeTransactionPayload(data);
-      if (tx) return { tx };
-      lastError = `Prázdná odpověď z ${path}`;
+      // Historie (/history) neznámý filtr ignoruje a vrací poslední transakci – bez shody
+      // by se platba vyhodnotila podle CIZÍ transakce. Detail (/transactions) filtruje sám,
+      // tam pole chybět smí; u historie musí sedět.
+      const mismatch = tx
+        ? Object.entries(query).find(([key, value]) => {
+            const actual = tx[key];
+            if (actual === undefined || actual === null) return index > 0;
+            return String(actual) !== value;
+          })
+        : undefined;
+      if (tx && !mismatch) return { tx };
+      lastError = mismatch
+        ? `${path} vrátil jinou transakci (${mismatch[0]}=${String(tx?.[mismatch[0]] ?? '∅')})`
+        : `Prázdná odpověď z ${path}`;
       continue;
     }
     const body = await response.text().catch(() => '');

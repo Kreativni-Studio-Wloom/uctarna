@@ -110,8 +110,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   /** Zobrazení úspěchu platby (nastavuje posluchač níže) – sdílí ho i předání z Bluefy. */
   const paymentSuccessFnRef = useRef<((saleId?: string | null) => void) | null>(null);
   const sumUpVerifyingRef = useRef(false);
-  /** Bluefy: ověřování platby po návratu ze SumUp a jeho výsledek (když neprošla). */
-  const [sumUpCheck, setSumUpCheck] = useState<{ kind: 'checking' | 'failed' | 'not_found' } | null>(null);
+  const sumUpRerunRef = useRef(false);
+  const verifyPendingSumUpRef = useRef<((hint?: { txCode: string | null } | null) => Promise<void>) | null>(null);
   const highlightTimerRef = useRef<number | null>(null);
   const pendingHighlightRef = useRef<AddedProductHighlight | null>(null);
   const addBurstRef = useRef<Map<string, { count: number; lastAt: number }>>(new Map());
@@ -488,21 +488,24 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
   // nové záložky, která přejde sem. Výsledek platby proto neověřujeme z callback URL,
   // ale přímo u SumUp podle čísla dokladu – po návratu do okna a při načtení pokladny.
   // hint = výsledek z callback URL (nová záložka) – použije se, jen když SumUp API nejde ověřit.
+  // Chová se jako Safari: žádná extra okna. Prošla → stejné potvrzení/EET jako v Safari,
+  // neprošla nebo nenalezena → nic, košík zůstane, jak byl.
   const verifyPendingSumUp = useCallback(async (hint?: { txCode: string | null } | null) => {
-    if (sumUpVerifyingRef.current || !shouldVerifySumUpOnReturn()) return;
+    if (!shouldVerifySumUpOnReturn()) return;
+    if (sumUpVerifyingRef.current) {
+      // Ověřování už běží (např. z dřívějšího přepnutí) – po něm proběhne ještě jednou.
+      sumUpRerunRef.current = true;
+      return;
+    }
     const pending = readPendingSumUpPayment(storeId);
     if (!pending) return;
     sumUpVerifyingRef.current = true;
-    setSumUpCheck({ kind: 'checking' });
     try {
       // Transakce se v SumUp API objeví s malým zpožděním – zkoušíme cca 15 s.
       for (let attempt = 0; attempt < 8; attempt++) {
         if (attempt > 0) await new Promise((r) => window.setTimeout(r, 2000));
         // Mezitím ji mohlo dokončit jiné okno.
-        if (!readPendingSumUpPayment(storeId)) {
-          setSumUpCheck(null);
-          return;
-        }
+        if (!readPendingSumUpPayment(storeId)) return;
         let state = 'error';
         let txCode: string | null = null;
         try {
@@ -515,32 +518,25 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
         } catch {
           state = 'error';
         }
-        if (state === 'success') {
-          setSumUpCheck(null);
-          await finishSumUpCheckout(txCode, pending.documentId);
+        if (state === 'success' || (hint && state !== 'failed' && attempt === 7)) {
+          await finishSumUpCheckout(state === 'success' ? txCode : hint?.txCode ?? null, pending.documentId);
           paymentSuccessFnRef.current?.(pending.documentId);
           return;
         }
         if (state === 'failed') {
           clearPendingSumUpPayment();
-          setShowCheckout(false);
-          setSumUpCheck({ kind: 'failed' });
           return;
         }
       }
-      if (hint) {
-        setSumUpCheck(null);
-        await finishSumUpCheckout(hint.txCode, pending.documentId);
-        paymentSuccessFnRef.current?.(pending.documentId);
-        return;
-      }
-      // Nenalezeno (typicky zrušeno v SumUp ještě před platbou) – košík necháme.
-      setShowCheckout(false);
-      setSumUpCheck({ kind: 'not_found' });
     } finally {
       sumUpVerifyingRef.current = false;
+      if (sumUpRerunRef.current) {
+        sumUpRerunRef.current = false;
+        void verifyPendingSumUpRef.current?.(null);
+      }
     }
   }, [storeId, finishSumUpCheckout]);
+  verifyPendingSumUpRef.current = verifyPendingSumUp;
 
   useEffect(() => {
     if (!user || !storeDoc) return;
@@ -1844,58 +1840,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ storeId, storeName }) => {
             source={eetResultSource}
             onClose={closeEetResult}
           />
-        )}
-      </AnimatePresence>
-
-      {/* Bluefy: ověřování platby po návratu ze SumUp / platba neproběhla */}
-      <AnimatePresence>
-        {sumUpCheck && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4"
-            onClick={() => sumUpCheck.kind !== 'checking' && setSumUpCheck(null)}
-          >
-            <div
-              className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {sumUpCheck.kind === 'checking' ? (
-                <>
-                  <div className="mx-auto mb-4 animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white">Ověřuji platbu kartou…</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                    {sumUpCheck.kind === 'failed' ? 'Platba kartou neproběhla' : 'Platba kartou nebyla dokončena'}
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-5">
-                    Košík zůstal beze změny – můžete zaplatit znovu nebo zvolit hotovost.
-                  </p>
-                  <div className="flex gap-2">
-                    {sumUpCheck.kind === 'not_found' && (
-                      <button
-                        type="button"
-                        onClick={() => void verifyPendingSumUp(null)}
-                        className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
-                      >
-                        Ověřit znovu
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setSumUpCheck(null)}
-                      className="flex-1 bg-brand-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-brand-700"
-                    >
-                      Zpět do košíku
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </motion.div>
         )}
       </AnimatePresence>
 

@@ -46,6 +46,7 @@ function SumUpNavratContent() {
   const [result, setResult] = useState<Result>(null);
   const [swAsk, setSwAsk] = useState<{ id: string; url: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   // Jen Bluefy schémata – stránka nesmí sloužit jako přesměrování kamkoli jinam.
   const jumpRaw = searchParams.get('jump');
@@ -110,6 +111,8 @@ function SumUpNavratContent() {
     if (swAsk && ok) {
       setBluefySameWindow(swAsk.id);
       setSameWindow(swAsk.url);
+      setJustSaved(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     try {
       sessionStorage.removeItem(SW_TEST_KEY);
@@ -168,6 +171,24 @@ function SumUpNavratContent() {
 
         {browser === 'bluefy' ? (
           <>
+            {sameWindow && (
+              <div
+                className={`p-4 rounded-lg text-sm flex items-start gap-3 ${
+                  justSaved
+                    ? 'bg-green-600 text-white'
+                    : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
+                }`}
+              >
+                <span className="text-2xl leading-none">✓</span>
+                <div>
+                  <div className="font-semibold text-base">
+                    {justSaved ? 'Uloženo – nastaveno správně' : 'Nastaveno správně'}
+                  </div>
+                  <div>Po platbě kartou se vrátíte do stejného okna Bluefy. Nic dalšího není potřeba.</div>
+                </div>
+              </div>
+            )}
+
             {swAsk && (
               <div className="p-4 rounded-lg bg-sky-50 dark:bg-sky-900/20 text-sky-900 dark:text-sky-200 text-sm space-y-3">
                 <p>

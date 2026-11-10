@@ -176,7 +176,7 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
               <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">Návrat ze SumUp</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
                 {bluefyReturn === 'same-window'
-                  ? 'Po platbě kartou se vrátíte do stejného okna Bluefy.'
+                  ? '✓ Nastaveno správně – po platbě kartou se vrátíte do stejného okna Bluefy.'
                   : bluefyReturn === 'new-tab'
                     ? 'Vrací do Bluefy v nové záložce – doporučujeme nastavit „Stejné okno“.'
                     : 'Nenastaveno – po platbě kartou vás iPhone vrátí do Safari.'}
