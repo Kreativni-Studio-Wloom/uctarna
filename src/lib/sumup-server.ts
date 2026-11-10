@@ -414,3 +414,30 @@ export async function diagnoseSumUpConnection(): Promise<Record<string, unknown>
 
   return result;
 }
+
+export type SumUpPaymentState = 'success' | 'failed' | 'pending' | 'not_found' | 'error';
+
+/**
+ * Stav platby podle foreign-tx-id (= číslo dokladu z aplikace). Používá pokladna,
+ * když se po platbě vrátí do stejného okna bez callback URL (Bluefy).
+ * Jeden dotaz bez opakování – opakování řídí klient.
+ */
+export async function fetchSumUpPaymentState(
+  foreignTxId: string
+): Promise<{ state: SumUpPaymentState; txCode: string | null; error?: string }> {
+  const auth = await getSumUpAccessToken();
+  if (!auth.token) return { state: 'error', txCode: null, error: auth.error ?? 'SumUp API není nakonfigurováno' };
+  const merchantCode = await resolveMerchantCode(auth.token);
+  if (!merchantCode) return { state: 'error', txCode: null, error: 'Nelze zjistit merchant_code' };
+
+  const { tx, lastError } = await fetchTransactionByQuery(auth.token, merchantCode, {
+    foreign_transaction_id: foreignTxId,
+  });
+  if (!tx) return { state: 'not_found', txCode: null, error: lastError };
+
+  const status = String(tx.status ?? tx.simple_status ?? '').toUpperCase();
+  const txCode = typeof tx.transaction_code === 'string' ? tx.transaction_code : null;
+  if (status === 'SUCCESSFUL' || status === 'PAID') return { state: 'success', txCode };
+  if (status === 'PENDING') return { state: 'pending', txCode };
+  return { state: 'failed', txCode };
+}

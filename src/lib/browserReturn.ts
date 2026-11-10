@@ -73,6 +73,34 @@ export function setBluefyVariant(id: string): void {
   }
 }
 
+// Návrat do STEJNÉHO okna: callback jen přepne do aplikace Bluefy bez otevření
+// stránky. SumUp k němu přidá ?smp-status=…, proto se varianta ověřuje i s tím.
+export const BLUEFY_SAME_WINDOW_KEY = 'uctarna_bluefy_same_window';
+
+export const BLUEFY_SAME_WINDOW_VARIANTS: { id: string; url: string }[] = [
+  { id: 'bluefys', url: 'bluefys://' },
+  { id: 'bluefy', url: 'bluefy://' },
+  { id: 'bluefy-https', url: 'bluefy-https://' },
+];
+
+export function getBluefySameWindow(): { id: string; url: string } | null {
+  try {
+    const id = localStorage.getItem(BLUEFY_SAME_WINDOW_KEY);
+    return BLUEFY_SAME_WINDOW_VARIANTS.find((v) => v.id === id) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function setBluefySameWindow(id: string | null): void {
+  try {
+    if (id) localStorage.setItem(BLUEFY_SAME_WINDOW_KEY, id);
+    else localStorage.removeItem(BLUEFY_SAME_WINDOW_KEY);
+  } catch {
+    // ignorujeme
+  }
+}
+
 /**
  * Vrátí URL, která na iOS otevře `target` ve stejném prohlížeči, ve kterém
  * právě běžíme. Mimo iOS (Android otevírá callback správně) a u Safari vrací
@@ -94,6 +122,9 @@ export function wrapReturnUrl(target: string): string {
     case 'edge':
       return `microsoft-edge-https://${hostPath(u)}`;
     case 'bluefy': {
+      // Nejlépe: jen přepnout zpět do Bluefy (stejné okno), výsledek ověří pokladna u SumUp.
+      const sameWindow = getBluefySameWindow();
+      if (sameWindow) return sameWindow.url;
       const variant = getBluefyVariant();
       return variant ? variant.build(u) : target;
     }
@@ -144,16 +175,44 @@ export function handOffToPos(
   return true;
 }
 
-/** Přečte a z adresy odstraní předání úspěšné platby (?sumup=success). */
-export function takeSumUpHandoff(): { txCode: string | null; foreignTxId: string | null } | null {
+/** Odstraní z adresy pokladny parametry z návratové stránky; vrátí úspěch z callbacku, pokud byl. */
+export function stripSumUpHandoffParams(): { txCode: string | null } | null {
   if (typeof window === 'undefined') return null;
   const url = new URL(window.location.href);
-  if (url.searchParams.get('sumup') !== 'success') return null;
-  const handoff = {
-    txCode: url.searchParams.get('smp-tx-code'),
-    foreignTxId: url.searchParams.get('foreign-tx-id'),
-  };
-  ['sumup', 'smp-tx-code', 'foreign-tx-id'].forEach((k) => url.searchParams.delete(k));
+  const keys = ['sumup', 'smp-tx-code', 'foreign-tx-id'];
+  if (!keys.some((k) => url.searchParams.has(k))) return null;
+  const hint = url.searchParams.get('sumup') === 'success' ? { txCode: url.searchParams.get('smp-tx-code') } : null;
+  keys.forEach((k) => url.searchParams.delete(k));
   window.history.replaceState(window.history.state, '', url.toString());
-  return handoff;
+  return hint;
+}
+
+/** Pokladna si výsledek platby ověřuje sama u SumUp (jen Bluefy – v Safari to řeší návratová záložka). */
+export function shouldVerifySumUpOnReturn(): boolean {
+  return detectBrowser() === 'bluefy';
+}
+
+const PENDING_MAX_AGE_MS = 30 * 60 * 1000;
+
+/** Rozpracovaná SumUp platba této prodejny (uctarna_payment_data), nejvýš 30 min stará. */
+export function readPendingSumUpPayment(storeId: string): { documentId: string } | null {
+  try {
+    const raw = localStorage.getItem('uctarna_payment_data');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const documentId = data?.documentId || data?.foreignTxId;
+    if (data?.storeId !== storeId || typeof documentId !== 'string' || !documentId) return null;
+    if (typeof data.timestamp === 'number' && Date.now() - data.timestamp > PENDING_MAX_AGE_MS) return null;
+    return { documentId };
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingSumUpPayment(): void {
+  try {
+    localStorage.removeItem('uctarna_payment_data');
+  } catch {
+    // ignorujeme
+  }
 }

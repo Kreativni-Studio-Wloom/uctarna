@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BLUEFY_VARIANT_KEY, detectBrowser, handOffToPos, wrapReturnUrl } from '../src/lib/browserReturn';
+import {
+  BLUEFY_SAME_WINDOW_KEY,
+  BLUEFY_VARIANT_KEY,
+  detectBrowser,
+  handOffToPos,
+  readPendingSumUpPayment,
+  wrapReturnUrl,
+} from '../src/lib/browserReturn';
 
 const SAFARI = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const CHROME = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0 Mobile/15E148 Safari/604.1';
@@ -63,5 +70,22 @@ describe('handOffToPos', () => {
     localStorage.setItem('uctarna_payment_data', JSON.stringify({ storeId: 'abc' }));
     expect(handOffToPos({ status: 'fail' })).toBe(true);
     expect(replace).toHaveBeenCalledWith('/store/abc?view=pos');
+  });
+});
+
+describe('Bluefy – stejné okno', () => {
+  it('s ověřenou variantou vrací jen přepnutí do aplikace (přednost před novou záložkou)', () => {
+    setup(SAFARI, { bluetooth: true, variant: 'bluefys-host' });
+    localStorage.setItem(BLUEFY_SAME_WINDOW_KEY, 'bluefys');
+    expect(wrapReturnUrl(TARGET)).toBe('bluefys://');
+  });
+
+  it('rozpracovanou platbu vrací jen pro stejnou prodejnu a nejvýš 30 min starou', () => {
+    setup(SAFARI, { bluetooth: true });
+    localStorage.setItem('uctarna_payment_data', JSON.stringify({ storeId: 'abc', documentId: 'doc1', timestamp: Date.now() }));
+    expect(readPendingSumUpPayment('abc')).toEqual({ documentId: 'doc1' });
+    expect(readPendingSumUpPayment('jina')).toBeNull();
+    localStorage.setItem('uctarna_payment_data', JSON.stringify({ storeId: 'abc', documentId: 'doc1', timestamp: Date.now() - 31 * 60 * 1000 }));
+    expect(readPendingSumUpPayment('abc')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Printer, Bluetooth } from 'lucide-react';
-import { detectBrowser, getBluefyVariant } from '@/lib/browserReturn';
+import { detectBrowser, getBluefySameWindow, getBluefyVariant } from '@/lib/browserReturn';
 import {
   PaperWidth,
   PRINTER_STATUS_EVENT,
@@ -92,9 +92,10 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
   };
 
   // null = nejsme v Bluefy (řádek se nezobrazí), jinak zda je návrat ze SumUp nastavený.
-  const [bluefyReturn, setBluefyReturn] = useState<boolean | null>(null);
+  const [bluefyReturn, setBluefyReturn] = useState<'same-window' | 'new-tab' | false | null>(null);
   useEffect(() => {
-    setBluefyReturn(detectBrowser() === 'bluefy' ? getBluefyVariant() !== null : null);
+    if (detectBrowser() !== 'bluefy') return;
+    setBluefyReturn(getBluefySameWindow() ? 'same-window' : getBluefyVariant() ? 'new-tab' : false);
   }, []);
 
   const statusText = !status.supported
@@ -174,16 +175,18 @@ export const ReceiptPrinterSettings: React.FC<{ store: ReceiptStoreData }> = ({ 
             <div className="min-w-0">
               <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">Návrat ze SumUp</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
-                {bluefyReturn
-                  ? 'Po platbě kartou se vrátíte do Bluefy.'
-                  : 'Nenastaveno – po platbě kartou vás iPhone vrátí do Safari.'}
+                {bluefyReturn === 'same-window'
+                  ? 'Po platbě kartou se vrátíte do stejného okna Bluefy.'
+                  : bluefyReturn === 'new-tab'
+                    ? 'Vrací do Bluefy v nové záložce – doporučujeme nastavit „Stejné okno“.'
+                    : 'Nenastaveno – po platbě kartou vás iPhone vrátí do Safari.'}
               </div>
             </div>
             <a
               href="/sumup-navrat"
               className="shrink-0 px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
             >
-              {bluefyReturn ? 'Změnit' : 'Nastavit'}
+              {bluefyReturn === 'same-window' ? 'Změnit' : 'Nastavit'}
             </a>
           </div>
         )}
